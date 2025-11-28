@@ -1,14 +1,10 @@
-/**
- * Travion Mobile App
- *
- * Main entry point for the application
- */
-
 import React from 'react';
-import { HomeScreen } from '@screens';
+import { TripPlanningScreen } from '@screens';
 
 function App() {
-  return <HomeScreen />;
+  // Change between OnboardingScreen and TripPlanningScreen to preview
+  // return <OnboardingScreen />;
+  return <TripPlanningScreen />;
 }
 
 export default App;
