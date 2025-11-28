@@ -1,7 +1,6 @@
 import React from 'react';
-import { SafeAreaView, ScrollView, StatusBar, StyleSheet, Text, View } from 'react-native';
+import { SafeAreaView, StatusBar, Text, View } from 'react-native';
 import { Button } from '@components/common';
-import { colors, spacing } from '@theme';
 import { logger } from '@utils';
 
 export const HomeScreen: React.FC = () => {
@@ -10,54 +9,27 @@ export const HomeScreen: React.FC = () => {
   };
 
   return (
-    <SafeAreaView style={styles.container}>
-      <StatusBar barStyle="dark-content" backgroundColor={colors.background.primary} />
-      <ScrollView
-        contentInsetAdjustmentBehavior="automatic"
-        contentContainerStyle={styles.scrollContent}
-      >
-        <View style={styles.header}>
-          <Text style={styles.title}>Welcome to Travion</Text>
-          <Text style={styles.subtitle}>Your journey starts here</Text>
+    <SafeAreaView className="flex-1 bg-gray-100">
+      <StatusBar barStyle="dark-content" backgroundColor="#FFFFFF" />
+      <View className="flex-1 p-6">
+        <View className="bg-red-500 p-4 rounded-lg mb-4">
+          <Text className="text-white text-xl font-bold">NativeWind Test</Text>
+          <Text className="text-white">
+            If you see red background and white text, it's working!
+          </Text>
         </View>
 
-        <View style={styles.content}>
+        <View className="mt-8 mb-12">
+          <Text className="text-4xl font-bold text-gray-900 mb-2">Welcome to Travion</Text>
+          <Text className="text-lg text-gray-600">Your journey starts here</Text>
+        </View>
+
+        <View className="flex-1">
           <Button title="Get Started" onPress={handlePress} fullWidth />
-          <View style={styles.spacer} />
+          <View className="h-4" />
           <Button title="Learn More" variant="outline" onPress={handlePress} fullWidth />
         </View>
-      </ScrollView>
+      </View>
     </SafeAreaView>
   );
 };
-
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: colors.background.primary,
-  },
-  scrollContent: {
-    flexGrow: 1,
-    padding: spacing.lg,
-  },
-  header: {
-    marginTop: spacing.xl,
-    marginBottom: spacing.xxl,
-  },
-  title: {
-    fontSize: 32,
-    fontWeight: '700',
-    color: colors.text.primary,
-    marginBottom: spacing.sm,
-  },
-  subtitle: {
-    fontSize: 18,
-    color: colors.text.secondary,
-  },
-  content: {
-    flex: 1,
-  },
-  spacer: {
-    height: spacing.md,
-  },
-});
