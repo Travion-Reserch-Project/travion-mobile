@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { View, Text, TouchableOpacity, Image, ActivityIndicator, Alert } from 'react-native';
-import { GoogleSignin } from '@react-native-google-signin/google-signin';
+import { GoogleSignin, statusCodes } from '@react-native-google-signin/google-signin';
 
 const googleIcon = require('@assets/images/google-svg.png');
 
@@ -9,12 +9,10 @@ interface GoogleSignInButtonProps {
   disabled?: boolean;
 }
 
-// Configure Google Sign-In
+// Simple Google Sign-In configuration
 GoogleSignin.configure({
-  offlineAccess: true, // Enable server-side access
-  forceCodeForRefreshToken: true, // Enable refresh tokens
+  offlineAccess: false,
 });
-
 export const GoogleSignInButton: React.FC<GoogleSignInButtonProps> = ({
   onLoginSuccess,
   disabled = false,
@@ -57,15 +55,21 @@ export const GoogleSignInButton: React.FC<GoogleSignInButtonProps> = ({
 
       let errorMessage = 'Unable to sign in with Google. Please try again.';
 
-      if (error.code === 'SIGN_IN_CANCELLED') {
+      if (error.code === statusCodes.SIGN_IN_CANCELLED) {
         errorMessage = 'Sign-in was cancelled.';
-      } else if (error.code === 'IN_PROGRESS') {
+      } else if (error.code === statusCodes.IN_PROGRESS) {
         errorMessage = 'Sign-in is already in progress.';
-      } else if (error.code === 'PLAY_SERVICES_NOT_AVAILABLE') {
+      } else if (error.code === statusCodes.PLAY_SERVICES_NOT_AVAILABLE) {
         errorMessage = 'Google Play Services not available.';
+      } else if (error.message?.includes('offline use requires server web ClientID')) {
+        errorMessage = 'Configuration error. Please contact support.';
+        console.error('Missing web client ID in Google Sign-In configuration');
       }
 
-      Alert.alert('Sign-in Failed', errorMessage);
+      // Only show alert for non-cancelled errors
+      if (error.code !== statusCodes.SIGN_IN_CANCELLED) {
+        Alert.alert('Sign-in Failed', errorMessage);
+      }
     } finally {
       setLoading(false);
     }

@@ -25,6 +25,7 @@ module.exports = {
           '@store': './src/store',
           '@stores': './src/stores',
           '@theme': './src/theme',
+          '@config': './src/config',
         },
       },
     ],
