@@ -96,7 +96,7 @@ export const UserProfileForm: React.FC<UserProfileFormProps> = ({ onSubmit }) =>
       {/* Username Input */}
       <View className="mb-6 mt-5">
         <Text className="text-sm font-gilroy-medium text-gray-700 mb-2">Username</Text>
-        <View className="border border-gray-300 rounded-lg px-4 py-1 flex-row items-center">
+        <View className="border border-gray-300 rounded-lg px-4 py-2 flex-row items-center">
           <View className="w-6 h-6 mr-3 items-center justify-center">
             <FontAwesome5 name="user" size={16} color="#6B7280" />
           </View>
@@ -118,7 +118,7 @@ export const UserProfileForm: React.FC<UserProfileFormProps> = ({ onSubmit }) =>
       {/* Birth Date Input */}
       <View className="mb-6">
         <Text className="text-sm font-gilroy-medium text-gray-700 mb-2">Birth Date</Text>
-        <View className="border border-gray-300 rounded-lg px-4 py-1 flex-row items-center">
+        <View className="border border-gray-300 rounded-lg px-4 py-2 flex-row items-center">
           <View className="w-6 h-6 mr-3 items-center justify-center">
             <FontAwesome5 name="calendar" size={16} color="#6B7280" />
           </View>
@@ -178,7 +178,7 @@ export const UserProfileForm: React.FC<UserProfileFormProps> = ({ onSubmit }) =>
       {/* Country Input */}
       <View className="mb-6">
         <Text className="text-sm font-gilroy-medium text-gray-700 mb-2">Country</Text>
-        <View className="border border-gray-300 rounded-lg px-4 py-1 flex-row items-center">
+        <View className="border border-gray-300 rounded-lg px-4 py-2 flex-row items-center">
           <View className="w-6 h-6 mr-3 items-center justify-center">
             <FontAwesome5 name="globe" size={16} color="#6B7280" />
           </View>
@@ -200,7 +200,7 @@ export const UserProfileForm: React.FC<UserProfileFormProps> = ({ onSubmit }) =>
       <View className="mb-8">
         <Text className="text-sm font-gilroy-medium text-gray-700 mb-2">Preferred Language</Text>
         <TouchableOpacity
-          className="border border-gray-300 rounded-lg px-4 py-3 flex-row items-center justify-between"
+          className="border border-gray-300 rounded-lg px-4 py-2 flex-row items-center justify-between"
           onPress={() => setShowLanguageDropdown(!showLanguageDropdown)}
         >
           <View className="flex-row items-center flex-1">

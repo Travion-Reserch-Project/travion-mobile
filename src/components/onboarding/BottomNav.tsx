@@ -14,7 +14,12 @@ export const BottomNav: React.FC<{
     <View className="flex-row justify-between p-md border-t border-border-light bg-white">
       {!isFirstStep && <Button title="Back" onPress={onBack} variant="text" />}
       {isFirstStep && <View />}
-      <Button title={isLastStep ? 'Finish' : 'Next'} onPress={onNext} disabled={isNextDisabled} />
+      <Button
+        title={isLastStep ? 'Finish' : 'Next'}
+        onPress={onNext}
+        disabled={isNextDisabled}
+        size="medium"
+      />
     </View>
   );
 };
