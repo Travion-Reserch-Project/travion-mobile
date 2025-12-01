@@ -73,3 +73,14 @@ yarn-error.log
 !.yarn/releases
 !.yarn/sdks
 !.yarn/versions
+
+# Google Services Config Files (Contains API keys)
+android/app/google-services.json
+ios/TravionMobile/GoogleService-Info.plist
+
+# Environment Configuration
+.env
+.env.local
+.env.development
+.env.staging
+.env.production

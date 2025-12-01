@@ -11,12 +11,8 @@ interface GoogleSignInButtonProps {
 
 // Configure Google Sign-In
 GoogleSignin.configure({
-  iosClientId: '119774457316-367pmus3vdlbje1jg1qsektm1ka6pp2v.apps.googleusercontent.com',
-  webClientId: '119774457316-367pmus3vdlbje1jg1qsektm1ka6pp2v.apps.googleusercontent.com', // This is the web client ID from Google Console
-  offlineAccess: true, // if you want to access Google API on behalf of the user FROM YOUR SERVER
-  hostedDomain: '', // specifies a hosted domain restriction
-  forceCodeForRefreshToken: true, // [Android] related to `serverAuthCode`, read the docs link below *.
-  accountName: '', // [Android] specifies an account name on the device that should be used
+  offlineAccess: true, // Enable server-side access
+  forceCodeForRefreshToken: true, // Enable refresh tokens
 });
 
 export const GoogleSignInButton: React.FC<GoogleSignInButtonProps> = ({
