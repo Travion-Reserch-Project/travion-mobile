@@ -9,7 +9,6 @@ interface ActivityItem {
   icon: string;
   rating: number;
   duration: string;
-  price?: string;
   difficulty?: 'Easy' | 'Medium' | 'Hard';
 }
 
@@ -25,7 +24,6 @@ const defaultActivities: ActivityItem[] = [
     icon: 'walking',
     rating: 4.8,
     duration: '3-4 hours',
-    price: '$25',
     difficulty: 'Easy',
   },
   {
@@ -35,7 +33,6 @@ const defaultActivities: ActivityItem[] = [
     icon: 'mountain',
     rating: 4.9,
     duration: '5-6 hours',
-    price: '$45',
     difficulty: 'Hard',
   },
   {
@@ -45,7 +42,6 @@ const defaultActivities: ActivityItem[] = [
     icon: 'university',
     rating: 4.6,
     duration: '2-3 hours',
-    price: '$15',
     difficulty: 'Easy',
   },
   {
@@ -55,7 +51,6 @@ const defaultActivities: ActivityItem[] = [
     icon: 'utensils',
     rating: 4.7,
     duration: '2-3 hours',
-    price: '$35',
     difficulty: 'Easy',
   },
 ];
@@ -128,11 +123,6 @@ export const Activities: React.FC<ActivitiesProps> = ({ activities = defaultActi
                 <Text className="text-lg font-gilroy-bold text-gray-900 flex-1">
                   {activity.title}
                 </Text>
-                {activity.price && (
-                  <Text className="text-lg font-gilroy-bold text-primary ml-2">
-                    {activity.price}
-                  </Text>
-                )}
               </View>
 
               <Text className="text-sm font-gilroy-regular text-gray-600 mb-3 leading-5">
@@ -165,10 +155,6 @@ export const Activities: React.FC<ActivitiesProps> = ({ activities = defaultActi
                     </View>
                   )}
                 </View>
-
-                <TouchableOpacity className="bg-primary/10 px-4 py-2 rounded-full">
-                  <Text className="text-sm font-gilroy-medium text-primary">Book Now</Text>
-                </TouchableOpacity>
               </View>
             </View>
           </View>
