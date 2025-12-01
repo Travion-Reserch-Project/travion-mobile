@@ -3,7 +3,7 @@ export const APP_VERSION = '1.0.0';
 
 // API Configuration
 export const API_CONFIG = {
-  BASE_URL: __DEV__ ? 'http://localhost:3000/api' : 'https://api.travion.com',
+  BASE_URL: __DEV__ ? 'http://localhost:3001' : 'https://api.travion.com',
   TIMEOUT: 30000,
 } as const;
 

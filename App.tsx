@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import {
   OnboardingScreen,
@@ -8,13 +8,40 @@ import {
   MainAppScreen,
 } from '@screens';
 import { UserProfileData } from '@components/forms';
+import { useAuthStore } from '@stores';
 
-function App() {
+function AppContent() {
+  const { isAuthenticated, isLoading, user, initializeAuth } = useAuthStore();
   const [currentScreen, setCurrentScreen] = useState<
     'onboarding' | 'login' | 'profileSetup' | 'completion' | 'home'
   >('onboarding');
   const [isFirstTimeLogin, setIsFirstTimeLogin] = useState(true);
   const [userProfile, setUserProfile] = useState<UserProfileData | null>(null);
+
+  useEffect(() => {
+    // Initialize auth state on app start
+    initializeAuth();
+  }, [initializeAuth]);
+
+  useEffect(() => {
+    // If user is authenticated, go to home
+    if (isAuthenticated && user) {
+      setCurrentScreen('home');
+      // Convert user data to UserProfileData format if needed
+      setUserProfile({
+        username: user.name || 'Traveler',
+        birthDate: '',
+        gender: '',
+        country: '',
+        preferredLanguage: 'English',
+      });
+    }
+  }, [isAuthenticated, user]);
+
+  // Show loading while checking auth state
+  if (isLoading) {
+    return null; // You could show a loading screen here
+  }
 
   const handleFinishOnboarding = () => {
     setCurrentScreen('login');
@@ -55,8 +82,8 @@ function App() {
     if (currentScreen === 'home') {
       return (
         <MainAppScreen
-          userName={userProfile?.username || 'Traveler'}
-          userEmail="travel@example.com"
+          userName={userProfile?.username || user?.name || 'Traveler'}
+          userEmail={user?.email || 'travel@example.com'}
         />
       );
     }
@@ -64,7 +91,15 @@ function App() {
     return <OnboardingScreen onFinish={handleFinishOnboarding} />;
   };
 
-  return <SafeAreaProvider>{renderCurrentScreen()}</SafeAreaProvider>;
+  return <>{renderCurrentScreen()}</>;
+}
+
+function App() {
+  return (
+    <SafeAreaProvider>
+      <AppContent />
+    </SafeAreaProvider>
+  );
 }
 
 export default App;

@@ -1,14 +1,13 @@
 import React, { useState } from 'react';
-import { View, Text, TextInput, TouchableOpacity, Image } from 'react-native';
+import { View, Text, TextInput, TouchableOpacity } from 'react-native';
 import FontAwesome5 from 'react-native-vector-icons/FontAwesome5';
 import { Button } from '@components/common';
-
-const googleIcon = require('@assets/images/google-svg.png');
+import { GoogleSignInButton } from '@components/auth';
 
 interface LoginFormProps {
   onLogin: (email: string, password: string, rememberMe: boolean) => void;
   onForgotPassword: () => void;
-  onGoogleLogin?: () => void;
+  onGoogleLogin?: (authData: any) => void;
   onSignUp: () => void;
 }
 
@@ -114,11 +113,9 @@ export const LoginForm: React.FC<LoginFormProps> = ({
 
       {/* Google Login Button */}
       <View className="mb-6">
-        <Button
-          title="Continue with Google"
-          onPress={onGoogleLogin}
-          variant="outline"
-          icon={<Image source={googleIcon} className="w-4 h-4" resizeMode="contain" />}
+        <GoogleSignInButton
+          onLoginSuccess={onGoogleLogin || (() => {})}
+          disabled={!onGoogleLogin}
         />
       </View>
 

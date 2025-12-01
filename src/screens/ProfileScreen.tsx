@@ -1,7 +1,8 @@
 import React from 'react';
-import { View, Text, StatusBar, ScrollView } from 'react-native';
+import { View, Text, StatusBar, ScrollView, Alert } from 'react-native';
 import FontAwesome5 from 'react-native-vector-icons/FontAwesome5';
 import { Button } from '@components/common';
+import { useAuthStore } from '@stores';
 
 interface ProfileScreenProps {
   userName?: string;
@@ -12,6 +13,27 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
   userName = 'Travel Enthusiast',
   userEmail = 'travel@example.com',
 }) => {
+  const { logout, user } = useAuthStore();
+
+  const handleSignOut = () => {
+    Alert.alert('Sign Out', 'Are you sure you want to sign out?', [
+      {
+        text: 'Cancel',
+        style: 'cancel',
+      },
+      {
+        text: 'Sign Out',
+        style: 'destructive',
+        onPress: async () => {
+          try {
+            await logout();
+          } catch (error) {
+            console.error('Logout error:', error);
+          }
+        },
+      },
+    ]);
+  };
   return (
     <View className="flex-1 bg-gray-50">
       <StatusBar barStyle="dark-content" backgroundColor="#F9FAFB" />
@@ -24,9 +46,13 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
               <FontAwesome5 name="user" size={32} color="white" />
             </View>
 
-            <Text className="text-2xl font-gilroy-bold text-gray-900 mb-1">{userName}</Text>
+            <Text className="text-2xl font-gilroy-bold text-gray-900 mb-1">
+              {user?.name || userName}
+            </Text>
 
-            <Text className="text-base font-gilroy-regular text-gray-600">{userEmail}</Text>
+            <Text className="text-base font-gilroy-regular text-gray-600">
+              {user?.email || userEmail}
+            </Text>
           </View>
         </View>
 
@@ -85,7 +111,7 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
 
           {/* Logout Button */}
           <View className="mb-6">
-            <Button title="Sign Out" variant="outline" onPress={() => {}} />
+            <Button title="Sign Out" variant="outline" onPress={handleSignOut} />
           </View>
         </View>
       </ScrollView>

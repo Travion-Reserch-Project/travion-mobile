@@ -23,6 +23,8 @@
       "@types/*": ["src/types/*"],
       "@store": ["src/store"],
       "@store/*": ["src/store/*"],
+      "@stores": ["src/stores"],
+      "@stores/*": ["src/stores/*"],
       "@theme": ["src/theme"],
       "@theme/*": ["src/theme/*"]
     }

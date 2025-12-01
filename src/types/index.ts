@@ -5,6 +5,29 @@ export interface User {
   name: string;
   email: string;
   avatar?: string;
+  verified?: boolean;
+}
+
+export interface AuthTokens {
+  accessToken: string;
+  refreshToken: string;
+  expiresIn: number;
+}
+
+export interface LoginRequest {
+  email: string;
+  password: string;
+}
+
+export interface RegisterRequest {
+  email: string;
+  password: string;
+  name: string;
+}
+
+export interface AuthResponse {
+  tokens: AuthTokens;
+  user: User;
 }
 
 export interface ApiResponse<T = any> {
