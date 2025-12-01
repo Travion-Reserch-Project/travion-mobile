@@ -11,7 +11,9 @@ interface GoogleSignInButtonProps {
 
 // Simple Google Sign-In configuration
 GoogleSignin.configure({
-  offlineAccess: false,
+  iosClientId: '119774457316-367pmus3vdlbje1jg1qsektm1ka6pp2v.apps.googleusercontent.com',
+  webClientId: '119774457316-o33n86q8gtvbj5n61etculqujrumrq1r.apps.googleusercontent.com',
+  offlineAccess: true,
 });
 export const GoogleSignInButton: React.FC<GoogleSignInButtonProps> = ({
   onLoginSuccess,
@@ -52,6 +54,8 @@ export const GoogleSignInButton: React.FC<GoogleSignInButtonProps> = ({
       onLoginSuccess(authData);
     } catch (error: any) {
       console.error('Google Sign-In error:', error);
+      console.error('Error code:', error.code);
+      console.error('Error message:', error.message);
 
       let errorMessage = 'Unable to sign in with Google. Please try again.';
 
@@ -61,9 +65,9 @@ export const GoogleSignInButton: React.FC<GoogleSignInButtonProps> = ({
         errorMessage = 'Sign-in is already in progress.';
       } else if (error.code === statusCodes.PLAY_SERVICES_NOT_AVAILABLE) {
         errorMessage = 'Google Play Services not available.';
-      } else if (error.message?.includes('offline use requires server web ClientID')) {
-        errorMessage = 'Configuration error. Please contact support.';
-        console.error('Missing web client ID in Google Sign-In configuration');
+      } else if (error.code === '12501' || error.message?.includes('DEVELOPER_ERROR')) {
+        errorMessage = 'Configuration error. Please check Google Console setup.';
+        console.error('DEVELOPER_ERROR: Check SHA-1 fingerprint in Google Console');
       }
 
       // Only show alert for non-cancelled errors
