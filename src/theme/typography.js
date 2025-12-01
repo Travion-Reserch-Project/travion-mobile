@@ -1,10 +1,12 @@
-export const typography = {
+const typography = {
   // Font families
   fontFamily: {
-    regular: 'System',
-    medium: 'System',
-    bold: 'System',
-    semiBold: 'System',
+    regular: 'Gilroy-Regular',
+    medium: 'Gilroy-Medium',
+    bold: 'Gilroy-Bold',
+    semiBold: 'Gilroy-SemiBold',
+    // Fallback to system fonts if Gilroy is not available
+    system: 'System',
   },
 
   // Font sizes
@@ -33,6 +35,6 @@ export const typography = {
     semiBold: '600',
     bold: '700',
   },
-} as const;
+};
 
-export type Typography = typeof typography;
+module.exports = typography;

@@ -2,18 +2,27 @@ import React from 'react';
 import {
   TouchableOpacity,
   Text,
-  StyleSheet,
+  View,
   ActivityIndicator,
   type TouchableOpacityProps,
 } from 'react-native';
-import { colors, spacing } from '@theme';
 
 interface ButtonProps extends TouchableOpacityProps {
   title: string;
-  variant?: 'primary' | 'secondary' | 'outline';
+  variant?:
+    | 'primary'
+    | 'minimal'
+    | 'secondary'
+    | 'outline'
+    | 'text'
+    | 'success'
+    | 'warning'
+    | 'error';
   size?: 'small' | 'medium' | 'large';
   loading?: boolean;
   fullWidth?: boolean;
+  icon?: React.ReactNode;
+  iconPosition?: 'left' | 'right';
 }
 
 export const Button: React.FC<ButtonProps> = ({
@@ -22,86 +31,92 @@ export const Button: React.FC<ButtonProps> = ({
   size = 'medium',
   loading = false,
   fullWidth = false,
+  icon,
+  iconPosition = 'left',
   disabled,
   style,
   ...props
 }) => {
+  const getButtonClasses = () => {
+    const baseClasses = 'rounded-lg items-center justify-center';
+
+    const variantClasses = {
+      primary: 'bg-primary',
+      minimal: 'bg-black',
+      secondary: 'bg-secondary',
+      success: 'bg-success',
+      warning: 'bg-warning',
+      error: 'bg-error',
+      outline: 'bg-transparent border border-primary',
+      text: 'bg-transparent',
+    };
+
+    const sizeClasses = {
+      small: 'py-xs px-md',
+      medium: 'py-sm px-lg',
+      large: 'py-md px-xl',
+    };
+
+    const widthClass = fullWidth ? 'w-full' : '';
+    const disabledClass = disabled ? 'opacity-50' : '';
+
+    return `${baseClasses} ${variantClasses[variant]} ${sizeClasses[size]} ${widthClass} ${disabledClass}`.trim();
+  };
+
+  const getTextClasses = () => {
+    const baseClasses = 'font-semiBold';
+
+    const variantClasses = {
+      primary: 'text-white',
+      minimal: 'text-white',
+      secondary: 'text-white',
+      success: 'text-white',
+      warning: 'text-black',
+      error: 'text-white',
+      outline: 'text-primary',
+      text: 'text-black',
+    };
+
+    const sizeClasses = {
+      small: 'text-sm',
+      medium: 'text-base',
+      large: 'text-lg',
+    };
+
+    return `${baseClasses} ${variantClasses[variant]} ${sizeClasses[size]}`.trim();
+  };
+
+  const getLoadingColor = () => {
+    const colorMap = {
+      primary: '#ffffff',
+      minimal: '#ffffff',
+      secondary: '#ffffff',
+      success: '#ffffff',
+      warning: '#000000', // Black for yellow/orange background
+      error: '#ffffff',
+      outline: '#007AFF', // primary color
+      text: '#007AFF', // primary color
+    };
+
+    return colorMap[variant];
+  };
+
   return (
     <TouchableOpacity
-      style={[
-        styles.button,
-        styles[variant],
-        styles[size],
-        fullWidth && styles.fullWidth,
-        disabled && styles.disabled,
-        style,
-      ]}
+      className={getButtonClasses()}
+      style={style}
       disabled={disabled || loading}
       {...props}
     >
       {loading ? (
-        <ActivityIndicator color={variant === 'outline' ? colors.primary : colors.white} />
+        <ActivityIndicator color={getLoadingColor()} />
       ) : (
-        <Text style={[styles.text, styles[`${variant}Text`], styles[`${size}Text`]]}>{title}</Text>
+        <View className="flex-row items-center justify-center">
+          {icon && iconPosition === 'left' && <View className="mr-2">{icon}</View>}
+          <Text className={`${getTextClasses()} font-gilroy-bold`}>{title}</Text>
+          {icon && iconPosition === 'right' && <View className="ml-2">{icon}</View>}
+        </View>
       )}
     </TouchableOpacity>
   );
 };
-
-const styles = StyleSheet.create({
-  button: {
-    borderRadius: 8,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  primary: {
-    backgroundColor: colors.primary,
-  },
-  secondary: {
-    backgroundColor: colors.secondary,
-  },
-  outline: {
-    backgroundColor: 'transparent',
-    borderWidth: 1,
-    borderColor: colors.primary,
-  },
-  small: {
-    paddingVertical: spacing.xs,
-    paddingHorizontal: spacing.md,
-  },
-  medium: {
-    paddingVertical: spacing.sm,
-    paddingHorizontal: spacing.lg,
-  },
-  large: {
-    paddingVertical: spacing.md,
-    paddingHorizontal: spacing.xl,
-  },
-  fullWidth: {
-    width: '100%',
-  },
-  disabled: {
-    opacity: 0.5,
-  },
-  text: {
-    fontWeight: '600',
-  },
-  primaryText: {
-    color: colors.white,
-  },
-  secondaryText: {
-    color: colors.white,
-  },
-  outlineText: {
-    color: colors.primary,
-  },
-  smallText: {
-    fontSize: 14,
-  },
-  mediumText: {
-    fontSize: 16,
-  },
-  largeText: {
-    fontSize: 18,
-  },
-});

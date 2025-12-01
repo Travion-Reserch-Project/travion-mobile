@@ -9,8 +9,14 @@
 /* Begin PBXBuildFile section */
 		0C80B921A6F3F58F76C31292 /* libPods-TravionMobile.a in Frameworks */ = {isa = PBXBuildFile; fileRef = 5DCACB8F33CDC322A6C60F78 /* libPods-TravionMobile.a */; };
 		13B07FBF1A68108700A75B9A /* Images.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 13B07FB51A68108700A75B9A /* Images.xcassets */; };
+		481FE3D3B43844B39D89D810 /* Gilroy-Regular.ttf in Resources */ = {isa = PBXBuildFile; fileRef = C074C0C0F38D4C74882ADDBF /* Gilroy-Regular.ttf */; };
+		53F0B6D7EC36D1290383C4D2 /* PrivacyInfo.xcprivacy in Resources */ = {isa = PBXBuildFile; fileRef = 13B07FB81A68108700A75B9A /* PrivacyInfo.xcprivacy */; };
+		7036DBE15BC34DB4A4CC0892 /* Gilroy-Bold.ttf in Resources */ = {isa = PBXBuildFile; fileRef = AD9EB0B53F8A46ACB8E290C5 /* Gilroy-Bold.ttf */; };
 		761780ED2CA45674006654EE /* AppDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = 761780EC2CA45674006654EE /* AppDelegate.swift */; };
+		7BCF17BF3F56464ABDD1FD4D /* Gilroy-Light.ttf in Resources */ = {isa = PBXBuildFile; fileRef = BD3C6A64C4CF4928B5017654 /* Gilroy-Light.ttf */; };
+		7C40251C2E85458ABB04F9D2 /* Gilroy-Heavy.ttf in Resources */ = {isa = PBXBuildFile; fileRef = A52C2EC8BD02489BB38D738F /* Gilroy-Heavy.ttf */; };
 		81AB9BB82411601600AC10FF /* LaunchScreen.storyboard in Resources */ = {isa = PBXBuildFile; fileRef = 81AB9BB72411601600AC10FF /* LaunchScreen.storyboard */; };
+		874C26B0BFB44EC8A16AA568 /* Gilroy-Medium.ttf in Resources */ = {isa = PBXBuildFile; fileRef = DD19875234AD48F3A7AB804E /* Gilroy-Medium.ttf */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -23,6 +29,11 @@
 		5DCACB8F33CDC322A6C60F78 /* libPods-TravionMobile.a */ = {isa = PBXFileReference; explicitFileType = archive.ar; includeInIndex = 0; path = "libPods-TravionMobile.a"; sourceTree = BUILT_PRODUCTS_DIR; };
 		761780EC2CA45674006654EE /* AppDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = AppDelegate.swift; path = TravionMobile/AppDelegate.swift; sourceTree = "<group>"; };
 		81AB9BB72411601600AC10FF /* LaunchScreen.storyboard */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = file.storyboard; name = LaunchScreen.storyboard; path = TravionMobile/LaunchScreen.storyboard; sourceTree = "<group>"; };
+		A52C2EC8BD02489BB38D738F /* Gilroy-Heavy.ttf */ = {isa = PBXFileReference; explicitFileType = undefined; fileEncoding = undefined; includeInIndex = 0; lastKnownFileType = unknown; name = "Gilroy-Heavy.ttf"; path = "../src/assets/fonts/Gilroy-Heavy.ttf"; sourceTree = "<group>"; };
+		AD9EB0B53F8A46ACB8E290C5 /* Gilroy-Bold.ttf */ = {isa = PBXFileReference; explicitFileType = undefined; fileEncoding = undefined; includeInIndex = 0; lastKnownFileType = unknown; name = "Gilroy-Bold.ttf"; path = "../src/assets/fonts/Gilroy-Bold.ttf"; sourceTree = "<group>"; };
+		BD3C6A64C4CF4928B5017654 /* Gilroy-Light.ttf */ = {isa = PBXFileReference; explicitFileType = undefined; fileEncoding = undefined; includeInIndex = 0; lastKnownFileType = unknown; name = "Gilroy-Light.ttf"; path = "../src/assets/fonts/Gilroy-Light.ttf"; sourceTree = "<group>"; };
+		C074C0C0F38D4C74882ADDBF /* Gilroy-Regular.ttf */ = {isa = PBXFileReference; explicitFileType = undefined; fileEncoding = undefined; includeInIndex = 0; lastKnownFileType = unknown; name = "Gilroy-Regular.ttf"; path = "../src/assets/fonts/Gilroy-Regular.ttf"; sourceTree = "<group>"; };
+		DD19875234AD48F3A7AB804E /* Gilroy-Medium.ttf */ = {isa = PBXFileReference; explicitFileType = undefined; fileEncoding = undefined; includeInIndex = 0; lastKnownFileType = unknown; name = "Gilroy-Medium.ttf"; path = "../src/assets/fonts/Gilroy-Medium.ttf"; sourceTree = "<group>"; };
 		ED297162215061F000B7C4FE /* JavaScriptCore.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = JavaScriptCore.framework; path = System/Library/Frameworks/JavaScriptCore.framework; sourceTree = SDKROOT; };
 /* End PBXFileReference section */
 
@@ -74,6 +85,7 @@
 				83CBBA001A601CBA00E9B192 /* Products */,
 				2D16E6871FA4F8E400B85C8A /* Frameworks */,
 				BBD78D7AC51CEA395F1C20DB /* Pods */,
+				A4CDC7D59BFA438CA5136914 /* Resources */,
 			);
 			indentWidth = 2;
 			sourceTree = "<group>";
@@ -86,6 +98,19 @@
 				13B07F961A680F5B00A75B9A /* TravionMobile.app */,
 			);
 			name = Products;
+			sourceTree = "<group>";
+		};
+		A4CDC7D59BFA438CA5136914 /* Resources */ = {
+			isa = PBXGroup;
+			children = (
+				AD9EB0B53F8A46ACB8E290C5 /* Gilroy-Bold.ttf */,
+				A52C2EC8BD02489BB38D738F /* Gilroy-Heavy.ttf */,
+				BD3C6A64C4CF4928B5017654 /* Gilroy-Light.ttf */,
+				DD19875234AD48F3A7AB804E /* Gilroy-Medium.ttf */,
+				C074C0C0F38D4C74882ADDBF /* Gilroy-Regular.ttf */,
+			);
+			name = Resources;
+			path = "";
 			sourceTree = "<group>";
 		};
 		BBD78D7AC51CEA395F1C20DB /* Pods */ = {
@@ -159,6 +184,12 @@
 			files = (
 				81AB9BB82411601600AC10FF /* LaunchScreen.storyboard in Resources */,
 				13B07FBF1A68108700A75B9A /* Images.xcassets in Resources */,
+				7036DBE15BC34DB4A4CC0892 /* Gilroy-Bold.ttf in Resources */,
+				7C40251C2E85458ABB04F9D2 /* Gilroy-Heavy.ttf in Resources */,
+				7BCF17BF3F56464ABDD1FD4D /* Gilroy-Light.ttf in Resources */,
+				874C26B0BFB44EC8A16AA568 /* Gilroy-Medium.ttf in Resources */,
+				481FE3D3B43844B39D89D810 /* Gilroy-Regular.ttf in Resources */,
+				53F0B6D7EC36D1290383C4D2 /* PrivacyInfo.xcprivacy in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -374,7 +405,10 @@
 					"-DFOLLY_CFG_NO_COROUTINES=1",
 					"-DFOLLY_HAVE_CLOCK_GETTIME=1",
 				);
+				REACT_NATIVE_PATH = "${PODS_ROOT}/../../node_modules/react-native";
 				SDKROOT = iphoneos;
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = "$(inherited) DEBUG";
+				USE_HERMES = true;
 			};
 			name = Debug;
 		};
@@ -439,7 +473,9 @@
 					"-DFOLLY_CFG_NO_COROUTINES=1",
 					"-DFOLLY_HAVE_CLOCK_GETTIME=1",
 				);
+				REACT_NATIVE_PATH = "${PODS_ROOT}/../../node_modules/react-native";
 				SDKROOT = iphoneos;
+				USE_HERMES = true;
 				VALIDATE_PRODUCT = YES;
 			};
 			name = Release;

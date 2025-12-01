@@ -1,35 +1,148 @@
 import React from 'react';
-import { SafeAreaView, StatusBar, Text, View } from 'react-native';
-import { Button } from '@components/common';
-import { logger } from '@utils';
+import { View, Text, ScrollView, StatusBar } from 'react-native';
+import FontAwesome5 from 'react-native-vector-icons/FontAwesome5';
 
-export const HomeScreen: React.FC = () => {
-  const handlePress = () => {
-    logger.info('Button pressed!');
-  };
+interface HomeScreenProps {
+  userName?: string;
+}
 
+export const HomeScreen: React.FC<HomeScreenProps> = ({ userName = 'Traveler' }) => {
   return (
-    <SafeAreaView className="flex-1 bg-gray-100">
-      <StatusBar barStyle="dark-content" backgroundColor="#FFFFFF" />
-      <View className="flex-1 p-6">
-        <View className="bg-red-500 p-4 rounded-lg mb-4">
-          <Text className="text-white text-xl font-bold">NativeWind Test</Text>
-          <Text className="text-white">
-            If you see red background and white text, it's working!
-          </Text>
+    <View className="flex-1 bg-gray-50">
+      <StatusBar barStyle="dark-content" backgroundColor="#F9FAFB" />
+
+      <ScrollView className="flex-1">
+        {/* Header */}
+        <View className="bg-white px-6 py-8 rounded-b-3xl shadow-sm">
+          <View className="flex-row items-center justify-between mb-4">
+            <View>
+              <Text className="text-lg font-gilroy-regular text-gray-600">Welcome back,</Text>
+              <Text className="text-2xl font-gilroy-bold text-gray-900">{userName}</Text>
+            </View>
+
+            {/* Notification Bell */}
+            <View className="w-12 h-12 bg-primary rounded-full items-center justify-center">
+              <FontAwesome5 name="bell" size={18} color="white" />
+            </View>
+          </View>
+
+          {/* Search Bar */}
+          <View className="flex-row items-center bg-gray-100 rounded-xl px-4 py-3 mt-4">
+            <FontAwesome5 name="search" size={16} color="#9CA3AF" />
+            <Text className="ml-3 text-gray-500 font-gilroy-regular flex-1">
+              Where do you want to go?
+            </Text>
+          </View>
         </View>
 
-        <View className="mt-8 mb-12">
-          <Text className="text-4xl font-bold text-gray-900 mb-2">Welcome to Travion</Text>
-          <Text className="text-lg text-gray-600">Your journey starts here</Text>
+        {/* Quick Actions */}
+        <View className="px-6 mt-6">
+          <Text className="text-xl font-gilroy-bold text-gray-900 mb-4">Quick Actions</Text>
+
+          <View className="flex-row justify-between">
+            <View className="flex-1 bg-white rounded-2xl p-6 mr-3 items-center shadow-sm">
+              <View className="w-16 h-16 bg-blue-100 rounded-full items-center justify-center mb-3">
+                <FontAwesome5 name="plane" size={24} color="#3B82F6" />
+              </View>
+              <Text className="text-sm font-gilroy-bold text-gray-900 text-center">
+                Book Flight
+              </Text>
+            </View>
+
+            <View className="flex-1 bg-white rounded-2xl p-6 mx-1.5 items-center shadow-sm">
+              <View className="w-16 h-16 bg-green-100 rounded-full items-center justify-center mb-3">
+                <FontAwesome5 name="hotel" size={24} color="#10B981" />
+              </View>
+              <Text className="text-sm font-gilroy-bold text-gray-900 text-center">
+                Find Hotels
+              </Text>
+            </View>
+
+            <View className="flex-1 bg-white rounded-2xl p-6 ml-3 items-center shadow-sm">
+              <View className="w-16 h-16 bg-yellow-100 rounded-full items-center justify-center mb-3">
+                <FontAwesome5 name="car" size={24} color="#F59E0B" />
+              </View>
+              <Text className="text-sm font-gilroy-bold text-gray-900 text-center">Rent Car</Text>
+            </View>
+          </View>
         </View>
 
-        <View className="flex-1">
-          <Button title="Get Started" onPress={handlePress} fullWidth />
-          <View className="h-4" />
-          <Button title="Learn More" variant="outline" onPress={handlePress} fullWidth />
+        {/* Recommended Destinations */}
+        <View className="px-6 mt-8">
+          <View className="flex-row items-center justify-between mb-4">
+            <Text className="text-xl font-gilroy-bold text-gray-900">Recommended for You</Text>
+            <Text className="text-sm font-gilroy-medium text-primary">See All</Text>
+          </View>
+
+          <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+            <View className="flex-row">
+              {/* Destination Card 1 */}
+              <View className="w-72 bg-white rounded-2xl mr-4 shadow-sm overflow-hidden">
+                <View className="h-48 bg-gradient-to-br from-blue-400 to-purple-500 items-center justify-center">
+                  <FontAwesome5 name="mountain" size={48} color="white" />
+                </View>
+                <View className="p-4">
+                  <Text className="text-lg font-gilroy-bold text-gray-900 mb-1">
+                    Mountain Adventure
+                  </Text>
+                  <Text className="text-sm font-gilroy-regular text-gray-600 mb-3">
+                    Explore breathtaking mountain views
+                  </Text>
+                  <View className="flex-row items-center justify-between">
+                    <Text className="text-lg font-gilroy-bold text-primary">$299</Text>
+                    <View className="flex-row items-center">
+                      <FontAwesome5 name="star" size={12} color="#F59E0B" solid />
+                      <Text className="text-sm font-gilroy-medium text-gray-600 ml-1">4.8</Text>
+                    </View>
+                  </View>
+                </View>
+              </View>
+
+              {/* Destination Card 2 */}
+              <View className="w-72 bg-white rounded-2xl mr-4 shadow-sm overflow-hidden">
+                <View className="h-48 bg-gradient-to-br from-green-400 to-blue-500 items-center justify-center">
+                  <FontAwesome5 name="umbrella-beach" size={48} color="white" />
+                </View>
+                <View className="p-4">
+                  <Text className="text-lg font-gilroy-bold text-gray-900 mb-1">
+                    Beach Paradise
+                  </Text>
+                  <Text className="text-sm font-gilroy-regular text-gray-600 mb-3">
+                    Relax on pristine beaches
+                  </Text>
+                  <View className="flex-row items-center justify-between">
+                    <Text className="text-lg font-gilroy-bold text-primary">$399</Text>
+                    <View className="flex-row items-center">
+                      <FontAwesome5 name="star" size={12} color="#F59E0B" solid />
+                      <Text className="text-sm font-gilroy-medium text-gray-600 ml-1">4.9</Text>
+                    </View>
+                  </View>
+                </View>
+              </View>
+            </View>
+          </ScrollView>
         </View>
-      </View>
-    </SafeAreaView>
+
+        {/* Recent Activity */}
+        <View className="px-6 mt-8 mb-6">
+          <Text className="text-xl font-gilroy-bold text-gray-900 mb-4">Recent Activity</Text>
+
+          <View className="bg-white rounded-2xl p-4 shadow-sm">
+            <View className="flex-row items-center">
+              <View className="w-12 h-12 bg-primary/10 rounded-full items-center justify-center">
+                <FontAwesome5 name="map-marker-alt" size={18} color="#F5840E" />
+              </View>
+              <View className="flex-1 ml-4">
+                <Text className="text-base font-gilroy-bold text-gray-900">Trip to Paris</Text>
+                <Text className="text-sm font-gilroy-regular text-gray-600">
+                  Saved for later • 2 days ago
+                </Text>
+              </View>
+              <FontAwesome5 name="chevron-right" size={14} color="#9CA3AF" />
+            </View>
+          </View>
+        </View>
+      </ScrollView>
+    </View>
   );
 };

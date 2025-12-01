@@ -1,3 +1,10 @@
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+/* Set Gilroy-Bold as the default font */
+@layer base {
+  * {
+    font-family: 'Gilroy-Bold';
+  }
+}

@@ -1,5 +1,5 @@
-export const colors = {
-  primary: '#007AFF',
+const colors = {
+  primary: '#F5840E',
   secondary: '#5856D6',
   success: '#34C759',
   warning: '#FF9500',
@@ -23,14 +23,14 @@ export const colors = {
 
   // Background colors
   background: {
-    primary: '#FFFFFF',
+    primary: '#F5840E',
     secondary: '#F9FAFB',
     tertiary: '#F3F4F6',
   },
 
   // Text colors
   text: {
-    primary: '#111827',
+    primary: '#F5840E',
     secondary: '#6B7280',
     tertiary: '#9CA3AF',
     inverse: '#FFFFFF',
@@ -42,6 +42,6 @@ export const colors = {
     default: '#D1D5DB',
     dark: '#9CA3AF',
   },
-} as const;
+};
 
-export type Colors = typeof colors;
+module.exports = colors;
