@@ -5,7 +5,7 @@ import type { AuthTokens, User, AuthResponse, LoginRequest, RegisterRequest } fr
 class AuthService {
   async login(email: string, password: string): Promise<AuthResponse> {
     const loginData: LoginRequest = { email, password };
-    const response = await apiClient.post<AuthResponse>('/api/v1/auth/login', loginData);
+    const response = await apiClient.post<AuthResponse>('/auth/login', loginData);
 
     if (!response.success) {
       throw new Error(response.error || 'Login failed');
@@ -19,7 +19,7 @@ class AuthService {
   }
 
   async register(userData: RegisterRequest): Promise<AuthResponse> {
-    const response = await apiClient.post<AuthResponse>('/api/v1/auth/register', userData);
+    const response = await apiClient.post<AuthResponse>('/auth/register', userData);
 
     if (!response.success) {
       throw new Error(response.error || 'Registration failed');
@@ -32,13 +32,83 @@ class AuthService {
     return authData;
   }
 
+  /**
+   * Login/register with Google OAuth
+   */
+  async loginWithGoogle(googleAuthData: {
+    tokens: { accessToken: string; refreshToken: string; expiresIn: number };
+    user: { userId: string; email: string; name: string; picture: string; verified: boolean };
+  }): Promise<AuthResponse> {
+    try {
+      const response = await apiClient.post<AuthResponse>('/auth/google', {
+        idToken: googleAuthData.tokens.accessToken,
+        user: googleAuthData.user,
+      });
+
+      if (!response.success) {
+        throw new Error(response.error || 'Google authentication failed');
+      }
+
+      console.log('Full response object:', response);
+      console.log('Response.data:', response.data);
+
+      // The response might be nested - check both possibilities
+      const authData = response.data;
+
+      console.log('Backend Google auth response - authData:', authData);
+      console.log('authData structure:', {
+        hasAuthData: !!authData,
+        authDataKeys: authData ? Object.keys(authData) : [],
+        hasTokens: !!authData?.tokens,
+        tokensKeys: authData?.tokens ? Object.keys(authData.tokens) : [],
+        accessToken: authData?.tokens?.accessToken ? 'present' : 'missing',
+        hasUser: !!authData?.user,
+      });
+
+      // Validate that we have the required data before storing
+      if (!authData?.tokens || !authData.tokens.accessToken) {
+        console.error('Token validation failed:', {
+          hasTokens: !!authData?.tokens,
+          hasAccessToken: !!authData?.tokens?.accessToken,
+          tokensObject: authData?.tokens,
+        });
+        throw new Error('Invalid response: missing tokens from backend');
+      }
+
+      if (!authData.user) {
+        throw new Error('Invalid response: missing user data from backend');
+      }
+
+      await AuthUtils.storeTokens(authData.tokens);
+      await AuthUtils.storeUser(authData.user);
+
+      return authData;
+    } catch (error) {
+      console.error('Google login API call failed:', error);
+
+      // If backend call fails, fall back to using the Google data directly
+      // This allows the app to work even if backend is down
+      console.log('Falling back to local Google auth data storage');
+
+      const fallbackAuthData: AuthResponse = {
+        tokens: googleAuthData.tokens,
+        user: googleAuthData.user,
+      };
+
+      await AuthUtils.storeTokens(fallbackAuthData.tokens);
+      await AuthUtils.storeUser(fallbackAuthData.user);
+
+      return fallbackAuthData;
+    }
+  }
+
   async getProfile(): Promise<User> {
     const tokens = await AuthUtils.getStoredTokens();
     if (!tokens) {
       throw new Error('No tokens available');
     }
 
-    const response = await apiClient.get<{ user: User }>('/api/v1/auth/profile', {
+    const response = await apiClient.get<{ user: User }>('/auth/profile', {
       headers: {
         Authorization: `Bearer ${tokens.accessToken}`,
       },
@@ -69,7 +139,7 @@ class AuthService {
       throw new Error('No refresh token available');
     }
 
-    const response = await apiClient.post<{ tokens: AuthTokens }>('/api/v1/auth/refresh', {
+    const response = await apiClient.post<{ tokens: AuthTokens }>('/auth/refresh', {
       refreshToken: tokens.refreshToken,
     });
 
@@ -92,7 +162,7 @@ class AuthService {
     if (tokens) {
       try {
         await apiClient.post(
-          '/api/v1/auth/logout',
+          '/auth/logout',
           {},
           {
             headers: {

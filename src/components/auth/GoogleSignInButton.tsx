@@ -34,22 +34,45 @@ export const GoogleSignInButton: React.FC<GoogleSignInButtonProps> = ({
       const result = await GoogleSignin.signIn();
 
       console.log('Google Sign-In success:', result);
+      console.log('Google result structure:', {
+        hasData: !!result.data,
+        dataKeys: result.data ? Object.keys(result.data) : [],
+        hasUser: !!result.data?.user,
+        hasIdToken: !!result.data?.idToken,
+        userKeys: result.data?.user ? Object.keys(result.data.user) : [],
+      });
+
+      // Validate that we have the required data
+      if (!result.data?.idToken) {
+        throw new Error('No ID token received from Google Sign-In');
+      }
+
+      if (!result.data?.user?.email) {
+        throw new Error('No user data received from Google Sign-In');
+      }
 
       // Format the data for your backend
       const authData = {
         tokens: {
-          accessToken: result.data?.idToken || '',
-          refreshToken: '', // Google SDK handles refresh internally
-          expiresIn: Date.now() + 60 * 60 * 1000, // 1 hour
+          accessToken: result.data.idToken,
+          refreshToken: result.data.serverAuthCode || '',
+          expiresIn: Date.now() + 60 * 60 * 1000,
         },
         user: {
-          id: result.data?.user.id || '',
-          email: result.data?.user.email || '',
-          name: result.data?.user.name || '',
-          picture: result.data?.user.photo || '',
+          userId: result.data.user.id || '',
+          email: result.data.user.email || '',
+          name: result.data.user.name || '',
+          picture: result.data.user.photo || '',
           verified: true,
         },
       };
+
+      console.log('Formatted auth data:', {
+        hasTokens: !!authData.tokens,
+        hasAccessToken: !!authData.tokens.accessToken,
+        hasUser: !!authData.user,
+        userEmail: authData.user.email,
+      });
 
       onLoginSuccess(authData);
     } catch (error: any) {

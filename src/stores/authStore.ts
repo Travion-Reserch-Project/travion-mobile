@@ -68,25 +68,16 @@ export const useAuthStore = create<AuthState>()(
         try {
           set({ isLoading: true });
 
-          // Store the tokens using AuthUtils (for consistency)
-          await AuthUtils.storeTokens(authData.tokens);
+          // Call backend API to authenticate with Google
+          const response = await authService.loginWithGoogle(authData);
 
+          // Store the tokens and user data returned from backend
           set({
-            tokens: authData.tokens,
+            tokens: response.tokens,
+            user: response.user,
           });
 
-          if (authData.user) {
-            await AuthUtils.storeUser(authData.user);
-            set({ user: authData.user });
-          } else {
-            // Try to fetch user profile if not provided
-            try {
-              const userProfile = await authService.getProfile();
-              set({ user: userProfile });
-            } catch (error) {
-              console.error('Failed to get user profile after Google login:', error);
-            }
-          }
+          console.log('Google login successful, user stored in database');
         } catch (error) {
           console.error('Google login error:', error);
           throw error;

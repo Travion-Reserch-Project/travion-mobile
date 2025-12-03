@@ -49,6 +49,21 @@ class AuthUtils {
    */
   static async storeTokens(tokens: AuthTokens): Promise<void> {
     try {
+      // Validate tokens before storing
+      if (!tokens) {
+        throw new Error('Tokens are undefined or null');
+      }
+
+      if (!tokens.accessToken) {
+        throw new Error('Access token is missing from tokens object');
+      }
+
+      console.log('Storing tokens:', {
+        hasAccessToken: !!tokens.accessToken,
+        hasRefreshToken: !!tokens.refreshToken,
+        expiresIn: tokens.expiresIn,
+      });
+
       await AsyncStorage.setItem(this.TOKEN_KEY, JSON.stringify(tokens));
     } catch (error) {
       console.error('Error storing tokens:', error);
