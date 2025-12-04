@@ -11,7 +11,7 @@ import { UserProfileData } from '@components/forms';
 import { useAuthStore } from '@stores';
 
 function AppContent() {
-  const { isAuthenticated, isLoading, user, initializeAuth } = useAuthStore();
+  const { isAuthenticated, isLoading, user, initializeAuth, refreshProfile } = useAuthStore();
   const [currentScreen, setCurrentScreen] = useState<
     'onboarding' | 'login' | 'profileSetup' | 'completion' | 'home'
   >('onboarding');
@@ -56,9 +56,18 @@ function AppContent() {
     }
   };
 
-  const handleProfileComplete = (profileData: UserProfileData) => {
+  const handleProfileComplete = async (profileData: UserProfileData) => {
     console.log('Profile setup completed:', profileData);
     setUserProfile(profileData);
+
+    // Refresh the user profile to get the updated profileStatus
+    try {
+      await refreshProfile();
+      console.log('Profile refreshed after completion');
+    } catch (error) {
+      console.error('Failed to refresh profile:', error);
+    }
+
     setCurrentScreen('completion');
   };
 
@@ -73,7 +82,16 @@ function AppContent() {
     }
 
     if (currentScreen === 'completion') {
-      return <ProfileCompletionScreen onGetStarted={handleGetStarted} />;
+      // Check if user has complete profile status or check directly from userProfile state
+      const isComplete = user?.profileStatus === 'Complete' || userProfile !== null;
+      console.log('App.tsx - user:', user);
+      console.log('App.tsx - profileStatus:', user?.profileStatus);
+      console.log('App.tsx - userProfile exists:', userProfile !== null);
+      console.log('App.tsx - isComplete:', isComplete);
+
+      return (
+        <ProfileCompletionScreen onGetStarted={handleGetStarted} isProfileComplete={isComplete} />
+      );
     }
 
     if (currentScreen === 'login') {
