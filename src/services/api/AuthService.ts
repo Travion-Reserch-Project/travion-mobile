@@ -68,6 +68,7 @@ class AuthService extends BaseApiService {
       const normalizedUser = {
         ...authData.user,
         userId: authData.user.userId || (authData.user as any)._id,
+        profileStatus: authData.user.profileStatus || ('Incomplete' as const), // Default to Incomplete if not provided
       };
       await AuthUtils.storeUser(normalizedUser);
 
@@ -78,6 +79,7 @@ class AuthService extends BaseApiService {
       const normalizedUser = {
         ...googleAuthData.user,
         userId: googleAuthData.user.userId || (googleAuthData.user as any)._id,
+        profileStatus: 'Incomplete' as const, // Default to Incomplete for new Google users
       };
 
       await AuthUtils.clearAuthData();

@@ -12,19 +12,37 @@ class UserService extends BaseApiService {
   async getProfile(): Promise<User> {
     try {
       const response = await this.authenticatedGet<{ user: User }>('/profile');
-      if (!response.data) {
-        throw new Error('No data received from profile API');
+
+      // Handle 304 Not Modified response (use cached data)
+      if (response.status === 304 || !response.data) {
+        console.log('Profile not modified, using cached data');
+        const storedUser = await AuthUtils.getStoredUser();
+        if (storedUser) {
+          return storedUser;
+        }
+        throw new Error('No cached user data available for 304 response');
       }
+
+      if (!response.data.user) {
+        throw new Error('No user data received from profile API');
+      }
+
       return response.data.user;
     } catch (error) {
-      console.warn('Profile API failed, using stored data:', error);
+      console.warn('Profile API failed, attempting to use stored data:', error);
 
-      const storedUser = await AuthUtils.getStoredUser();
-      if (storedUser) {
-        return storedUser;
+      try {
+        const storedUser = await AuthUtils.getStoredUser();
+        if (storedUser) {
+          console.log('Using stored user data');
+          return storedUser;
+        }
+      } catch (storageError) {
+        console.error('Failed to get stored user:', storageError);
       }
 
-      throw error;
+      // If all else fails, throw the original error
+      throw new Error('Unable to get profile data from API or storage');
     }
   }
   //Update user profile with data validation

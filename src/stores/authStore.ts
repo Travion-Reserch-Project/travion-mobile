@@ -10,8 +10,7 @@ interface AuthState {
   user: User | null;
   tokens: AuthTokens | null;
   isLoading: boolean;
-
-  // Computed
+  hasSeenOnboarding: boolean;
   isAuthenticated: boolean;
 
   // Actions
@@ -22,6 +21,9 @@ interface AuthState {
   refreshProfile: () => Promise<void>;
   initializeAuth: () => Promise<void>;
   updateUser: (user: User) => Promise<void>;
+  completeOnboarding: () => void;
+  resetOnboarding: () => void; // For testing purposes
+  clearAllData: () => Promise<void>; // Clear all persisted data
 
   // Internal actions
   setUser: (user: User | null) => void;
@@ -36,15 +38,8 @@ export const useAuthStore = create<AuthState>()(
       user: null,
       tokens: null,
       isLoading: false,
-
-      // Computed getter
-      get isAuthenticated() {
-        const { tokens } = get();
-        if (!tokens) return false;
-
-        const now = Date.now();
-        return now < tokens.expiresIn;
-      },
+      hasSeenOnboarding: false,
+      isAuthenticated: false,
 
       // Actions
       login: async (email: string, password: string) => {
@@ -53,9 +48,18 @@ export const useAuthStore = create<AuthState>()(
 
           const authData = await authService.login(email, password);
 
+          // Convert expiresIn from seconds to timestamp
+          const tokensWithTimestamp = authData.tokens
+            ? {
+                ...authData.tokens,
+                expiresIn: Date.now() + authData.tokens.expiresIn * 1000,
+              }
+            : null;
+
           set({
-            tokens: authData.tokens,
+            tokens: tokensWithTimestamp,
             user: authData.user,
+            isAuthenticated: !!(tokensWithTimestamp && authData.user),
           });
         } catch (error) {
           console.error('Login error:', error);
@@ -73,9 +77,35 @@ export const useAuthStore = create<AuthState>()(
           const response = await authService.loginWithGoogle(authData);
 
           // Store the tokens and user data returned from backend
+          // Convert expiresIn from seconds to timestamp
+          const tokensWithTimestamp = response.tokens
+            ? {
+                ...response.tokens,
+                expiresIn: Date.now() + response.tokens.expiresIn * 1000, // Convert seconds to milliseconds and add to now
+              }
+            : null;
+
           set({
-            tokens: response.tokens,
+            tokens: tokensWithTimestamp,
             user: response.user,
+            isAuthenticated: !!(tokensWithTimestamp && response.user),
+          });
+
+          // Debug: Check the state immediately after setting
+          const currentState = get();
+          console.log('State after Google login set:', {
+            isAuthenticated: currentState.isAuthenticated,
+            hasUser: !!currentState.user,
+            hasTokens: !!currentState.tokens,
+          });
+
+          // Debug log the stored values
+          console.log('Google login - tokens stored:', {
+            hasTokens: !!tokensWithTimestamp,
+            hasUser: !!response.user,
+            userProfileStatus: response.user?.profileStatus || 'NOT_SET',
+            originalExpiresIn: response.tokens?.expiresIn,
+            convertedExpiresIn: tokensWithTimestamp?.expiresIn,
           });
 
           // Only log success if we have valid tokens
@@ -98,9 +128,18 @@ export const useAuthStore = create<AuthState>()(
 
           const authData = await authService.register(userData);
 
+          // Convert expiresIn from seconds to timestamp
+          const tokensWithTimestamp = authData.tokens
+            ? {
+                ...authData.tokens,
+                expiresIn: Date.now() + authData.tokens.expiresIn * 1000,
+              }
+            : null;
+
           set({
-            tokens: authData.tokens,
+            tokens: tokensWithTimestamp,
             user: authData.user,
+            isAuthenticated: !!(tokensWithTimestamp && authData.user),
           });
         } catch (error) {
           console.error('Registration error:', error);
@@ -119,6 +158,7 @@ export const useAuthStore = create<AuthState>()(
           set({
             tokens: null,
             user: null,
+            isAuthenticated: false,
           });
         } catch (error) {
           console.error('Logout error:', error);
@@ -126,6 +166,7 @@ export const useAuthStore = create<AuthState>()(
           set({
             tokens: null,
             user: null,
+            isAuthenticated: false,
           });
         } finally {
           set({ isLoading: false });
@@ -151,25 +192,27 @@ export const useAuthStore = create<AuthState>()(
         try {
           set({ isLoading: true });
 
-          const authState = await AuthUtils.getAuthState();
+          // After hydration, ensure isAuthenticated state is correct
+          const currentState = get();
+          const { user, tokens, hasSeenOnboarding } = currentState;
+          const shouldBeAuthenticated = !!(user && tokens);
 
-          if (authState.isAuthenticated && authState.user && authState.tokens) {
-            set({
-              tokens: authState.tokens,
-              user: authState.user,
-            });
-          } else {
-            // Clear any stale data
-            set({
-              tokens: null,
-              user: null,
-            });
-          }
+          set({ isAuthenticated: shouldBeAuthenticated });
+
+          console.log('Auth initialized', {
+            hasUser: !!user,
+            hasTokens: !!tokens,
+            hasSeenOnboarding,
+            isAuthenticated: shouldBeAuthenticated,
+            userProfileStatus: user?.profileStatus,
+            storedState: 'hydrated from AsyncStorage',
+          });
         } catch (error) {
           console.error('Auth initialization error:', error);
           set({
             tokens: null,
             user: null,
+            isAuthenticated: false,
           });
         } finally {
           set({ isLoading: false });
@@ -186,9 +229,49 @@ export const useAuthStore = create<AuthState>()(
         }
       },
 
+      completeOnboarding: () => {
+        set({ hasSeenOnboarding: true });
+      },
+
+      resetOnboarding: () => {
+        set({ hasSeenOnboarding: false });
+      },
+
+      clearAllData: async () => {
+        try {
+          // Clear AsyncStorage
+          await AsyncStorage.removeItem('auth-store');
+
+          // Reset all state to initial values
+          set({
+            user: null,
+            tokens: null,
+            isLoading: false,
+            hasSeenOnboarding: false,
+            isAuthenticated: false,
+          });
+
+          console.log('All auth data cleared successfully');
+        } catch (error) {
+          console.error('Error clearing auth data:', error);
+        }
+      },
+
       // Internal setters for direct state updates
-      setUser: (user: User | null) => set({ user }),
-      setTokens: (tokens: AuthTokens | null) => set({ tokens }),
+      setUser: (user: User | null) => {
+        const { tokens } = get();
+        set({
+          user,
+          isAuthenticated: !!(user && tokens),
+        });
+      },
+      setTokens: (tokens: AuthTokens | null) => {
+        const { user } = get();
+        set({
+          tokens,
+          isAuthenticated: !!(user && tokens),
+        });
+      },
       setLoading: (isLoading: boolean) => set({ isLoading }),
     }),
     {
@@ -198,7 +281,25 @@ export const useAuthStore = create<AuthState>()(
       partialize: state => ({
         user: state.user,
         tokens: state.tokens,
+        hasSeenOnboarding: state.hasSeenOnboarding,
+        isAuthenticated: state.isAuthenticated,
       }),
+      onRehydrateStorage: () => {
+        console.log('Auth store: Starting hydration from AsyncStorage...');
+        return (state, error) => {
+          if (error) {
+            console.error('Auth store hydration error:', error);
+          } else {
+            console.log('Auth store: Hydration completed', {
+              hasUser: !!state?.user,
+              hasTokens: !!state?.tokens,
+              hasSeenOnboarding: state?.hasSeenOnboarding,
+              isAuthenticated: state?.isAuthenticated,
+              userProfileStatus: state?.user?.profileStatus,
+            });
+          }
+        };
+      },
     },
   ),
 );

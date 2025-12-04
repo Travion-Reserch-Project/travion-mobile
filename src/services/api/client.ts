@@ -61,18 +61,14 @@ class ApiClient {
 
     this.addResponseInterceptor(async response => {
       if (response.status === 401) {
-        try {
-          await this.refreshToken();
-        } catch {
-          await AuthUtils.clearAuthData();
-          throw new ApiError('Authentication expired', 401, 'AUTH_EXPIRED');
-        }
+        await AuthUtils.clearAuthData();
+        throw new ApiError('Authentication expired', 401, 'AUTH_EXPIRED');
       }
       return response;
     });
   }
 
-  // Get authentication headers (with cookie fallback)
+  // Get authentication headers
   private async getAuthHeaders(): Promise<Record<string, string>> {
     const headers: Record<string, string> = {};
 
@@ -83,27 +79,6 @@ class ApiClient {
       }
     }
     return headers;
-  }
-
-  // Refresh authentication token
-  private async refreshToken(): Promise<void> {
-    const tokens = await AuthUtils.getStoredTokens();
-    if (!tokens?.refreshToken) {
-      throw new Error('No refresh token available');
-    }
-
-    const response = await this.request('/auth/refresh', {
-      method: HttpMethod.POST,
-      body: { refreshToken: tokens.refreshToken },
-      useAuth: false,
-    });
-
-    if (response.success && response.data) {
-      const tokenData = response.data as any;
-      if (tokenData.tokens) {
-        await AuthUtils.storeTokens(tokenData.tokens);
-      }
-    }
   }
 
   // Add request interceptor
@@ -200,6 +175,17 @@ class ApiClient {
       // Parse response
       const contentType = finalResponse.headers.get('content-type');
       let data: any;
+
+      // Handle 304 Not Modified responses
+      if (finalResponse.status === 304) {
+        // For 304 responses, there's no body content, so return cached data structure
+        return {
+          success: true,
+          data: undefined,
+          status: finalResponse.status,
+          headers: finalResponse.headers,
+        };
+      }
 
       if (contentType?.includes('application/json')) {
         data = await finalResponse.json();

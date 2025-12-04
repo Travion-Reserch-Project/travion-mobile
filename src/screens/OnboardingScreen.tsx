@@ -10,6 +10,9 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import LottieView from 'lottie-react-native';
+import { NativeStackScreenProps } from '@react-navigation/native-stack';
+import { AuthStackParamList } from '@navigation/AuthNavigator';
+import { useAuthStore } from '@stores';
 
 // Lottie animation imports
 const mapAnimation = require('@assets/animations/onbord4.json');
@@ -25,9 +28,7 @@ interface OnboardingSlide {
   animation?: any;
 }
 
-interface OnboardingScreenProps {
-  onFinish?: () => void;
-}
+type OnboardingScreenProps = NativeStackScreenProps<AuthStackParamList, 'Onboarding'>;
 
 const slides: OnboardingSlide[] = [
   {
@@ -53,9 +54,10 @@ const slides: OnboardingSlide[] = [
   },
 ];
 
-export const OnboardingScreen: React.FC<OnboardingScreenProps> = ({ onFinish }) => {
+export const OnboardingScreen: React.FC<OnboardingScreenProps> = ({ navigation }) => {
   const [currentIndex, setCurrentIndex] = useState(0);
   const flatListRef = useRef<FlatList>(null);
+  const { completeOnboarding } = useAuthStore();
 
   const handleScroll = (event: NativeSyntheticEvent<NativeScrollEvent>) => {
     const scrollPosition = event.nativeEvent.contentOffset.x;
@@ -70,8 +72,9 @@ export const OnboardingScreen: React.FC<OnboardingScreenProps> = ({ onFinish }) 
         animated: true,
       });
     } else {
-      // Navigate to login screen when finish is clicked
-      onFinish?.();
+      // Mark onboarding as complete and navigate to login screen
+      completeOnboarding();
+      navigation.navigate('Login');
     }
   };
 

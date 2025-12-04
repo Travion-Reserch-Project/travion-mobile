@@ -1,23 +1,31 @@
 import React from 'react';
-import { View, Text, ScrollView, StatusBar } from 'react-native';
+import { View, Text, ScrollView, StatusBar, StyleSheet } from 'react-native';
 import FontAwesome5 from 'react-native-vector-icons/FontAwesome5';
+import { useAuthStore } from '@stores';
 
 interface HomeScreenProps {
   userName?: string;
 }
 
-export const HomeScreen: React.FC<HomeScreenProps> = ({ userName = 'Traveler' }) => {
+export const HomeScreen: React.FC<HomeScreenProps> = () => {
+  const { user } = useAuthStore();
   return (
     <View className="flex-1 bg-gray-50">
       <StatusBar barStyle="dark-content" backgroundColor="#F9FAFB" />
 
-      <ScrollView className="flex-1">
+      <ScrollView
+        className="flex-1"
+        contentContainerStyle={styles.scrollViewContent}
+        showsVerticalScrollIndicator={false}
+      >
         {/* Header */}
-        <View className="bg-white px-6 py-8 rounded-b-3xl shadow-sm">
+        <View className="bg-white px-6 pt-12 pb-8 rounded-b-3xl shadow-sm">
           <View className="flex-row items-center justify-between mb-4">
             <View>
               <Text className="text-lg font-gilroy-regular text-gray-600">Welcome back,</Text>
-              <Text className="text-2xl font-gilroy-bold text-gray-900">{userName}</Text>
+              <Text className="text-2xl font-gilroy-bold text-gray-900">
+                {user?.userName || 'Traveler'}
+              </Text>
             </View>
 
             {/* Notification Bell */}
@@ -124,7 +132,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ userName = 'Traveler' })
         </View>
 
         {/* Recent Activity */}
-        <View className="px-6 mt-8 mb-6">
+        <View className="px-6 mt-8 pb-4">
           <Text className="text-xl font-gilroy-bold text-gray-900 mb-4">Recent Activity</Text>
 
           <View className="bg-white rounded-2xl p-4 shadow-sm">
@@ -146,3 +154,9 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ userName = 'Traveler' })
     </View>
   );
 };
+
+const styles = StyleSheet.create({
+  scrollViewContent: {
+    flexGrow: 1,
+  },
+});

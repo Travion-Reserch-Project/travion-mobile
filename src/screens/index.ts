@@ -2,7 +2,7 @@ export * from './HomeScreen';
 export * from './OnboardingScreen';
 export * from './LoginScreen';
 export * from './UserProfileSetupScreen';
-export * from './ProfileCompletionScreen';
+export * from './LoadingScreen';
 export * from './ExploreScreen';
 export * from './TripsScreen';
 export * from './ChatbotScreen';

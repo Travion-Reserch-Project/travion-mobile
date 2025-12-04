@@ -10,7 +10,6 @@ interface ProfileScreenProps {
 }
 
 export const ProfileScreen: React.FC<ProfileScreenProps> = ({
-  userName = 'Travel Enthusiast',
   userEmail = 'travel@example.com',
 }) => {
   const { logout, user } = useAuthStore();
@@ -46,7 +45,7 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
               <FontAwesome5 name="user" size={32} color="white" />
             </View>
 
-            <Text className="text-2xl font-gilroy-bold text-gray-900 mb-1">{userName}</Text>
+            <Text className="text-2xl font-gilroy-bold text-gray-900 mb-1">{user?.userName}</Text>
 
             <Text className="text-base font-gilroy-regular text-gray-600">
               {user?.email || userEmail}
