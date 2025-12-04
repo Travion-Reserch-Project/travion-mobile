@@ -1,5 +1,5 @@
 {
-  "name": "TravionMobile",
+  "name": "travion-mobile",
   "version": "0.0.1",
   "private": true,
   "scripts": {
@@ -18,12 +18,14 @@
   },
   "dependencies": {
     "@react-native-async-storage/async-storage": "^2.2.0",
+    "@react-native-community/datetimepicker": "^8.5.1",
     "@react-native-google-signin/google-signin": "^16.0.0",
     "@react-native/new-app-screen": "0.82.1",
     "lottie-react-native": "^7.3.4",
     "nativewind": "^2.0.11",
     "react": "19.1.1",
     "react-native": "0.82.1",
+    "react-native-modal-datetime-picker": "^18.0.0",
     "react-native-safe-area-context": "^5.5.2",
     "react-native-vector-icons": "^10.3.0",
     "react-native-webview": "^13.16.0",

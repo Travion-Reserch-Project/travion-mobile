@@ -1,16 +1,90 @@
-import React from 'react';
-import { View, Text, ScrollView, StatusBar } from 'react-native';
+import React, { useState, useEffect, useCallback } from 'react';
+import { View, Text, ScrollView, StatusBar, ActivityIndicator, Alert } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { UserProfileForm, UserProfileData } from '@components/forms';
+import { useAuthStore } from '@stores';
+import { userService } from '@services/api';
 
 interface UserProfileSetupProps {
   onComplete: (profileData: UserProfileData) => void;
 }
 
 export const UserProfileSetupScreen: React.FC<UserProfileSetupProps> = ({ onComplete }) => {
-  const handleProfileSubmit = (profileData: UserProfileData) => {
-    onComplete(profileData);
+  const { updateUser } = useAuthStore();
+  const [isLoading, setIsLoading] = useState(true);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [existingData, setExistingData] = useState<UserProfileData | null>(null);
+
+  const fetchExistingProfile = useCallback(async () => {
+    try {
+      setIsLoading(true);
+      const profileData = await userService.getProfile();
+
+      if (profileData) {
+        // Map User data to UserProfileData format
+        const formData: UserProfileData = {
+          name: profileData.name || '',
+          userName: profileData.name || '',
+          dob: new Date(),
+          gender: '',
+          country: '',
+          preferredLanguage: '',
+        };
+
+        setExistingData(formData);
+        updateUser(profileData);
+      }
+    } catch (error) {
+      console.error('Failed to fetch profile:', error);
+      // Continue with empty form if fetch fails
+      setExistingData(null);
+    } finally {
+      setIsLoading(false);
+    }
+  }, [updateUser]);
+
+  useEffect(() => {
+    fetchExistingProfile();
+  }, [fetchExistingProfile]);
+
+  const handleProfileSubmit = async (profileData: UserProfileData) => {
+    try {
+      setIsSubmitting(true);
+
+      // Call update profile API
+      const updatedUser = await userService.updateProfile({
+        ...profileData,
+        profileStatus: 'Complete',
+      });
+
+      // Update local state
+      updateUser(updatedUser);
+
+      Alert.alert('Profile Updated', 'Your profile has been successfully updated!', [
+        { text: 'OK', onPress: () => onComplete(profileData) },
+      ]);
+    } catch (error: any) {
+      console.error('Profile update failed:', error);
+      Alert.alert('Update Failed', error.message || 'Failed to update profile. Please try again.', [
+        { text: 'OK' },
+      ]);
+    } finally {
+      setIsSubmitting(false);
+    }
   };
+
+  if (isLoading) {
+    return (
+      <SafeAreaView className="flex-1 bg-white">
+        <View className="flex-1 items-center justify-center">
+          <ActivityIndicator size="large" color="#F5840E" />
+          <Text className="mt-4 text-base font-gilroy-medium text-gray-600">
+            Loading your profile...
+          </Text>
+        </View>
+      </SafeAreaView>
+    );
+  }
 
   return (
     <SafeAreaView className="flex-1 bg-white">
@@ -30,7 +104,11 @@ export const UserProfileSetupScreen: React.FC<UserProfileSetupProps> = ({ onComp
           </View>
 
           {/* Profile Form */}
-          <UserProfileForm onSubmit={handleProfileSubmit} />
+          <UserProfileForm
+            onSubmit={handleProfileSubmit}
+            initialData={existingData}
+            _isSubmitting={isSubmitting}
+          />
         </View>
       </ScrollView>
     </SafeAreaView>

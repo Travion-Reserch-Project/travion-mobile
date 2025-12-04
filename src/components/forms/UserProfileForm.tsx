@@ -1,18 +1,22 @@
 import React, { useState } from 'react';
 import { View, Text, TextInput, TouchableOpacity } from 'react-native';
+import DateTimePickerModal from 'react-native-modal-datetime-picker';
 import FontAwesome5 from 'react-native-vector-icons/FontAwesome5';
 import { Button } from '@components/common';
 
 export interface UserProfileData {
-  username: string;
-  birthDate: string;
-  gender: 'male' | 'female' | 'other' | '';
+  name: string;
+  userName: string;
+  dob: Date;
+  gender: 'Male' | 'Female' | 'Other' | '';
   country: string;
   preferredLanguage: string;
 }
 
 interface UserProfileFormProps {
   onSubmit: (profileData: UserProfileData) => void;
+  initialData?: UserProfileData | null;
+  _isSubmitting?: boolean;
 }
 
 const COMMON_LANGUAGES = [
@@ -30,34 +34,53 @@ const COMMON_LANGUAGES = [
   { code: 'hi', name: 'Hindi' },
 ];
 
-export const UserProfileForm: React.FC<UserProfileFormProps> = ({ onSubmit }) => {
+export const UserProfileForm: React.FC<UserProfileFormProps> = ({
+  onSubmit,
+  initialData,
+  _isSubmitting = false,
+}) => {
   const [profileData, setProfileData] = useState<UserProfileData>({
-    username: '',
-    birthDate: '',
-    gender: '',
-    country: '',
-    preferredLanguage: '',
+    name: initialData?.name || '',
+    userName: initialData?.userName || '',
+    dob: initialData?.dob || new Date(),
+    gender: initialData?.gender || '',
+    country: initialData?.country || '',
+    preferredLanguage: initialData?.preferredLanguage || '',
   });
 
   const [errors, setErrors] = useState<Partial<Record<keyof UserProfileData, string>>>({});
   const [showLanguageDropdown, setShowLanguageDropdown] = useState(false);
+  const [isDatePickerVisible, setDatePickerVisible] = useState(false);
 
-  const handleInputChange = (field: keyof UserProfileData, value: string) => {
+  const handleInputChange = (field: keyof UserProfileData, value: string | Date) => {
     setProfileData(prev => ({ ...prev, [field]: value }));
     if (errors[field]) {
       setErrors(prev => ({ ...prev, [field]: '' }));
     }
   };
 
+  const showDatePicker = () => {
+    setDatePickerVisible(true);
+  };
+
+  const hideDatePicker = () => {
+    setDatePickerVisible(false);
+  };
+
+  const handleDateConfirm = (date: Date) => {
+    handleInputChange('dob', date);
+    hideDatePicker();
+  };
+
   const validateForm = () => {
     const newErrors: Partial<Record<keyof UserProfileData, string>> = {};
 
-    if (!profileData.username.trim()) {
-      newErrors.username = 'Username is required';
+    if (!profileData.userName.trim()) {
+      newErrors.userName = 'Username is required';
     }
 
-    if (!profileData.birthDate.trim()) {
-      newErrors.birthDate = 'Birth date is required';
+    if (!profileData.dob) {
+      newErrors.dob = 'Birth date is required';
     }
 
     if (!profileData.gender) {
@@ -82,7 +105,7 @@ export const UserProfileForm: React.FC<UserProfileFormProps> = ({ onSubmit }) =>
     }
   };
 
-  const handleGenderSelect = (gender: 'male' | 'female' | 'other') => {
+  const handleGenderSelect = (gender: 'Male' | 'Female' | 'Other') => {
     handleInputChange('gender', gender);
   };
 
@@ -104,36 +127,47 @@ export const UserProfileForm: React.FC<UserProfileFormProps> = ({ onSubmit }) =>
             className="flex-1 text-base font-gilroy-regular text-gray-900"
             placeholder="Enter your username"
             placeholderTextColor="#9CA3AF"
-            value={profileData.username}
-            onChangeText={value => handleInputChange('username', value)}
+            value={profileData.userName}
+            onChangeText={value => handleInputChange('userName', value)}
             autoCapitalize="none"
             autoCorrect={false}
           />
         </View>
-        {errors.username && (
-          <Text className="text-sm font-gilroy-regular text-red-400 mt-1">{errors.username}</Text>
+        {errors.userName && (
+          <Text className="text-sm font-gilroy-regular text-red-400 mt-1">{errors.userName}</Text>
         )}
       </View>
 
       {/* Birth Date Input */}
       <View className="mb-6">
         <Text className="text-sm font-gilroy-medium text-gray-700 mb-2">Birth Date</Text>
-        <View className="border border-gray-300 rounded-lg px-4 py-2 flex-row items-center">
+        <TouchableOpacity
+          className="border border-gray-300 rounded-lg px-4 py-3 flex-row items-center"
+          onPress={showDatePicker}
+        >
           <View className="w-6 h-6 mr-3 items-center justify-center">
             <FontAwesome5 name="calendar" size={16} color="#6B7280" />
           </View>
-          <TextInput
-            className="flex-1 text-base font-gilroy-regular text-gray-900"
-            placeholder="DD/MM/YYYY"
-            placeholderTextColor="#9CA3AF"
-            value={profileData.birthDate}
-            onChangeText={value => handleInputChange('birthDate', value)}
-            keyboardType="numeric"
-          />
-        </View>
-        {errors.birthDate && (
-          <Text className="text-sm font-gilroy-regular text-red-400 mt-1">{errors.birthDate}</Text>
+          <Text className="flex-1 text-base font-gilroy-regular text-gray-900">
+            {profileData.dob.toLocaleDateString('en-GB')}
+          </Text>
+          <FontAwesome5 name="chevron-down" size={12} color="#9CA3AF" />
+        </TouchableOpacity>
+        {errors.dob && (
+          <Text className="text-sm font-gilroy-regular text-red-400 mt-1">{errors.dob}</Text>
         )}
+
+        <DateTimePickerModal
+          isVisible={isDatePickerVisible}
+          mode="date"
+          onConfirm={handleDateConfirm}
+          onCancel={hideDatePicker}
+          maximumDate={new Date()}
+          date={profileData.dob}
+          confirmTextIOS="Done"
+          cancelTextIOS="Cancel"
+          buttonTextColorIOS="#007AFF"
+        />
       </View>
 
       {/* Gender Selection */}
@@ -141,9 +175,9 @@ export const UserProfileForm: React.FC<UserProfileFormProps> = ({ onSubmit }) =>
         <Text className="text-sm font-gilroy-medium text-gray-700 mb-3">Gender</Text>
         <View className="flex-row justify-between">
           {[
-            { key: 'male', label: 'Male', icon: 'mars' },
-            { key: 'female', label: 'Female', icon: 'venus' },
-            { key: 'other', label: 'Other', icon: 'genderless' },
+            { key: 'Male', label: 'Male', icon: 'mars' },
+            { key: 'Female', label: 'Female', icon: 'venus' },
+            { key: 'Other', label: 'Other', icon: 'genderless' },
           ].map(option => (
             <TouchableOpacity
               key={option.key}

@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
-import { authService } from '../services/api/AuthService';
+import { authService, userService } from '../services/api';
 import { AuthUtils } from '@utils/auth';
 import type { AuthTokens, User } from '@types';
 
@@ -78,7 +78,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       } else {
         // Try to fetch user profile if not provided
         try {
-          const userProfile = await authService.getProfile();
+          const userProfile = await userService.getProfile();
           setUser(userProfile);
         } catch (error) {
           console.error('Failed to get user profile after Google login:', error);
@@ -122,7 +122,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   const refreshProfile = async () => {
     try {
       if (!tokens) return;
-      const userProfile = await authService.getProfile();
+      const userProfile = await userService.getProfile();
       setUser(userProfile);
     } catch (error) {
       console.error('Refresh profile error:', error);

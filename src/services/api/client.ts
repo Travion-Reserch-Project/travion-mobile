@@ -1,77 +1,304 @@
 import { API_CONFIG } from '@constants';
+import { AuthUtils } from '@utils/auth';
 import type { ApiResponse } from '@types';
 
-/**
- * API Client for making HTTP requests
- */
+//HTTP Methods enum
+enum HttpMethod {
+  GET = 'GET',
+  POST = 'POST',
+  PUT = 'PUT',
+  DELETE = 'DELETE',
+  PATCH = 'PATCH',
+}
+
+//Request configuration interface
+interface RequestConfig extends Omit<RequestInit, 'body'> {
+  body?: any;
+  useAuth?: boolean;
+  retries?: number;
+  timeout?: number;
+}
+
+//API Error class for better error handling
+export class ApiError extends Error {
+  constructor(message: string, public status?: number, public code?: string, public details?: any) {
+    super(message);
+    this.name = 'ApiError';
+  }
+}
+
 class ApiClient {
   private baseURL: string;
   private timeout: number;
+  private retryAttempts: number;
+  private retryDelay: number;
+
+  // Interceptors
+  private requestInterceptors: Array<
+    (config: RequestConfig) => RequestConfig | Promise<RequestConfig>
+  > = [];
+  private responseInterceptors: Array<(response: Response) => Response | Promise<Response>> = [];
+  private errorInterceptors: Array<(error: Error) => Error | Promise<Error>> = [];
 
   constructor() {
-    this.baseURL = API_CONFIG.BASE_URL;
+    this.baseURL = `${API_CONFIG.BASE_URL}${API_CONFIG.API_VERSION}`;
     this.timeout = API_CONFIG.TIMEOUT;
+    this.retryAttempts = API_CONFIG.RETRY_ATTEMPTS;
+    this.retryDelay = API_CONFIG.RETRY_DELAY;
+
+    this.setupDefaultInterceptors();
   }
 
-  private async request<T>(endpoint: string, options: RequestInit = {}): Promise<ApiResponse<T>> {
-    try {
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), this.timeout);
+  // Setup default request/response interceptors
+  private setupDefaultInterceptors(): void {
+    this.addRequestInterceptor(async config => {
+      if (config.useAuth !== false) {
+        const authHeaders = await this.getAuthHeaders();
+        config.headers = { ...config.headers, ...authHeaders };
+      }
+      return config;
+    });
 
-      const response = await fetch(`${this.baseURL}${endpoint}`, {
-        ...options,
-        signal: controller.signal,
+    this.addResponseInterceptor(async response => {
+      if (response.status === 401) {
+        try {
+          await this.refreshToken();
+        } catch {
+          await AuthUtils.clearAuthData();
+          throw new ApiError('Authentication expired', 401, 'AUTH_EXPIRED');
+        }
+      }
+      return response;
+    });
+  }
+
+  // Get authentication headers (with cookie fallback)
+  private async getAuthHeaders(): Promise<Record<string, string>> {
+    const headers: Record<string, string> = {};
+
+    if (!API_CONFIG.USE_COOKIES) {
+      const tokens = await AuthUtils.getStoredTokens();
+      if (tokens?.accessToken) {
+        headers.Authorization = `Bearer ${tokens.accessToken}`;
+      }
+    }
+    return headers;
+  }
+
+  // Refresh authentication token
+  private async refreshToken(): Promise<void> {
+    const tokens = await AuthUtils.getStoredTokens();
+    if (!tokens?.refreshToken) {
+      throw new Error('No refresh token available');
+    }
+
+    const response = await this.request('/auth/refresh', {
+      method: HttpMethod.POST,
+      body: { refreshToken: tokens.refreshToken },
+      useAuth: false,
+    });
+
+    if (response.success && response.data) {
+      const tokenData = response.data as any;
+      if (tokenData.tokens) {
+        await AuthUtils.storeTokens(tokenData.tokens);
+      }
+    }
+  }
+
+  // Add request interceptor
+  addRequestInterceptor(
+    interceptor: (config: RequestConfig) => RequestConfig | Promise<RequestConfig>,
+  ): void {
+    this.requestInterceptors.push(interceptor);
+  }
+
+  // Add response interceptor
+  addResponseInterceptor(interceptor: (response: Response) => Response | Promise<Response>): void {
+    this.responseInterceptors.push(interceptor);
+  }
+
+  // Add error interceptor
+  addErrorInterceptor(interceptor: (error: Error) => Error | Promise<Error>): void {
+    this.errorInterceptors.push(interceptor);
+  }
+
+  // Apply request interceptors
+  private async applyRequestInterceptors(config: RequestConfig): Promise<RequestConfig> {
+    let finalConfig = config;
+    for (const interceptor of this.requestInterceptors) {
+      finalConfig = await interceptor(finalConfig);
+    }
+    return finalConfig;
+  }
+
+  // Apply response interceptors
+  private async applyResponseInterceptors(response: Response): Promise<Response> {
+    let finalResponse = response;
+    for (const interceptor of this.responseInterceptors) {
+      finalResponse = await interceptor(finalResponse);
+    }
+    return finalResponse;
+  }
+
+  // Apply error interceptors
+  private async applyErrorInterceptors(error: Error): Promise<Error> {
+    let finalError = error;
+    for (const interceptor of this.errorInterceptors) {
+      finalError = await interceptor(finalError);
+    }
+    return finalError;
+  }
+
+  // Sleep utility for retry delay
+  private sleep(ms: number): Promise<void> {
+    return new Promise(resolve => setTimeout(resolve, ms));
+  }
+
+  // Core request method with retry logic and interceptors
+  private async request<T>(
+    endpoint: string,
+    config: RequestConfig = {},
+    attempt: number = 0,
+  ): Promise<ApiResponse<T>> {
+    try {
+      const finalConfig = await this.applyRequestInterceptors(config);
+
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), finalConfig.timeout || this.timeout);
+
+      const requestInit: RequestInit = {
+        method: finalConfig.method || HttpMethod.GET,
         headers: {
           'Content-Type': 'application/json',
-          ...options.headers,
+          ...finalConfig.headers,
         },
-      });
+        signal: controller.signal,
+        credentials: API_CONFIG.USE_COOKIES ? 'include' : 'same-origin', // Enable cookies
+        ...finalConfig,
+      };
 
+      console.log('Request method - finalConfig.body:', finalConfig.body);
+      if (finalConfig.body) {
+        if (finalConfig.body instanceof FormData) {
+          delete (requestInit.headers as Record<string, string>)['Content-Type'];
+          requestInit.body = finalConfig.body;
+        } else {
+          const serializedBody = JSON.stringify(finalConfig.body);
+          console.log('Serialized body:', serializedBody);
+          requestInit.body = serializedBody;
+        }
+      }
+
+      // Make request
+      const response = await fetch(`${this.baseURL}${endpoint}`, requestInit);
       clearTimeout(timeoutId);
 
-      const data = await response.json();
+      // Apply response interceptors
+      const finalResponse = await this.applyResponseInterceptors(response);
 
-      if (!response.ok) {
-        return {
-          success: false,
-          error: data.message || 'An error occurred',
-        };
+      // Parse response
+      const contentType = finalResponse.headers.get('content-type');
+      let data: any;
+
+      if (contentType?.includes('application/json')) {
+        data = await finalResponse.json();
+      } else {
+        data = await finalResponse.text();
+      }
+
+      // Handle HTTP errors
+      if (!finalResponse.ok) {
+        const error = new ApiError(
+          data.message || `HTTP ${finalResponse.status}`,
+          finalResponse.status,
+          data.code,
+          data,
+        );
+        throw await this.applyErrorInterceptors(error);
       }
 
       return {
         success: true,
         data,
+        status: finalResponse.status,
+        headers: finalResponse.headers,
       };
     } catch (error) {
+      // Handle network errors and retries
+      if (
+        attempt < (config.retries || this.retryAttempts) &&
+        (error instanceof TypeError ||
+          (error instanceof ApiError && error.status !== undefined && error.status >= 500)) // Server error
+      ) {
+        await this.sleep(this.retryDelay * Math.pow(2, attempt)); // Exponential backoff
+        return this.request(endpoint, config, attempt + 1);
+      }
+
+      const finalError = await this.applyErrorInterceptors(error as Error);
+
       return {
         success: false,
-        error: error instanceof Error ? error.message : 'Network error',
+        error: finalError.message,
+        status: (finalError as ApiError).status,
+        code: (finalError as ApiError).code,
       };
     }
   }
 
-  async get<T>(endpoint: string, options?: RequestInit): Promise<ApiResponse<T>> {
-    return this.request<T>(endpoint, { ...options, method: 'GET' });
+  // HTTP Methods
+  async get<T>(endpoint: string, config?: Omit<RequestConfig, 'method'>): Promise<ApiResponse<T>> {
+    return this.request<T>(endpoint, { ...config, method: HttpMethod.GET });
   }
 
-  async post<T>(endpoint: string, body?: any, options?: RequestInit): Promise<ApiResponse<T>> {
-    return this.request<T>(endpoint, {
-      ...options,
-      method: 'POST',
-      body: JSON.stringify(body),
+  async post<T>(
+    endpoint: string,
+    body?: any,
+    config?: Omit<RequestConfig, 'method' | 'body'>,
+  ): Promise<ApiResponse<T>> {
+    console.log('ApiClient.post called:', {
+      endpoint,
+      hasBody: !!body,
+      bodyKeys: body ? Object.keys(body) : [],
     });
+    return this.request<T>(endpoint, { ...config, method: HttpMethod.POST, body });
   }
 
-  async put<T>(endpoint: string, body?: any, options?: RequestInit): Promise<ApiResponse<T>> {
+  async put<T>(
+    endpoint: string,
+    body?: any,
+    config?: Omit<RequestConfig, 'method' | 'body'>,
+  ): Promise<ApiResponse<T>> {
+    return this.request<T>(endpoint, { ...config, method: HttpMethod.PUT, body });
+  }
+
+  async patch<T>(
+    endpoint: string,
+    body?: any,
+    config?: Omit<RequestConfig, 'method' | 'body'>,
+  ): Promise<ApiResponse<T>> {
+    return this.request<T>(endpoint, { ...config, method: HttpMethod.PATCH, body });
+  }
+
+  async delete<T>(
+    endpoint: string,
+    config?: Omit<RequestConfig, 'method'>,
+  ): Promise<ApiResponse<T>> {
+    return this.request<T>(endpoint, { ...config, method: HttpMethod.DELETE });
+  }
+
+  // Upload file with progress tracking
+  async upload<T>(
+    endpoint: string,
+    file: FormData,
+    onProgress?: (progress: number) => void,
+    config?: Omit<RequestConfig, 'method' | 'body'>,
+  ): Promise<ApiResponse<T>> {
     return this.request<T>(endpoint, {
-      ...options,
-      method: 'PUT',
-      body: JSON.stringify(body),
+      ...config,
+      method: HttpMethod.POST,
+      body: file,
     });
-  }
-
-  async delete<T>(endpoint: string, options?: RequestInit): Promise<ApiResponse<T>> {
-    return this.request<T>(endpoint, { ...options, method: 'DELETE' });
   }
 }
 

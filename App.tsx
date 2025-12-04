@@ -29,8 +29,9 @@ function AppContent() {
       setCurrentScreen('home');
       // Convert user data to UserProfileData format if needed
       setUserProfile({
-        username: user.name || 'Traveler',
-        birthDate: '',
+        name: user.name || 'Anonymous',
+        userName: user.name || 'Traveler',
+        dob: new Date(),
         gender: '',
         country: '',
         preferredLanguage: 'English',
@@ -82,7 +83,7 @@ function AppContent() {
     if (currentScreen === 'home') {
       return (
         <MainAppScreen
-          userName={userProfile?.username || user?.name || 'Traveler'}
+          userName={userProfile?.userName || user?.name || 'Traveler'}
           userEmail={user?.email || 'travel@example.com'}
         />
       );

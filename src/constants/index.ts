@@ -3,8 +3,12 @@ export const APP_VERSION = '1.0.0';
 
 // API Configuration
 export const API_CONFIG = {
-  BASE_URL: __DEV__ ? 'http://localhost:3001/api/v1' : 'https://api.travion.com',
+  BASE_URL: __DEV__ ? 'http://localhost:3001' : 'https://api.travion.com',
+  API_VERSION: '/api/v1',
   TIMEOUT: 30000,
+  USE_COOKIES: true, // Enable cookie-based authentication
+  RETRY_ATTEMPTS: 3,
+  RETRY_DELAY: 1000,
 } as const;
 
 // Screen names for navigation
@@ -17,6 +21,7 @@ export const SCREENS = {
 // Storage keys
 export const STORAGE_KEYS = {
   AUTH_TOKEN: '@travion:auth_token',
+  REFRESH_TOKEN: '@travion:refresh_token',
   USER_DATA: '@travion:user_data',
   THEME_PREFERENCE: '@travion:theme_preference',
 } as const;

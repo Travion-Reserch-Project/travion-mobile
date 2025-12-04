@@ -52,6 +52,13 @@ export const GoogleSignInButton: React.FC<GoogleSignInButtonProps> = ({
       }
 
       // Format the data for your backend
+      console.log('Raw Google result data:', {
+        hasIdToken: !!result.data?.idToken,
+        idToken: result.data?.idToken,
+        hasServerAuthCode: !!result.data?.serverAuthCode,
+        hasUser: !!result.data?.user,
+      });
+
       const authData = {
         tokens: {
           accessToken: result.data.idToken,

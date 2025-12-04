@@ -6,6 +6,7 @@ export interface User {
   email: string;
   avatar?: string;
   verified?: boolean;
+  profileStatus?: 'Incomplete' | 'Complete';
 }
 
 export interface AuthTokens {
@@ -35,6 +36,12 @@ export interface ApiResponse<T = any> {
   data?: T;
   error?: string;
   message?: string;
+  status?: number;
+  code?: string;
+  headers?: Headers;
 }
 
 export type LoadingState = 'idle' | 'loading' | 'success' | 'error';
+
+// Export service types
+export * from './services';

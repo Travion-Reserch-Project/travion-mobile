@@ -7,15 +7,12 @@ class AuthUtils {
   private static readonly USER_KEY = 'user_profile';
   private static readonly REFRESH_THRESHOLD = 5 * 60 * 1000; // 5 minutes before expiry
 
-  /**
-   * Check if user is currently authenticated
-   */
+  // Check if user is currently authenticated
   static async isAuthenticated(): Promise<boolean> {
     try {
       const tokens = await this.getStoredTokens();
       if (!tokens) return false;
 
-      // Check if token is expired
       const now = Date.now();
       const expiryTime = tokens.expiresIn;
 
@@ -26,9 +23,7 @@ class AuthUtils {
     }
   }
 
-  /**
-   * Check if token needs refresh (within 5 minutes of expiry)
-   */
+  // Check if token needs refresh (within 5 minutes of expiry)
   static async needsTokenRefresh(): Promise<boolean> {
     try {
       const tokens = await this.getStoredTokens();
@@ -44,12 +39,9 @@ class AuthUtils {
     }
   }
 
-  /**
-   * Store authentication tokens securely
-   */
+  // Store authentication tokens securely
   static async storeTokens(tokens: AuthTokens): Promise<void> {
     try {
-      // Validate tokens before storing
       if (!tokens) {
         throw new Error('Tokens are undefined or null');
       }
@@ -71,9 +63,7 @@ class AuthUtils {
     }
   }
 
-  /**
-   * Retrieve stored authentication tokens
-   */
+  // Retrieve stored authentication tokens
   static async getStoredTokens(): Promise<AuthTokens | null> {
     try {
       const tokens = await AsyncStorage.getItem(this.TOKEN_KEY);
@@ -84,11 +74,19 @@ class AuthUtils {
     }
   }
 
-  /**
-   * Store user profile data
-   */
+  // Store user profile data
   static async storeUser(user: User): Promise<void> {
     try {
+      if (!user) {
+        console.error('Attempted to store undefined/null user');
+        throw new Error('User data is required');
+      }
+
+      if (!user.userId || !user.email) {
+        console.error('Invalid user data - missing required fields:', user);
+        throw new Error('User data is incomplete');
+      }
+
       await AsyncStorage.setItem(this.USER_KEY, JSON.stringify(user));
     } catch (error) {
       console.error('Error storing user:', error);
@@ -96,9 +94,7 @@ class AuthUtils {
     }
   }
 
-  /**
-   * Retrieve stored user profile data
-   */
+  // Retrieve stored user profile data
   static async getStoredUser(): Promise<User | null> {
     try {
       const user = await AsyncStorage.getItem(this.USER_KEY);
@@ -109,28 +105,21 @@ class AuthUtils {
     }
   }
 
-  /**
-   * Clear all authentication data (logout)
-   */
+  // Clear all authentication data (logout)
   static async clearAuthData(): Promise<void> {
     try {
       await AsyncStorage.multiRemove([this.TOKEN_KEY, this.USER_KEY]);
 
-      // Attempt to sign out from Google; some versions may not expose isSignedIn(), so just try signOut and ignore failures
       try {
         await GoogleSignin.signOut();
-      } catch {
-        // Ignore signOut errors (e.g., not signed in or no-op)
-      }
+      } catch {}
     } catch (error) {
       console.error('Error clearing auth data:', error);
       throw new Error('Failed to clear authentication data');
     }
   }
 
-  /**
-   * Get current auth state (authenticated user and tokens)
-   */
+  // Get current auth state (authenticated user and tokens)
   static async getAuthState(): Promise<{
     user: User | null;
     tokens: AuthTokens | null;
@@ -150,9 +139,7 @@ class AuthUtils {
     }
   }
 
-  /**
-   * Extract and parse tokens from cookie string (for WebView OAuth)
-   */
+  // Extract and parse tokens from cookie string (for WebView OAuth)
   static extractTokensFromCookies(cookies: string): AuthTokens | null {
     try {
       const cookieArray = cookies.split(';').map(cookie => cookie.trim());
@@ -187,9 +174,7 @@ class AuthUtils {
     }
   }
 
-  /**
-   * Validate token structure
-   */
+  // Validate token structure
   static validateTokens(tokens: any): tokens is AuthTokens {
     return (
       tokens &&

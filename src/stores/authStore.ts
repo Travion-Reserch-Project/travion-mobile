@@ -1,7 +1,7 @@
 import { create } from 'zustand';
 import { createJSONStorage, persist } from 'zustand/middleware';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { authService } from '../services/api/AuthService';
+import { authService, userService } from '../services/api';
 import { AuthUtils } from '@utils/auth';
 import type { AuthTokens, User } from '@types';
 
@@ -21,6 +21,7 @@ interface AuthState {
   logout: () => Promise<void>;
   refreshProfile: () => Promise<void>;
   initializeAuth: () => Promise<void>;
+  updateUser: (user: User) => Promise<void>;
 
   // Internal actions
   setUser: (user: User | null) => void;
@@ -77,7 +78,12 @@ export const useAuthStore = create<AuthState>()(
             user: response.user,
           });
 
-          console.log('Google login successful, user stored in database');
+          // Only log success if we have valid tokens
+          if (response.tokens) {
+            console.log('Google login successful, user stored in database');
+          } else {
+            console.log('Google login successful (offline mode), user stored locally');
+          }
         } catch (error) {
           console.error('Google login error:', error);
           throw error;
@@ -131,7 +137,7 @@ export const useAuthStore = create<AuthState>()(
           const { tokens } = get();
           if (!tokens) return;
 
-          const userProfile = await authService.getProfile();
+          const userProfile = await userService.getProfile();
           set({ user: userProfile });
         } catch (error) {
           console.error('Refresh profile error:', error);
@@ -167,6 +173,16 @@ export const useAuthStore = create<AuthState>()(
           });
         } finally {
           set({ isLoading: false });
+        }
+      },
+
+      updateUser: async (user: User) => {
+        try {
+          await AuthUtils.storeUser(user);
+          set({ user });
+        } catch (error) {
+          console.error('Update user error:', error);
+          throw error;
         }
       },
 
