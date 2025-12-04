@@ -4,6 +4,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { UserProfileForm, UserProfileData } from '@components/forms';
 import { useAuthStore } from '@stores';
 import { userService } from '@services/api';
+import { User } from '@types';
 
 interface UserProfileSetupProps {
   onComplete: (profileData: UserProfileData) => void;
@@ -21,6 +22,19 @@ export const UserProfileSetupScreen: React.FC<UserProfileSetupProps> = ({ onComp
       const profileData = await userService.getProfile();
 
       if (profileData) {
+        // Check if profile is already complete
+        if (profileData.profileStatus === 'Complete') {
+          onComplete({
+            name: profileData.name || '',
+            userName: (profileData as any).userName || profileData.name || '',
+            dob: (profileData as any).dob ? new Date((profileData as any).dob) : new Date(),
+            gender: ((profileData as any).gender || '') as 'Male' | 'Female' | 'Other' | '',
+            country: (profileData as any).country || '',
+            preferredLanguage: (profileData as any).preferredLanguage || '',
+          });
+          return;
+        }
+
         // Map User data to UserProfileData format
         const formData: UserProfileData = {
           name: profileData.name || '',
@@ -32,7 +46,7 @@ export const UserProfileSetupScreen: React.FC<UserProfileSetupProps> = ({ onComp
         };
 
         setExistingData(formData);
-        updateUser(profileData);
+        updateUser(profileData as User);
       }
     } catch (error) {
       console.error('Failed to fetch profile:', error);
@@ -41,7 +55,7 @@ export const UserProfileSetupScreen: React.FC<UserProfileSetupProps> = ({ onComp
     } finally {
       setIsLoading(false);
     }
-  }, [updateUser]);
+  }, [updateUser, onComplete]);
 
   useEffect(() => {
     fetchExistingProfile();
