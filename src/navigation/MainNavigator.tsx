@@ -2,7 +2,7 @@ import React from 'react';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { UserProfileSetupScreen, MainAppScreen } from '@screens';
 import { useAuthStore } from '@stores';
-import { View, Text, StyleSheet } from 'react-native';
+import { View, Text, StyleSheet, Platform } from 'react-native';
 import LottieView from 'lottie-react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
@@ -46,8 +46,17 @@ const WelcomeBackScreen: React.FC = () => {
 export const MainNavigator: React.FC = () => {
   const { user } = useAuthStore();
 
-  // Simple logic: if user has profileStatus 'Complete', show welcome back, otherwise profile setup
-  const hasCompleteProfile = user?.profileStatus === 'Complete';
+  // Handle undefined profileStatus (default to Incomplete)
+  const profileStatus = user?.profileStatus || 'Incomplete';
+  const hasCompleteProfile = profileStatus === 'Complete';
+
+  // Debug logging for Android issues
+  console.log(`[${Platform.OS}] MainNavigator render:`, {
+    hasUser: !!user,
+    profileStatus,
+    hasCompleteProfile,
+    userObject: user ? { id: user.id, profileStatus } : null,
+  });
 
   return (
     <Stack.Navigator screenOptions={{ headerShown: false }}>
