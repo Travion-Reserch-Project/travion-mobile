@@ -1,6 +1,7 @@
 import React from 'react';
 import { View, Text, TouchableOpacity } from 'react-native';
 import FontAwesome5 from 'react-native-vector-icons/FontAwesome5';
+import MapView, { Marker, PROVIDER_GOOGLE } from 'react-native-maps';
 
 interface SafetyAlert {
   id: string;
@@ -23,6 +24,14 @@ const defaultAlerts: SafetyAlert[] = [
     location: 'Colombo, Sri Lanka',
   },
 ];
+
+// Colombo default region (can later come from backend / GPS)
+const COLOMBO_REGION = {
+  latitude: 6.9271,
+  longitude: 79.8612,
+  latitudeDelta: 0.015,
+  longitudeDelta: 0.015,
+};
 
 export const SafetyAlerts: React.FC<SafetyAlertsProps> = ({ alerts = defaultAlerts }) => {
   const getRiskLevelColor = (level: string) => {
@@ -71,26 +80,30 @@ export const SafetyAlerts: React.FC<SafetyAlertsProps> = ({ alerts = defaultAler
 
       {/* Live Map Preview */}
       <View className="bg-white rounded-2xl overflow-hidden mb-6 shadow-sm">
-        {/* Map Placeholder - In real app, this would be an actual map */}
-        <View className="h-48 bg-blue-100 items-center justify-center">
-          <View className="absolute inset-0 bg-gradient-to-b from-blue-200 to-blue-300" />
-          {/* Map markers */}
-          <View className="absolute top-12 left-16">
-            <View className="w-6 h-6 bg-blue-600 rounded-full border-2 border-white" />
-          </View>
-          <View className="absolute bottom-16 right-20">
-            <View className="w-6 h-6 bg-red-500 rounded-full border-2 border-white" />
-          </View>
-          <View className="absolute top-20 right-12">
-            <View className="w-6 h-6 bg-green-500 rounded-full border-2 border-white" />
-          </View>
-
-          {/* Location label */}
-          <View className="absolute bottom-12 left-1/2 transform -translate-x-1/2 bg-white px-3 py-1 rounded-full">
-            <Text className="text-sm font-gilroy-bold text-gray-900">Colombo</Text>
-          </View>
+        {/* Real Map */}
+        <View style={{ width: '100%', height: 200 }}>
+          <MapView
+            style={{ flex: 1 }}
+            provider={PROVIDER_GOOGLE}
+            initialRegion={COLOMBO_REGION}
+            scrollEnabled={false}
+            zoomEnabled={true}
+            pitchEnabled={false}
+            rotateEnabled={false}
+          >
+            {/* Current location marker (Colombo) */}
+            <Marker
+              coordinate={{
+                latitude: COLOMBO_REGION.latitude,
+                longitude: COLOMBO_REGION.longitude,
+              }}
+              title="Colombo"
+              description="Current area risk preview"
+            />
+          </MapView>
         </View>
 
+        {/* Map caption */}
         <View className="p-4">
           <Text className="text-lg font-gilroy-bold text-gray-900 mb-1">Live Map Preview</Text>
           <Text className="text-sm font-gilroy-regular text-gray-600">Tap to view full map</Text>
