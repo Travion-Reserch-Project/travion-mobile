@@ -1,7 +1,20 @@
-import React from 'react';
-import { View, Text, TouchableOpacity } from 'react-native';
+import React, { useState, useEffect } from 'react';
+import {
+  View,
+  Text,
+  TouchableOpacity,
+  PermissionsAndroid,
+  Platform,
+  ActivityIndicator,
+} from 'react-native';
 import FontAwesome5 from 'react-native-vector-icons/FontAwesome5';
 import MapView, { Marker, PROVIDER_GOOGLE } from 'react-native-maps';
+import Geolocation from '@react-native-community/geolocation';
+import RNGeocoding from 'react-native-geocoding';
+import Config from 'react-native-config';
+
+// Initialize geocoding with API key
+RNGeocoding.init(Config.GOOGLE_MAPS_API_KEY as string);
 
 interface SafetyAlert {
   id: string;
@@ -14,6 +27,10 @@ interface SafetyAlert {
 interface SafetyAlertsProps {
   alerts?: SafetyAlert[];
 }
+interface LocationCoords {
+  latitude: number;
+  longitude: number;
+}
 
 const defaultAlerts: SafetyAlert[] = [
   {
@@ -21,19 +38,98 @@ const defaultAlerts: SafetyAlert[] = [
     title: 'Current Risk Level: Medium',
     description: 'Pickpocketing risk increases at this hour.',
     level: 'medium',
-    location: 'Colombo, Sri Lanka',
+    location: 'Current Location',
   },
 ];
 
-// Colombo default region (can later come from backend / GPS)
-const COLOMBO_REGION = {
+// Default fallback region (Colombo)
+const DEFAULT_REGION = {
   latitude: 6.9271,
   longitude: 79.8612,
-  latitudeDelta: 0.015,
-  longitudeDelta: 0.015,
+  latitudeDelta: 0.05,
+  longitudeDelta: 0.05,
 };
 
 export const SafetyAlerts: React.FC<SafetyAlertsProps> = ({ alerts = defaultAlerts }) => {
+  const [userLocation, setUserLocation] = useState<LocationCoords | null>(null);
+  const [locationName, setLocationName] = useState<string>('Current Location');
+  const [locationLoading, setLocationLoading] = useState(true);
+  const [mapRegion, setMapRegion] = useState(DEFAULT_REGION);
+
+  // Request location permissions and get current location
+  useEffect(() => {
+    const requestLocationPermission = async () => {
+      try {
+        if (Platform.OS === 'android') {
+          const granted = await PermissionsAndroid.request(
+            PermissionsAndroid.PERMISSIONS.ACCESS_FINE_LOCATION,
+            {
+              title: 'Location Permission',
+              message: 'Travion needs access to your location for safety alerts.',
+              buttonNeutral: 'Ask Me Later',
+              buttonNegative: 'Cancel',
+              buttonPositive: 'OK',
+            },
+          );
+          if (granted !== PermissionsAndroid.RESULTS.GRANTED) {
+            setLocationLoading(false);
+            return;
+          }
+        }
+
+        // Get current position
+        Geolocation.getCurrentPosition(
+          async position => {
+            const { latitude, longitude } = position.coords;
+            const newLocation = { latitude, longitude };
+            setUserLocation(newLocation);
+            setMapRegion({
+              latitude,
+              longitude,
+              latitudeDelta: 0.05,
+              longitudeDelta: 0.05,
+            });
+
+            // Reverse geocode to get location name
+            try {
+              console.log('Starting reverse geocoding for:', latitude, longitude);
+              const results = await RNGeocoding.from(latitude, longitude);
+              console.log('Geocoding results:', results);
+              if (results && results.results && results.results.length > 0) {
+                const address = results.results[0];
+                const locationString = address.formatted_address || 'Current Location';
+                console.log('Formatted address:', locationString);
+                // Extract city from formatted address
+                const parts = locationString.split(',');
+                const cityName = parts.length > 1 ? parts[parts.length - 2].trim() : parts[0];
+                console.log('Extracted city name:', cityName);
+                setLocationName(cityName);
+              } else {
+                console.log('No results found from geocoding');
+                setLocationName(`Coordinates: ${latitude.toFixed(4)}, ${longitude.toFixed(4)}`);
+              }
+            } catch (err) {
+              console.error('Reverse geocoding error:', err);
+              // Fallback: show coordinates if geocoding fails
+              setLocationName(`Coordinates: ${latitude.toFixed(4)}, ${longitude.toFixed(4)}`);
+            }
+
+            setLocationLoading(false);
+          },
+          error => {
+            console.log('Geolocation error:', error);
+            setLocationLoading(false);
+          },
+          { enableHighAccuracy: true, timeout: 15000, maximumAge: 10000 },
+        );
+      } catch (error) {
+        console.error('Permission error:', error);
+        setLocationLoading(false);
+      }
+    };
+
+    requestLocationPermission();
+  }, []);
   const getRiskLevelColor = (level: string) => {
     switch (level) {
       case 'high':
@@ -52,8 +148,8 @@ export const SafetyAlerts: React.FC<SafetyAlertsProps> = ({ alerts = defaultAler
       {/* Location Status */}
       <View className="flex-row items-center mb-6">
         <View className="w-3 h-3 bg-green-500 rounded-full mr-2" />
-        <Text className="text-base font-gilroy-medium text-gray-700">
-          Colombo, Sri Lanka • Live
+        <Text className="text-base font-gilroy-medium text-gray-700" numberOfLines={1}>
+          {locationLoading ? 'Getting location...' : `${locationName} • Live`}
         </Text>
       </View>
 
@@ -82,25 +178,34 @@ export const SafetyAlerts: React.FC<SafetyAlertsProps> = ({ alerts = defaultAler
       <View className="bg-white rounded-2xl overflow-hidden mb-6 shadow-sm">
         {/* Real Map */}
         <View style={{ width: '100%', height: 200 }}>
-          <MapView
-            style={{ flex: 1 }}
-            provider={PROVIDER_GOOGLE}
-            initialRegion={COLOMBO_REGION}
-            scrollEnabled={false}
-            zoomEnabled={true}
-            pitchEnabled={false}
-            rotateEnabled={false}
-          >
-            {/* Current location marker (Colombo) */}
-            <Marker
-              coordinate={{
-                latitude: COLOMBO_REGION.latitude,
-                longitude: COLOMBO_REGION.longitude,
-              }}
-              title="Colombo"
-              description="Current area risk preview"
-            />
-          </MapView>
+          {locationLoading ? (
+            <View className="flex-1 items-center justify-center bg-gray-100">
+              <ActivityIndicator size="large" color="#F97316" />
+              <Text className="text-sm text-gray-600 mt-2">Loading your location...</Text>
+            </View>
+          ) : (
+            <MapView
+              style={{ flex: 1 }}
+              provider={PROVIDER_GOOGLE}
+              initialRegion={mapRegion}
+              scrollEnabled={false}
+              zoomEnabled={true}
+              pitchEnabled={false}
+              rotateEnabled={false}
+            >
+              {/* Current location marker */}
+              {userLocation && (
+                <Marker
+                  coordinate={{
+                    latitude: userLocation.latitude,
+                    longitude: userLocation.longitude,
+                  }}
+                  title="Your Location"
+                  description="Current area risk preview"
+                />
+              )}
+            </MapView>
+          )}
         </View>
 
         {/* Map caption */}
