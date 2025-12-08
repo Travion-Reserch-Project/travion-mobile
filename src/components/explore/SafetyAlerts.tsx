@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   View,
   Text,
@@ -6,9 +6,10 @@ import {
   PermissionsAndroid,
   Platform,
   ActivityIndicator,
+  Animated,
 } from 'react-native';
 import FontAwesome5 from 'react-native-vector-icons/FontAwesome5';
-import MapView, { Marker, PROVIDER_GOOGLE } from 'react-native-maps';
+import MapView, { Marker, Circle, PROVIDER_GOOGLE } from 'react-native-maps';
 import Geolocation from '@react-native-community/geolocation';
 import RNGeocoding from 'react-native-geocoding';
 import Config from 'react-native-config';
@@ -55,6 +56,70 @@ export const SafetyAlerts: React.FC<SafetyAlertsProps> = ({ alerts = defaultAler
   const [locationName, setLocationName] = useState<string>('Current Location');
   const [locationLoading, setLocationLoading] = useState(true);
   const [mapRegion, setMapRegion] = useState(DEFAULT_REGION);
+  // Get current risk level from alerts (default to medium for now)
+  const currentRiskLevel = alerts[0]?.level || 'medium';
+
+  // Animation for pulsing dot
+  const pulseAnim = useRef(new Animated.Value(0)).current;
+
+  // Helper functions
+  const getRiskLevelColor = (level: string) => {
+    switch (level) {
+      case 'high':
+        return '#DC2626';
+      case 'medium':
+        return '#F97316';
+      case 'low':
+        return '#16A34A';
+      default:
+        return '#6B7280';
+    }
+  };
+
+  const getRiskRadius = (level: string) => {
+    // Radius in meters for the risk circle
+    switch (level) {
+      case 'high':
+        return 600; // 600m radius for high risk
+      case 'medium':
+        return 400; // 400m radius for medium risk
+      case 'low':
+        return 200; // 200m radius for low risk
+      default:
+        return 300;
+    }
+  };
+
+  const getMapZoomLevel = (radius: number) => {
+    // Calculate appropriate latitudeDelta/longitudeDelta to show the full circle
+    // Add padding factor to ensure circle is fully visible
+    const paddingFactor = 2.5;
+    // Convert radius in meters to degrees (roughly)
+    const degreesPerMeter = 0.00001;
+    const delta = radius * degreesPerMeter * paddingFactor;
+    return { latitudeDelta: delta, longitudeDelta: delta };
+  };
+
+  // Pulsing animation effect
+  useEffect(() => {
+    const pulse = Animated.loop(
+      Animated.sequence([
+        Animated.timing(pulseAnim, {
+          toValue: 1,
+          duration: 1000,
+          useNativeDriver: true,
+        }),
+        Animated.timing(pulseAnim, {
+          toValue: 0,
+          duration: 1000,
+          useNativeDriver: true,
+        }),
+      ]),
+    );
+    pulse.start();
+
+    return () => pulse.stop();
+  }, [pulseAnim]);
 
   // Request location permissions and get current location
   useEffect(() => {
@@ -83,11 +148,15 @@ export const SafetyAlerts: React.FC<SafetyAlertsProps> = ({ alerts = defaultAler
             const { latitude, longitude } = position.coords;
             const newLocation = { latitude, longitude };
             setUserLocation(newLocation);
+
+            // Calculate zoom level based on risk radius
+            const radius = getRiskRadius(currentRiskLevel);
+            const zoomLevel = getMapZoomLevel(radius);
+
             setMapRegion({
               latitude,
               longitude,
-              latitudeDelta: 0.05,
-              longitudeDelta: 0.05,
+              ...zoomLevel,
             });
 
             // Reverse geocode to get location name
@@ -129,28 +198,29 @@ export const SafetyAlerts: React.FC<SafetyAlertsProps> = ({ alerts = defaultAler
     };
 
     requestLocationPermission();
-  }, []);
-  const getRiskLevelColor = (level: string) => {
-    switch (level) {
-      case 'high':
-        return '#DC2626';
-      case 'medium':
-        return '#F97316';
-      case 'low':
-        return '#16A34A';
-      default:
-        return '#6B7280';
-    }
-  };
+  }, [currentRiskLevel]);
 
   return (
     <View className="px-6">
       {/* Location Status */}
       <View className="flex-row items-center mb-6">
-        <View className="w-3 h-3 bg-green-500 rounded-full mr-2" />
         <Text className="text-base font-gilroy-medium text-gray-700" numberOfLines={1}>
-          {locationLoading ? 'Getting location...' : `${locationName} • Live`}
+          {locationLoading ? 'Getting location...' : locationName}
         </Text>
+        {!locationLoading && (
+          <View className="flex-row items-center ml-2">
+            <Animated.View
+              className="w-2 h-2 rounded-full mr-1"
+              style={{
+                backgroundColor: pulseAnim.interpolate({
+                  inputRange: [0, 1],
+                  outputRange: ['#6EE7B7', '#10B981'], // Light green to normal green
+                }),
+              }}
+            />
+            <Text className="text-base font-gilroy-medium text-gray-700">Live</Text>
+          </View>
+        )}
       </View>
 
       {/* Risk Alert Card */}
@@ -177,7 +247,7 @@ export const SafetyAlerts: React.FC<SafetyAlertsProps> = ({ alerts = defaultAler
       {/* Live Map Preview */}
       <View className="bg-white rounded-2xl overflow-hidden mb-6 shadow-sm">
         {/* Real Map */}
-        <View style={{ width: '100%', height: 200 }}>
+        <View className="w-full h-52">
           {locationLoading ? (
             <View className="flex-1 items-center justify-center bg-gray-100">
               <ActivityIndicator size="large" color="#F97316" />
@@ -185,24 +255,49 @@ export const SafetyAlerts: React.FC<SafetyAlertsProps> = ({ alerts = defaultAler
             </View>
           ) : (
             <MapView
-              style={{ flex: 1 }}
+              className="flex-1"
               provider={PROVIDER_GOOGLE}
               initialRegion={mapRegion}
               scrollEnabled={false}
-              zoomEnabled={true}
+              zoomEnabled={false}
               pitchEnabled={false}
               rotateEnabled={false}
             >
-              {/* Current location marker */}
+              {/* Risk circle around current location */}
               {userLocation && (
-                <Marker
-                  coordinate={{
-                    latitude: userLocation.latitude,
-                    longitude: userLocation.longitude,
-                  }}
-                  title="Your Location"
-                  description="Current area risk preview"
-                />
+                <>
+                  <Circle
+                    center={{
+                      latitude: userLocation.latitude,
+                      longitude: userLocation.longitude,
+                    }}
+                    radius={300}
+                    fillColor={`${getRiskLevelColor(currentRiskLevel)}40`}
+                    strokeColor={getRiskLevelColor(currentRiskLevel)}
+                    strokeWidth={2}
+                  />
+                  {/* Blue dot for current location */}
+                  <Marker
+                    coordinate={{
+                      latitude: userLocation.latitude,
+                      longitude: userLocation.longitude,
+                    }}
+                    anchor={{ x: 0.5, y: 0.5 }}
+                  >
+                    <View
+                      className="w-5 h-5 rounded-full"
+                      style={{
+                        backgroundColor: '#4285F4',
+                        borderWidth: 3,
+                        borderColor: '#FFFFFF',
+                        shadowColor: '#000',
+                        shadowOpacity: 0.3,
+                        shadowRadius: 3,
+                        elevation: 5,
+                      }}
+                    />
+                  </Marker>
+                </>
               )}
             </MapView>
           )}
