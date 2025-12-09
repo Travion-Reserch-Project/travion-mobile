@@ -7,6 +7,7 @@ import {
   Platform,
   ActivityIndicator,
   Animated,
+  useWindowDimensions,
 } from 'react-native';
 import FontAwesome5 from 'react-native-vector-icons/FontAwesome5';
 import MapView, { Marker, Circle, PROVIDER_GOOGLE } from 'react-native-maps';
@@ -27,6 +28,7 @@ interface SafetyAlert {
 
 interface SafetyAlertsProps {
   alerts?: SafetyAlert[];
+  onViewFullMap?: () => void;
 }
 interface LocationCoords {
   latitude: number;
@@ -36,8 +38,15 @@ interface LocationCoords {
 const defaultAlerts: SafetyAlert[] = [
   {
     id: '1',
+    title: 'Current Risk Level: High',
+    description: 'Gang activity reported in this area. Avoid traveling alone.',
+    level: 'high',
+    location: 'Current Location',
+  },
+  {
+    id: '2',
     title: 'Current Risk Level: Medium',
-    description: 'Pickpocketing risk increases at this hour.',
+    description: 'Pickpocketing risk increases at this hour. Stay alert.',
     level: 'medium',
     location: 'Current Location',
   },
@@ -51,13 +60,30 @@ const DEFAULT_REGION = {
   longitudeDelta: 0.05,
 };
 
-export const SafetyAlerts: React.FC<SafetyAlertsProps> = ({ alerts = defaultAlerts }) => {
+export const SafetyAlerts: React.FC<SafetyAlertsProps> = ({
+  alerts = defaultAlerts,
+  onViewFullMap,
+}) => {
   const [userLocation, setUserLocation] = useState<LocationCoords | null>(null);
   const [locationName, setLocationName] = useState<string>('Current Location');
   const [locationLoading, setLocationLoading] = useState(true);
   const [mapRegion, setMapRegion] = useState(DEFAULT_REGION);
-  // Get current risk level from alerts (default to medium for now)
-  const currentRiskLevel = alerts[0]?.level || 'medium';
+  const [selectedAlertIndex, setSelectedAlertIndex] = useState(0);
+  const { width } = useWindowDimensions();
+  // Account for horizontal padding (px-6 = 24 each side)
+  const carouselWidth = Math.max(width - 48, 280);
+  const cardHeight = 160;
+  const scrollRef = useRef<Animated.ScrollView | null>(null);
+
+  // Check if there are any high or medium risk incidents
+  const hasAnyRisk = alerts.some(alert => alert.level === 'high' || alert.level === 'medium');
+
+  // Filter alerts: if there are risks, exclude low-risk "Safe Area" cards
+  const filteredAlerts = hasAnyRisk ? alerts.filter(alert => alert.level !== 'low') : alerts;
+
+  // Get selected alert (or default if index out of range)
+  const selectedAlert = filteredAlerts[selectedAlertIndex] || filteredAlerts[0] || defaultAlerts[0];
+  const currentRiskLevel = selectedAlert.level;
 
   // Animation for pulsing dot
   const pulseAnim = useRef(new Animated.Value(0)).current;
@@ -198,7 +224,7 @@ export const SafetyAlerts: React.FC<SafetyAlertsProps> = ({ alerts = defaultAler
     };
 
     requestLocationPermission();
-  }, [currentRiskLevel]);
+  }, [selectedAlertIndex, currentRiskLevel]);
 
   return (
     <View className="px-6">
@@ -223,26 +249,123 @@ export const SafetyAlerts: React.FC<SafetyAlertsProps> = ({ alerts = defaultAler
         )}
       </View>
 
-      {/* Risk Alert Card */}
-      {alerts.map(alert => (
-        <View
-          key={alert.id}
-          className="rounded-2xl p-6 mb-6"
-          style={{ backgroundColor: getRiskLevelColor(alert.level) }}
-        >
-          <View className="flex-row items-start justify-between">
-            <View className="flex-1">
-              <Text className="text-xl font-gilroy-bold text-white mb-2">{alert.title}</Text>
-              <Text className="text-base font-gilroy-regular text-white/90">
-                {alert.description}
+      {/* Risk Alert Carousel */}
+      {alerts.length > 0 ? (
+        <View className="mb-6">
+          <View className="-mx-6">
+            <Animated.ScrollView
+              ref={scrollRef as any}
+              horizontal
+              pagingEnabled
+              showsHorizontalScrollIndicator={false}
+              decelerationRate="fast"
+              snapToInterval={carouselWidth}
+              snapToAlignment="start"
+              contentContainerStyle={{ paddingHorizontal: 0 }}
+              onMomentumScrollEnd={event => {
+                const index = Math.round(event.nativeEvent.contentOffset.x / carouselWidth);
+                setSelectedAlertIndex(Math.min(Math.max(index, 0), filteredAlerts.length - 1));
+              }}
+            >
+              {filteredAlerts.map((alert, index) => (
+                <View
+                  key={alert.id || index}
+                  style={{ width: carouselWidth, paddingHorizontal: 24 }}
+                >
+                  <View
+                    className="rounded-2xl p-6"
+                    style={{
+                      backgroundColor: getRiskLevelColor(alert.level),
+                      height: cardHeight,
+                      shadowColor: '#000',
+                      shadowOffset: { width: 0, height: 4 },
+                      shadowOpacity: 0.15,
+                      shadowRadius: 12,
+                      elevation: 6,
+                    }}
+                  >
+                    {alert.level === 'low' ? (
+                      // Safe Area Message
+                      <View className="flex-row items-start justify-between">
+                        <View className="flex-1">
+                          <Text className="text-2xl font-gilroy-bold text-white mb-2">
+                            Safe Area ✓
+                          </Text>
+                          <Text className="text-base font-gilroy-regular text-white/90">
+                            No risks detected in this location. You are safe!
+                          </Text>
+                        </View>
+                        <View className="w-12 h-12 bg-white/20 rounded-full items-center justify-center ml-4">
+                          <FontAwesome5 name="check-circle" size={20} color="white" />
+                        </View>
+                      </View>
+                    ) : (
+                      // High/Medium Risk Message
+                      <View className="flex-row items-start justify-between">
+                        <View className="flex-1">
+                          <Text className="text-xl font-gilroy-bold text-white mb-2">
+                            {alert.title}
+                          </Text>
+                          <Text className="text-base font-gilroy-regular text-white/90">
+                            {alert.description}
+                          </Text>
+                        </View>
+                        <View className="w-12 h-12 bg-white/20 rounded-full items-center justify-center ml-4">
+                          <FontAwesome5
+                            name={
+                              alert.level === 'high' ? 'exclamation-circle' : 'exclamation-triangle'
+                            }
+                            size={20}
+                            color="white"
+                          />
+                        </View>
+                      </View>
+                    )}
+                  </View>
+                </View>
+              ))}
+            </Animated.ScrollView>
+          </View>
+
+          {/* Carousel Indicators - Only show if multiple alerts */}
+          {filteredAlerts.length > 1 && (
+            <View className="mt-4">
+              {/* Page Indicator Dots */}
+              <View className="flex-row justify-center items-center gap-2">
+                {filteredAlerts.map((alert, index) => (
+                  <TouchableOpacity
+                    key={alert.id || index}
+                    onPress={() => {
+                      setSelectedAlertIndex(index);
+                      scrollRef.current?.scrollTo({
+                        x: index * carouselWidth,
+                        y: 0,
+                        animated: true,
+                      });
+                    }}
+                    className="transition-all"
+                  >
+                    <View
+                      className={`rounded-full ${
+                        index === selectedAlertIndex ? 'w-8 h-2' : 'w-2 h-2'
+                      }`}
+                      style={{
+                        backgroundColor:
+                          index === selectedAlertIndex ? getRiskLevelColor(alert.level) : '#D1D5DB',
+                      }}
+                    />
+                  </TouchableOpacity>
+                ))}
+              </View>
+
+              {/* Counter Text */}
+              <Text className="text-center text-xs font-gilroy-medium text-gray-500 mt-2">
+                {selectedAlertIndex + 1} of {filteredAlerts.length} alerts
               </Text>
             </View>
-            <View className="w-12 h-12 bg-white/20 rounded-full items-center justify-center ml-4">
-              <FontAwesome5 name="shield-alt" size={20} color="white" />
-            </View>
-          </View>
+          )}
         </View>
-      ))}
+      ) : null}
 
       {/* Live Map Preview */}
       <View className="bg-white rounded-2xl overflow-hidden mb-6 shadow-sm">
@@ -271,7 +394,7 @@ export const SafetyAlerts: React.FC<SafetyAlertsProps> = ({ alerts = defaultAler
                       latitude: userLocation.latitude,
                       longitude: userLocation.longitude,
                     }}
-                    radius={300}
+                    radius={getRiskRadius(currentRiskLevel)}
                     fillColor={`${getRiskLevelColor(currentRiskLevel)}40`}
                     strokeColor={getRiskLevelColor(currentRiskLevel)}
                     strokeWidth={2}
@@ -304,10 +427,10 @@ export const SafetyAlerts: React.FC<SafetyAlertsProps> = ({ alerts = defaultAler
         </View>
 
         {/* Map caption */}
-        <View className="p-4">
+        <TouchableOpacity onPress={onViewFullMap} className="p-4">
           <Text className="text-lg font-gilroy-bold text-gray-900 mb-1">Live Map Preview</Text>
-          <Text className="text-sm font-gilroy-regular text-gray-600">Tap to view full map</Text>
-        </View>
+          <Text className="text-sm font-gilroy-regular text-gray-600">Tap to view full map →</Text>
+        </TouchableOpacity>
       </View>
 
       {/* Quick Actions */}
