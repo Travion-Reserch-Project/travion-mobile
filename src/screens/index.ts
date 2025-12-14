@@ -9,3 +9,5 @@ export * from './ChatbotScreen';
 export * from './ProfileScreen';
 export * from './AlertsScreen';
 export * from './MainAppScreen';
+export * from './MapScreen';
+export * from './ReportIncidentScreen';
