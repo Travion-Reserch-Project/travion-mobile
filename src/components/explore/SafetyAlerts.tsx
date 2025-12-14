@@ -29,6 +29,7 @@ interface SafetyAlert {
 interface SafetyAlertsProps {
   alerts?: SafetyAlert[];
   onViewFullMap?: () => void;
+  onReportIncident?: () => void;
 }
 interface LocationCoords {
   latitude: number;
@@ -63,6 +64,7 @@ const DEFAULT_REGION = {
 export const SafetyAlerts: React.FC<SafetyAlertsProps> = ({
   alerts = defaultAlerts,
   onViewFullMap,
+  onReportIncident,
 }) => {
   const [userLocation, setUserLocation] = useState<LocationCoords | null>(null);
   const [locationName, setLocationName] = useState<string>('Current Location');
@@ -438,11 +440,20 @@ export const SafetyAlerts: React.FC<SafetyAlertsProps> = ({
         <Text className="text-lg font-gilroy-bold text-gray-900 mb-4">Quick Actions</Text>
         <View className="flex-row justify-between">
           {[
-            { icon: 'exclamation-triangle', label: 'Report Incident', color: '#F97316' },
+            {
+              icon: 'exclamation-triangle',
+              label: 'Report Incident',
+              color: '#F97316',
+              onPress: onReportIncident,
+            },
             { icon: 'bell', label: 'View Alerts', color: '#F97316' },
             { icon: 'shield-alt', label: 'Police Help', color: '#F97316' },
           ].map((action, index) => (
-            <TouchableOpacity key={index} className="flex-1 items-center mx-2">
+            <TouchableOpacity
+              key={index}
+              onPress={action.onPress}
+              className="flex-1 items-center mx-2"
+            >
               <View
                 className="w-16 h-16 rounded-full items-center justify-center mb-3"
                 style={{ backgroundColor: `${action.color}20` }}
