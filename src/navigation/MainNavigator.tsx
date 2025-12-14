@@ -1,6 +1,8 @@
 import React from 'react';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { UserProfileSetupScreen, MainAppScreen } from '@screens';
+import { MapScreen } from '@screens/MapScreen';
+import { ReportIncidentScreen } from '@screens/ReportIncidentScreen';
 import { useAuthStore } from '@stores';
 import { View, Text, StyleSheet } from 'react-native';
 import LottieView from 'lottie-react-native';
@@ -13,6 +15,16 @@ export type MainStackParamList = {
   ProfileSetup: undefined;
   WelcomeBack: undefined;
   MainApp: undefined;
+  MapScreen: {
+    alerts?: Array<{
+      id: string;
+      title: string;
+      description: string;
+      level: 'low' | 'medium' | 'high';
+      location: string;
+    }>;
+  };
+  ReportIncidentScreen: undefined;
 };
 
 const Stack = createNativeStackNavigator<MainStackParamList>();
@@ -55,11 +67,15 @@ export const MainNavigator: React.FC = () => {
         <>
           <Stack.Screen name="WelcomeBack" component={WelcomeBackScreen} />
           <Stack.Screen name="MainApp" component={MainAppScreen} />
+          <Stack.Screen name="MapScreen" component={MapScreen} />
+          <Stack.Screen name="ReportIncidentScreen" component={ReportIncidentScreen} />
         </>
       ) : (
         <>
           <Stack.Screen name="ProfileSetup" component={UserProfileSetupScreen} />
           <Stack.Screen name="MainApp" component={MainAppScreen} />
+          <Stack.Screen name="MapScreen" component={MapScreen} />
+          <Stack.Screen name="ReportIncidentScreen" component={ReportIncidentScreen} />
         </>
       )}
     </Stack.Navigator>
