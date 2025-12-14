@@ -2,11 +2,16 @@ import React, { useState } from 'react';
 import { View, Text, StatusBar, ScrollView, TouchableOpacity } from 'react-native';
 import FontAwesome5 from 'react-native-vector-icons/FontAwesome5';
 import { SafetyAlerts, HealthTips, Activities } from '../components/explore';
+import { useNavigation } from '@react-navigation/native';
+import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
+import type { MainStackParamList } from '../navigation/MainNavigator';
 
 type TabType = 'activities' | 'health' | 'safety';
+type NavigationProp = NativeStackNavigationProp<MainStackParamList>;
 
 export const ExploreScreen: React.FC = () => {
   const [activeTab, setActiveTab] = useState<TabType>('activities');
+  const navigation = useNavigation<NavigationProp>();
 
   const renderContent = () => {
     switch (activeTab) {
@@ -15,7 +20,12 @@ export const ExploreScreen: React.FC = () => {
       case 'health':
         return <HealthTips />;
       case 'safety':
-        return <SafetyAlerts />;
+        return (
+          <SafetyAlerts
+            onViewFullMap={() => navigation.navigate('MapScreen', {})}
+            onReportIncident={() => navigation.navigate('ReportIncidentScreen')}
+          />
+        );
       default:
         return <Activities />;
     }
