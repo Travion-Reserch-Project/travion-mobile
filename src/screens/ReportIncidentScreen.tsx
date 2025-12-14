@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   View,
   Text,
@@ -11,11 +11,15 @@ import {
   Modal,
   Alert,
   StyleSheet,
+  Animated,
+  Easing,
+  Image,
 } from 'react-native';
 import FontAwesome5 from 'react-native-vector-icons/FontAwesome5';
 import Geolocation from '@react-native-community/geolocation';
 import RNGeocoding from 'react-native-geocoding';
 import Config from 'react-native-config';
+import { launchImageLibrary } from 'react-native-image-picker';
 import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import type { MainStackParamList } from '../navigation/MainNavigator';
@@ -40,6 +44,7 @@ const INCIDENT_TYPES = [
 
 export const ReportIncidentScreen: React.FC = () => {
   const navigation = useNavigation<NavigationProp>();
+  const contentAnimation = useRef(new Animated.Value(0)).current;
 
   // States
   const [selectedIncidentType, setSelectedIncidentType] = useState<string>('1');
@@ -54,11 +59,25 @@ export const ReportIncidentScreen: React.FC = () => {
   const [descriptionFocused, setDescriptionFocused] = useState(false);
   const [locationInputFocused, setLocationInputFocused] = useState(false);
   const [timeInputFocused, setTimeInputFocused] = useState(false);
+  const [photoUri, setPhotoUri] = useState<string | null>(null);
 
   // Get current location and time on mount
   useEffect(() => {
     requestLocationPermission();
   }, []);
+
+  // Animate form once loading completes
+  useEffect(() => {
+    if (!loading) {
+      contentAnimation.setValue(0);
+      Animated.timing(contentAnimation, {
+        toValue: 1,
+        duration: 450,
+        easing: Easing.out(Easing.ease),
+        useNativeDriver: true,
+      }).start();
+    }
+  }, [loading, contentAnimation]);
 
   const requestLocationPermission = async () => {
     try {
@@ -97,16 +116,16 @@ export const ReportIncidentScreen: React.FC = () => {
             setLocationName('Location obtained');
             setEditingLocation('Location obtained');
           }
-
-          setLoading(false);
         },
         error => {
           console.log('Geolocation error:', error);
           setLocationName('Unable to get location');
-          setLoading(false);
         },
-        { enableHighAccuracy: true, timeout: 15000, maximumAge: 10000 },
+        { enableHighAccuracy: true, timeout: 8000, maximumAge: 10000 },
       );
+
+      // Do not block UI while location fetch happens; show form immediately
+      setLoading(false);
     } catch (error) {
       console.error('Permission error:', error);
       setLoading(false);
@@ -151,6 +170,27 @@ export const ReportIncidentScreen: React.FC = () => {
     setShowTimeModal(false);
   };
 
+  const handlePickPhoto = () => {
+    launchImageLibrary(
+      {
+        mediaType: 'photo',
+        quality: 0.85,
+        selectionLimit: 1,
+      },
+      response => {
+        if (response.didCancel) return;
+        if (response.errorCode) {
+          console.warn('Image picker error:', response.errorMessage || response.errorCode);
+          return;
+        }
+        const asset = response.assets && response.assets[0];
+        if (asset?.uri) {
+          setPhotoUri(asset.uri);
+        }
+      },
+    );
+  };
+
   const handleSubmit = () => {
     if (!selectedIncidentType || !description.trim()) {
       Alert.alert('Required Fields', 'Please select incident type and describe what happened');
@@ -170,6 +210,8 @@ export const ReportIncidentScreen: React.FC = () => {
       },
     ]);
   };
+
+  // console.log('API Key:', Config.GOOGLE_MAPS_API_KEY);
 
   if (loading) {
     return (
@@ -202,47 +244,72 @@ export const ReportIncidentScreen: React.FC = () => {
       </View>
 
       <ScrollView showsVerticalScrollIndicator={false} className="flex-1">
-        <View className="p-4">
+        <Animated.View
+          className="p-4"
+          style={{
+            opacity: contentAnimation,
+            transform: [
+              {
+                translateY: contentAnimation.interpolate({
+                  inputRange: [0, 1],
+                  outputRange: [12, 0],
+                }),
+              },
+              {
+                scale: contentAnimation.interpolate({
+                  inputRange: [0, 1],
+                  outputRange: [0.98, 1],
+                }),
+              },
+            ],
+          }}
+        >
           {/* Type of Incident Section */}
           <View className="mb-6">
             <Text className="text-lg font-gilroy-bold mb-3" style={{ color: colors.gray[900] }}>
               Type of Incident
             </Text>
-            <View className="flex-row flex-wrap gap-2">
-              {INCIDENT_TYPES.map(incident => (
-                <TouchableOpacity
-                  key={incident.id}
-                  onPress={() => setSelectedIncidentType(incident.id)}
-                  className={`rounded-full px-4 py-2 flex-row items-center gap-2 border-2`}
-                  style={{
-                    minWidth: 130,
-                    height: 42,
-                    justifyContent: 'center',
-                    alignItems: 'center',
-                    backgroundColor:
-                      selectedIncidentType === incident.id
-                        ? colors.primary
-                        : colors.background.tertiary,
-                    borderColor:
-                      selectedIncidentType === incident.id ? colors.primary : colors.border.light,
-                  }}
-                >
-                  <FontAwesome5
-                    name={incident.icon}
-                    size={14}
-                    color={selectedIncidentType === incident.id ? colors.white : colors.gray[600]}
-                  />
-                  <Text
-                    className="text-sm font-gilroy-medium"
+            <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+              <View className="flex-row gap-2">
+                {INCIDENT_TYPES.map(incident => (
+                  <TouchableOpacity
+                    key={incident.id}
+                    onPress={() => setSelectedIncidentType(incident.id)}
+                    className={`rounded-full flex-row items-center border-2`}
                     style={{
-                      color: selectedIncidentType === incident.id ? colors.white : colors.gray[700],
+                      minWidth: 130,
+                      height: 42,
+                      paddingHorizontal: 16,
+                      justifyContent: 'center',
+                      alignItems: 'center',
+                      backgroundColor:
+                        selectedIncidentType === incident.id
+                          ? colors.primary
+                          : colors.background.tertiary,
+                      borderColor:
+                        selectedIncidentType === incident.id ? colors.primary : colors.border.light,
                     }}
                   >
-                    {incident.label}
-                  </Text>
-                </TouchableOpacity>
-              ))}
-            </View>
+                    <FontAwesome5
+                      name={incident.icon}
+                      size={14}
+                      color={selectedIncidentType === incident.id ? colors.white : colors.gray[600]}
+                      style={{ marginRight: 8 }}
+                    />
+                    <Text
+                      className="text-sm font-gilroy-medium"
+                      style={{
+                        color:
+                          selectedIncidentType === incident.id ? colors.white : colors.gray[700],
+                        lineHeight: 14,
+                      }}
+                    >
+                      {incident.label}
+                    </Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+            </ScrollView>
           </View>
 
           {/* Location Section */}
@@ -320,18 +387,57 @@ export const ReportIncidentScreen: React.FC = () => {
             <Text className="text-lg font-gilroy-bold mb-3" style={{ color: colors.gray[900] }}>
               Add Photo (Optional)
             </Text>
-            <TouchableOpacity
-              className="items-center justify-center p-8 rounded-lg border-2"
-              style={{
-                backgroundColor: colors.white,
-                borderColor: colors.border.light,
-              }}
-            >
-              <FontAwesome5 name="camera" size={32} color={colors.primary} />
-              <Text className="text-sm font-gilroy-medium mt-3" style={{ color: colors.gray[600] }}>
-                Tap to add a photo
-              </Text>
-            </TouchableOpacity>
+            {photoUri ? (
+              <View>
+                <View
+                  className="rounded-lg overflow-hidden border"
+                  style={{ borderColor: colors.border.light, backgroundColor: colors.white }}
+                >
+                  <Image
+                    source={{ uri: photoUri }}
+                    style={{ width: '100%', height: 200 }}
+                    resizeMode="cover"
+                  />
+                </View>
+                <View className="flex-row gap-3 mt-3">
+                  <TouchableOpacity
+                    onPress={handlePickPhoto}
+                    className="flex-1 py-3 rounded-lg items-center"
+                    style={{ backgroundColor: colors.background.tertiary }}
+                  >
+                    <Text className="font-gilroy-bold" style={{ color: colors.gray[700] }}>
+                      Change Photo
+                    </Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    onPress={() => setPhotoUri(null)}
+                    className="flex-1 py-3 rounded-lg items-center"
+                    style={{ backgroundColor: colors.primary }}
+                  >
+                    <Text className="font-gilroy-bold" style={{ color: colors.white }}>
+                      Remove
+                    </Text>
+                  </TouchableOpacity>
+                </View>
+              </View>
+            ) : (
+              <TouchableOpacity
+                onPress={handlePickPhoto}
+                className="items-center justify-center p-8 rounded-lg border-2"
+                style={{
+                  backgroundColor: colors.white,
+                  borderColor: colors.border.light,
+                }}
+              >
+                <FontAwesome5 name="camera" size={32} color={colors.primary} />
+                <Text
+                  className="text-sm font-gilroy-medium mt-3"
+                  style={{ color: colors.gray[600] }}
+                >
+                  Tap to add a photo
+                </Text>
+              </TouchableOpacity>
+            )}
           </View>
 
           {/* Info Tip */}
@@ -360,7 +466,7 @@ export const ReportIncidentScreen: React.FC = () => {
               Submit Report
             </Text>
           </TouchableOpacity>
-        </View>
+        </Animated.View>
       </ScrollView>
 
       {/* Location Edit Modal */}
