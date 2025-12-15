@@ -260,7 +260,7 @@ export const ReportIncidentScreen: React.FC = () => {
         {/* Find Police Station Button */}
         <View className="px-6 pb-12">
           <TouchableOpacity
-            onPress={() => navigation.navigate('MapScreen', {})}
+            onPress={() => navigation.navigate('PoliceHelpScreen')}
             className="w-full py-4 rounded-full items-center justify-center flex-row gap-3"
             style={{ backgroundColor: colors.primary }}
           >
