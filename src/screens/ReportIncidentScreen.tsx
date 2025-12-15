@@ -9,7 +9,6 @@ import {
   PermissionsAndroid,
   TextInput,
   Modal,
-  Alert,
   StyleSheet,
   Animated,
   Easing,
@@ -61,6 +60,7 @@ export const ReportIncidentScreen: React.FC = () => {
   const [timeInputFocused, setTimeInputFocused] = useState(false);
   const [photoUri, setPhotoUri] = useState<string | null>(null);
   const [submitted, setSubmitted] = useState(false);
+  const [showErrorModal, setShowErrorModal] = useState(false);
 
   // Get current location and time on mount
   useEffect(() => {
@@ -78,6 +78,7 @@ export const ReportIncidentScreen: React.FC = () => {
         useNativeDriver: true,
       }).start();
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [loading]);
 
   const requestLocationPermission = async () => {
@@ -194,7 +195,7 @@ export const ReportIncidentScreen: React.FC = () => {
 
   const handleSubmit = () => {
     if (!selectedIncidentType || !description.trim()) {
-      Alert.alert('Required Fields', 'Please select incident type and describe what happened');
+      setShowErrorModal(true);
       return;
     }
     // Submit logic here
@@ -662,6 +663,65 @@ export const ReportIncidentScreen: React.FC = () => {
                 </Text>
               </TouchableOpacity>
             </View>
+          </View>
+        </View>
+      </Modal>
+
+      {/* Error Alert Modal */}
+      <Modal visible={showErrorModal} transparent animationType="fade">
+        <View className="flex-1 items-center justify-center" style={styles.modalContainer}>
+          <TouchableOpacity
+            style={styles.backdrop}
+            activeOpacity={1}
+            onPress={() => setShowErrorModal(false)}
+          />
+          <View
+            className="mx-6 rounded-2xl p-6"
+            style={{
+              backgroundColor: colors.white,
+              width: '80%',
+            }}
+          >
+            {/* Error Icon */}
+            <View className="items-center mb-4">
+              <View
+                style={{
+                  width: 64,
+                  height: 64,
+                  borderRadius: 32,
+                  backgroundColor: `${colors.error}15`,
+                  justifyContent: 'center',
+                  alignItems: 'center',
+                }}
+              >
+                <FontAwesome5 name="exclamation-circle" size={32} color="#EF4444" />
+              </View>
+            </View>
+
+            {/* Error Message */}
+            <Text
+              className="text-xl font-gilroy-bold text-center mb-2"
+              style={{ color: colors.gray[900] }}
+            >
+              Required Fields Missing
+            </Text>
+            <Text
+              className="text-sm font-gilroy-regular text-center mb-6"
+              style={{ color: colors.gray[600], lineHeight: 20 }}
+            >
+              Please select an incident type and describe what happened before submitting.
+            </Text>
+
+            {/* OK Button */}
+            <TouchableOpacity
+              onPress={() => setShowErrorModal(false)}
+              className="w-full py-3 rounded-lg items-center"
+              style={{ backgroundColor: colors.primary }}
+            >
+              <Text className="font-gilroy-bold" style={{ color: colors.white }}>
+                Got it
+              </Text>
+            </TouchableOpacity>
           </View>
         </View>
       </Modal>
