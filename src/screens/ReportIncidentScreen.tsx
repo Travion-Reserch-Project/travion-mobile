@@ -60,6 +60,7 @@ export const ReportIncidentScreen: React.FC = () => {
   const [locationInputFocused, setLocationInputFocused] = useState(false);
   const [timeInputFocused, setTimeInputFocused] = useState(false);
   const [photoUri, setPhotoUri] = useState<string | null>(null);
+  const [submitted, setSubmitted] = useState(false);
 
   // Get current location and time on mount
   useEffect(() => {
@@ -77,7 +78,7 @@ export const ReportIncidentScreen: React.FC = () => {
         useNativeDriver: true,
       }).start();
     }
-  }, [loading, contentAnimation]);
+  }, [loading]);
 
   const requestLocationPermission = async () => {
     try {
@@ -202,17 +203,89 @@ export const ReportIncidentScreen: React.FC = () => {
       location: locationName,
       time: incidentTime,
       description,
+      photo: photoUri,
     });
-    Alert.alert('Success', 'Incident report submitted successfully!', [
-      {
-        text: 'OK',
-        onPress: () => navigation.goBack(),
-      },
-    ]);
+    setSubmitted(true);
   };
 
   // console.log('API Key:', Config.GOOGLE_MAPS_API_KEY);
 
+  // Render success screen
+  if (submitted) {
+    return (
+      <View className="flex-1" style={{ backgroundColor: colors.background.secondary }}>
+        <View className="flex-1 items-center justify-center px-6">
+          {/* Success Checkmark Circle */}
+          <View
+            style={{
+              width: 120,
+              height: 120,
+              borderRadius: 60,
+              backgroundColor: `${colors.primary}25`,
+              justifyContent: 'center',
+              alignItems: 'center',
+              marginBottom: 32,
+            }}
+          >
+            <View
+              style={{
+                width: 90,
+                height: 90,
+                borderRadius: 45,
+                backgroundColor: `${colors.primary}40`,
+                justifyContent: 'center',
+                alignItems: 'center',
+              }}
+            >
+              <FontAwesome5 name="check" size={45} color={colors.primary} />
+            </View>
+          </View>
+
+          {/* Thank You Message */}
+          <Text
+            className="text-3xl font-gilroy-bold mb-3 text-center"
+            style={{ color: colors.gray[900] }}
+          >
+            Thank You!
+          </Text>
+          <Text
+            className="text-base font-gilroy-regular text-center mb-12"
+            style={{ color: colors.gray[600], lineHeight: 24 }}
+          >
+            Your report helps improve tourist safety.
+          </Text>
+        </View>
+
+        {/* Find Police Station Button */}
+        <View className="px-6 pb-12">
+          <TouchableOpacity
+            onPress={() => navigation.navigate('MapScreen', {})}
+            className="w-full py-4 rounded-full items-center justify-center flex-row gap-3"
+            style={{ backgroundColor: colors.primary }}
+          >
+            <FontAwesome5 name="shield-alt" size={18} color={colors.white} />
+            <Text
+              className="text-base font-gilroy-bold"
+              style={{ color: colors.white, lineHeight: 16 }}
+            >
+              Find Nearest Police Station
+            </Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            onPress={() => navigation.goBack()}
+            className="w-full py-4 rounded-full items-center justify-center mt-3"
+            style={{ backgroundColor: colors.background.tertiary }}
+          >
+            <Text className="text-base font-gilroy-bold" style={{ color: colors.gray[700] }}>
+              Back to Home
+            </Text>
+          </TouchableOpacity>
+        </View>
+      </View>
+    );
+  }
+
+  // Render loading state
   if (loading) {
     return (
       <View
