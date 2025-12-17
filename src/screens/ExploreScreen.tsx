@@ -24,6 +24,7 @@ export const ExploreScreen: React.FC = () => {
           <SafetyAlerts
             onViewFullMap={() => navigation.navigate('MapScreen', {})}
             onReportIncident={() => navigation.navigate('ReportIncidentScreen')}
+            onPoliceHelp={() => navigation.navigate('PoliceHelpScreen')}
           />
         );
       default:
