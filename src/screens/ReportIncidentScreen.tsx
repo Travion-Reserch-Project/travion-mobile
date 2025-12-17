@@ -261,16 +261,18 @@ export const ReportIncidentScreen: React.FC = () => {
         <View className="px-6 pb-12">
           <TouchableOpacity
             onPress={() => navigation.navigate('PoliceHelpScreen')}
-            className="w-full py-4 rounded-full items-center justify-center flex-row gap-3"
+            className="w-full py-5 rounded-full items-center justify-center"
             style={{ backgroundColor: colors.primary }}
           >
-            <FontAwesome5 name="shield-alt" size={18} color={colors.white} />
-            <Text
-              className="text-base font-gilroy-bold"
-              style={{ color: colors.white, lineHeight: 16 }}
-            >
-              Find Nearest Police Station
-            </Text>
+            <View className="flex-row items-center gap-3">
+              <FontAwesome5 name="shield-alt" size={18} color={colors.white} />
+              <Text
+                className="text-base font-gilroy-bold"
+                style={{ color: colors.white, lineHeight: 16 }}
+              >
+                Find Nearest Police Station
+              </Text>
+            </View>
           </TouchableOpacity>
           <TouchableOpacity
             onPress={() => navigation.goBack()}
