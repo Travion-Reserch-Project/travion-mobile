@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import {
   View,
   Text,
@@ -9,6 +9,7 @@ import {
   Platform,
   PermissionsAndroid,
 } from 'react-native';
+import MapView, { Marker, Circle, Callout, PROVIDER_GOOGLE, type Region } from 'react-native-maps';
 import FontAwesome5 from 'react-native-vector-icons/FontAwesome5';
 import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
@@ -87,6 +88,9 @@ export const PoliceHelpScreen: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [stations, setStations] = useState<Station[]>([]);
+  const [userLocation, setUserLocation] = useState<{ lat: number; lng: number } | null>(null);
+  const [mapRegion, setMapRegion] = useState<Region | null>(null);
+  const mapRef = useRef<MapView | null>(null);
 
   useEffect(() => {
     const init = async () => {
@@ -104,7 +108,14 @@ export const PoliceHelpScreen: React.FC = () => {
         Geolocation.getCurrentPosition(
           async pos => {
             const { latitude, longitude } = pos.coords;
+            setUserLocation({ lat: latitude, lng: longitude });
             await fetchNearbyStations(latitude, longitude, setStations, setError);
+            setMapRegion({
+              latitude,
+              longitude,
+              latitudeDelta: 0.05,
+              longitudeDelta: 0.05,
+            });
             setLoading(false);
           },
           () => {
@@ -120,6 +131,82 @@ export const PoliceHelpScreen: React.FC = () => {
     };
     init();
   }, []);
+
+  useEffect(() => {
+    if (!mapRegion && stations.length > 0) {
+      const first = stations[0];
+      setMapRegion({
+        latitude: first.lat,
+        longitude: first.lng,
+        latitudeDelta: 0.05,
+        longitudeDelta: 0.05,
+      });
+    }
+  }, [mapRegion, stations]);
+
+  const getRegion = (): Region => {
+    if (mapRegion) return mapRegion;
+    if (userLocation) {
+      return {
+        latitude: userLocation.lat,
+        longitude: userLocation.lng,
+        latitudeDelta: 0.05,
+        longitudeDelta: 0.05,
+      };
+    }
+    if (stations.length > 0) {
+      return {
+        latitude: stations[0].lat,
+        longitude: stations[0].lng,
+        latitudeDelta: 0.05,
+        longitudeDelta: 0.05,
+      };
+    }
+    return {
+      latitude: 6.9271,
+      longitude: 79.8612,
+      latitudeDelta: 0.1,
+      longitudeDelta: 0.1,
+    };
+  };
+
+  const animateToRegion = (region: Region) => {
+    mapRef.current?.animateToRegion(region, 200);
+    setMapRegion(region);
+  };
+
+  const handleZoom = (factor: number) => {
+    const region = getRegion();
+    const next: Region = {
+      ...region,
+      latitudeDelta: Math.max(0.002, region.latitudeDelta * factor),
+      longitudeDelta: Math.max(0.002, region.longitudeDelta * factor),
+    };
+    animateToRegion(next);
+  };
+
+  const handleZoomIn = () => handleZoom(0.5);
+  const handleZoomOut = () => handleZoom(2);
+
+  const handleCenterLocation = () => {
+    if (userLocation) {
+      animateToRegion({
+        latitude: userLocation.lat,
+        longitude: userLocation.lng,
+        latitudeDelta: 0.05,
+        longitudeDelta: 0.05,
+      });
+      return;
+    }
+    if (stations.length > 0) {
+      animateToRegion({
+        latitude: stations[0].lat,
+        longitude: stations[0].lng,
+        latitudeDelta: 0.05,
+        longitudeDelta: 0.05,
+      });
+    }
+  };
 
   const handleCall = (phone?: string) => {
     Linking.openURL(`tel:${phone}`);
@@ -161,7 +248,7 @@ export const PoliceHelpScreen: React.FC = () => {
       </View>
 
       {/* Segmented Tab Bar */}
-      <View className="bg-white px-4 py-12">
+      <View className="bg-white px-4 py-6">
         <View
           className="flex-row items-center p-1 rounded-full"
           style={{ backgroundColor: colors.background.tertiary }}
@@ -292,10 +379,181 @@ export const PoliceHelpScreen: React.FC = () => {
             ))}
         </ScrollView>
       ) : (
-        <View className="flex-1 items-center justify-center px-4">
-          <Text className="text-base font-gilroy-regular" style={{ color: colors.gray[600] }}>
-            Map view coming soon
-          </Text>
+        <View className="flex-1">
+          {loading && (
+            <View className="flex-1 items-center justify-center">
+              <ActivityIndicator size="small" color={colors.primary} />
+              <Text className="text-sm mt-3" style={{ color: colors.gray[600] }}>
+                Loading map...
+              </Text>
+            </View>
+          )}
+          {!loading && (userLocation || stations.length > 0) && (
+            <View className="flex-1">
+              <MapView
+                ref={ref => {
+                  mapRef.current = ref;
+                }}
+                provider={PROVIDER_GOOGLE}
+                style={{ flex: 1 }}
+                initialRegion={getRegion()}
+                onRegionChangeComplete={region => setMapRegion(region)}
+                showsUserLocation
+                showsMyLocationButton={false}
+              >
+                {/* User location marker (blue dot with accuracy circle) */}
+                {userLocation && (
+                  <>
+                    {/* Accuracy circle */}
+                    <Circle
+                      center={{ latitude: userLocation.lat, longitude: userLocation.lng }}
+                      radius={50}
+                      fillColor="rgba(66, 133, 244, 0.2)"
+                      strokeColor="rgba(66, 133, 244, 0.5)"
+                      strokeWidth={1}
+                    />
+                    {/* Blue dot marker */}
+                    <Marker
+                      coordinate={{ latitude: userLocation.lat, longitude: userLocation.lng }}
+                      anchor={{ x: 0.5, y: 0.5 }}
+                      title="Your Location"
+                      tracksViewChanges={false}
+                    >
+                      <View
+                        style={{
+                          width: 20,
+                          height: 20,
+                          borderRadius: 10,
+                          backgroundColor: '#4285F4',
+                          borderWidth: 3,
+                          borderColor: '#FFFFFF',
+                          shadowColor: '#000',
+                          shadowOpacity: 0.3,
+                          shadowRadius: 3,
+                          elevation: 5,
+                        }}
+                      />
+                    </Marker>
+                  </>
+                )}
+
+                {/* Police station markers */}
+                {stations.map(station => (
+                  <Marker
+                    key={station.id}
+                    coordinate={{ latitude: station.lat, longitude: station.lng }}
+                    pinColor="#FF6B6B"
+                    tracksViewChanges={false}
+                  >
+                    <Callout tooltip>
+                      <View
+                        style={{
+                          alignItems: 'center',
+                        }}
+                      >
+                        <View
+                          style={{
+                            backgroundColor: 'white',
+                            padding: 14,
+                            borderRadius: 10,
+                            minWidth: 180,
+                            shadowColor: '#000',
+                            shadowOffset: { width: 0, height: 8 },
+                            shadowOpacity: 0.5,
+                            shadowRadius: 12,
+                            elevation: 16,
+                          }}
+                        >
+                          <Text
+                            className="font-gilroy-bold text-sm mb-1"
+                            style={{ color: colors.gray[900] }}
+                          >
+                            {station.name}
+                          </Text>
+                          <Text
+                            className="font-gilroy-regular text-xs"
+                            style={{ color: colors.gray[600] }}
+                          >
+                            {station.distanceMeters < 1000
+                              ? `${Math.round(station.distanceMeters)}m away`
+                              : `${(station.distanceMeters / 1000).toFixed(1)}km away`}
+                          </Text>
+                        </View>
+                        {/* Triangle pointer */}
+                        <View
+                          style={{
+                            width: 0,
+                            height: 0,
+                            backgroundColor: 'transparent',
+                            borderStyle: 'solid',
+                            borderLeftWidth: 10,
+                            borderRightWidth: 10,
+                            borderTopWidth: 10,
+                            borderLeftColor: 'transparent',
+                            borderRightColor: 'transparent',
+                            borderTopColor: 'white',
+                            marginTop: -1,
+                          }}
+                        />
+                      </View>
+                    </Callout>
+                  </Marker>
+                ))}
+              </MapView>
+
+              {/* Map controls */}
+              <View className="absolute right-4 top-1/3 gap-3">
+                <TouchableOpacity
+                  onPress={handleZoomIn}
+                  className="w-12 h-12 rounded-full bg-white items-center justify-center shadow-md border border-gray-200"
+                  style={{
+                    shadowColor: '#000',
+                    shadowOffset: { width: 0, height: 2 },
+                    shadowOpacity: 0.15,
+                    shadowRadius: 8,
+                    elevation: 4,
+                  }}
+                >
+                  <FontAwesome5 name="plus" size={16} color="#374151" />
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  onPress={handleZoomOut}
+                  className="w-12 h-12 rounded-full bg-white items-center justify-center shadow-md border border-gray-200"
+                  style={{
+                    shadowColor: '#000',
+                    shadowOffset: { width: 0, height: 2 },
+                    shadowOpacity: 0.15,
+                    shadowRadius: 8,
+                    elevation: 4,
+                  }}
+                >
+                  <FontAwesome5 name="minus" size={16} color="#374151" />
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  onPress={handleCenterLocation}
+                  className="w-12 h-12 rounded-full bg-white items-center justify-center shadow-md border border-gray-200"
+                  style={{
+                    shadowColor: '#000',
+                    shadowOffset: { width: 0, height: 2 },
+                    shadowOpacity: 0.15,
+                    shadowRadius: 8,
+                    elevation: 4,
+                  }}
+                >
+                  <FontAwesome5 name="crosshairs" size={16} color="#374151" />
+                </TouchableOpacity>
+              </View>
+            </View>
+          )}
+          {!loading && error && (
+            <View className="flex-1 items-center justify-center px-4">
+              <Text className="text-sm text-center" style={{ color: colors.gray[600] }}>
+                {error}
+              </Text>
+            </View>
+          )}
         </View>
       )}
     </View>
