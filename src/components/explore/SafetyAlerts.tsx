@@ -18,7 +18,7 @@ import Config from 'react-native-config';
 // Initialize geocoding with API key
 RNGeocoding.init(Config.GOOGLE_MAPS_API_KEY as string);
 
-interface SafetyAlert {
+export interface SafetyAlert {
   id: string;
   title: string;
   description: string;
@@ -31,6 +31,7 @@ interface SafetyAlertsProps {
   onViewFullMap?: () => void;
   onReportIncident?: () => void;
   onPoliceHelp?: () => void;
+  onAlertSelected?: (alert: SafetyAlert) => void;
 }
 interface LocationCoords {
   latitude: number;
@@ -67,6 +68,7 @@ export const SafetyAlerts: React.FC<SafetyAlertsProps> = ({
   onViewFullMap,
   onReportIncident,
   onPoliceHelp,
+  onAlertSelected,
 }) => {
   const [userLocation, setUserLocation] = useState<LocationCoords | null>(null);
   const [locationName, setLocationName] = useState<string>('Current Location');
@@ -150,6 +152,13 @@ export const SafetyAlerts: React.FC<SafetyAlertsProps> = ({
 
     return () => pulse.stop();
   }, [pulseAnim]);
+
+  // Notify parent when selected alert changes
+  useEffect(() => {
+    if (onAlertSelected && selectedAlert) {
+      onAlertSelected(selectedAlert);
+    }
+  }, [selectedAlert, onAlertSelected]);
 
   // Request location permissions and get current location
   useEffect(() => {
