@@ -9,6 +9,7 @@ import { View, Text, StyleSheet } from 'react-native';
 import LottieView from 'lottie-react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
+import type { SafetyAlert } from '@components/explore/SafetyAlerts';
 
 const welcomeBackAnimation = require('@assets/animations/success.json');
 
@@ -17,13 +18,8 @@ export type MainStackParamList = {
   WelcomeBack: undefined;
   MainApp: undefined;
   MapScreen: {
-    alerts?: Array<{
-      id: string;
-      title: string;
-      description: string;
-      level: 'low' | 'medium' | 'high';
-      location: string;
-    }>;
+    alerts?: SafetyAlert[];
+    selectedAlert?: SafetyAlert;
   };
   ReportIncidentScreen: undefined;
   PoliceHelpScreen: undefined;

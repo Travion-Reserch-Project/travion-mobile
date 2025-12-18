@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { View, Text, StatusBar, ScrollView, TouchableOpacity } from 'react-native';
 import FontAwesome5 from 'react-native-vector-icons/FontAwesome5';
 import { SafetyAlerts, HealthTips, Activities } from '../components/explore';
+import type { SafetyAlert } from '../components/explore/SafetyAlerts';
 import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import type { MainStackParamList } from '../navigation/MainNavigator';
@@ -11,6 +12,7 @@ type NavigationProp = NativeStackNavigationProp<MainStackParamList>;
 
 export const ExploreScreen: React.FC = () => {
   const [activeTab, setActiveTab] = useState<TabType>('activities');
+  const [selectedAlert, setSelectedAlert] = useState<SafetyAlert | null>(null);
   const navigation = useNavigation<NavigationProp>();
 
   const renderContent = () => {
@@ -22,9 +24,12 @@ export const ExploreScreen: React.FC = () => {
       case 'safety':
         return (
           <SafetyAlerts
-            onViewFullMap={() => navigation.navigate('MapScreen', {})}
+            onViewFullMap={() =>
+              selectedAlert && navigation.navigate('MapScreen', { selectedAlert })
+            }
             onReportIncident={() => navigation.navigate('ReportIncidentScreen')}
             onPoliceHelp={() => navigation.navigate('PoliceHelpScreen')}
+            onAlertSelected={alert => setSelectedAlert(alert)}
           />
         );
       default:

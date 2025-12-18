@@ -13,6 +13,7 @@ import Geolocation from '@react-native-community/geolocation';
 import RNGeocoding from 'react-native-geocoding';
 import Config from 'react-native-config';
 import { useNavigation } from '@react-navigation/native';
+import type { SafetyAlert } from '../components/explore/SafetyAlerts';
 
 // Initialize geocoding with API key
 RNGeocoding.init(Config.GOOGLE_MAPS_API_KEY as string);
@@ -20,14 +21,6 @@ RNGeocoding.init(Config.GOOGLE_MAPS_API_KEY as string);
 interface LocationCoords {
   latitude: number;
   longitude: number;
-}
-
-interface SafetyAlert {
-  id: string;
-  title: string;
-  description: string;
-  level: 'low' | 'medium' | 'high';
-  location: string;
 }
 
 interface RiskCircle {
@@ -41,7 +34,7 @@ interface RiskCircle {
 }
 
 interface MapScreenProps {
-  route?: { params?: { alerts?: SafetyAlert[] } };
+  route?: { params?: { alerts?: SafetyAlert[]; selectedAlert?: SafetyAlert } };
 }
 
 const DEFAULT_REGION = {
@@ -77,6 +70,12 @@ const getRiskRadius = (level: string) => {
     default:
       return 300;
   }
+};
+
+const getHighestRiskLevel = (alertsList: SafetyAlert[]): 'high' | 'medium' | 'low' => {
+  if (alertsList.some(a => a.level === 'high')) return 'high';
+  if (alertsList.some(a => a.level === 'medium')) return 'medium';
+  return 'low';
 };
 
 // Sample alerts for demo
@@ -115,6 +114,7 @@ export const MapScreen: React.FC<MapScreenProps> = ({ route }) => {
   const navigation = useNavigation();
   const alerts =
     route?.params?.alerts && route.params.alerts.length > 0 ? route.params.alerts : sampleAlerts;
+  const selectedAlert = route?.params?.selectedAlert;
 
   const [userLocation, setUserLocation] = useState<LocationCoords | null>(null);
   const [locationName, setLocationName] = useState<string>('Current Location');
@@ -123,14 +123,9 @@ export const MapScreen: React.FC<MapScreenProps> = ({ route }) => {
   const [showRiskCircle, setShowRiskCircle] = useState(false);
   const mapRef = useRef<MapView>(null);
 
-  // Get highest risk level from all alerts
-  const getHighestRiskLevel = (alertsList: SafetyAlert[]): 'high' | 'medium' | 'low' => {
-    if (alertsList.some(a => a.level === 'high')) return 'high';
-    if (alertsList.some(a => a.level === 'medium')) return 'medium';
-    return 'low';
-  };
-
-  const highestRiskLevel = getHighestRiskLevel(alerts);
+  // Determine which risk level to display
+  // If selectedAlert is provided, use its level; otherwise use the highest risk
+  const displayRiskLevel = selectedAlert ? selectedAlert.level : getHighestRiskLevel(alerts);
 
   // Single risk circle at user location
   const riskCircle: RiskCircle | null = userLocation
@@ -138,10 +133,10 @@ export const MapScreen: React.FC<MapScreenProps> = ({ route }) => {
         id: 'user-location-risk',
         latitude: userLocation.latitude,
         longitude: userLocation.longitude,
-        radius: getRiskRadius(highestRiskLevel),
-        level: highestRiskLevel,
-        title: 'High Risk Area',
-        description: `${alerts.length} risk${alerts.length !== 1 ? 's' : ''} detected in this area`,
+        radius: getRiskRadius(displayRiskLevel),
+        level: displayRiskLevel,
+        title: 'Risk Area',
+        description: `Risk level: ${displayRiskLevel}`,
       }
     : null;
 
@@ -435,7 +430,7 @@ export const MapScreen: React.FC<MapScreenProps> = ({ route }) => {
               <View
                 className="rounded-2xl p-4 bg-white border-l-4 w-full"
                 style={{
-                  borderLeftColor: getRiskLevelColor(highestRiskLevel),
+                  borderLeftColor: getRiskLevelColor(displayRiskLevel),
                   shadowColor: '#000',
                   shadowOffset: { width: 0, height: 4 },
                   shadowOpacity: 0.15,
