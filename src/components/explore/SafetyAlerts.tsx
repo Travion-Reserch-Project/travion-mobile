@@ -77,7 +77,8 @@ export const SafetyAlerts: React.FC<SafetyAlertsProps> = ({
   const [selectedAlertIndex, setSelectedAlertIndex] = useState(0);
   const { width } = useWindowDimensions();
   // Account for horizontal padding (px-6 = 24 each side)
-  const carouselWidth = Math.max(width - 48, 280);
+  // Reduce effective card width so next card peeks visibly
+  const carouselWidth = Math.max(width - 46, 260);
   const cardHeight = 160;
   const scrollRef = useRef<Animated.ScrollView | null>(null);
 
@@ -306,7 +307,7 @@ export const SafetyAlerts: React.FC<SafetyAlertsProps> = ({
               {filteredAlerts.map((alert, index) => (
                 <View
                   key={alert.id || index}
-                  style={{ width: carouselWidth, paddingHorizontal: 24 }}
+                  style={{ width: carouselWidth, paddingHorizontal: 18 }}
                 >
                   <View
                     className="rounded-2xl p-6"
