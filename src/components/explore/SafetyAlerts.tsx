@@ -207,11 +207,34 @@ export const SafetyAlerts: React.FC<SafetyAlertsProps> = ({
                 const address = results.results[0];
                 const locationString = address.formatted_address || 'Current Location';
                 console.log('Formatted address:', locationString);
-                // Extract city from formatted address
-                const parts = locationString.split(',');
-                const cityName = parts.length > 1 ? parts[parts.length - 2].trim() : parts[0];
-                console.log('Extracted city name:', cityName);
-                setLocationName(cityName);
+                // Extract location names, removing postal codes
+                const parts = locationString.split(',').map(p => p.trim());
+                // Filter and clean location parts
+                const locationParts = parts
+                  .map(p => {
+                    // Remove trailing digits and spaces (postal codes like "Galle 80000" -> "Galle")
+                    return p.replace(/\s*\d+\s*$/, '').trim();
+                  })
+                  .filter(p => {
+                    // Skip if part is only digits (pure postal code like "94102")
+                    if (/^\d+$/.test(p)) return false;
+                    // Skip if part is only 2 chars (state codes like "CA", "NY")
+                    if (/^[A-Z]{2}$/.test(p)) return false;
+                    // Skip empty strings
+                    if (p === '') return false;
+                    return true;
+                  });
+
+                // Get at least 2 location names
+                let displayName = 'Current Location';
+                if (locationParts.length >= 2) {
+                  displayName = `${locationParts[0]}, ${locationParts[1]}`;
+                } else if (locationParts.length === 1) {
+                  displayName = locationParts[0];
+                }
+
+                console.log('Extracted location name:', displayName);
+                setLocationName(displayName);
               } else {
                 console.log('No results found from geocoding');
                 setLocationName(`Coordinates: ${latitude.toFixed(4)}, ${longitude.toFixed(4)}`);

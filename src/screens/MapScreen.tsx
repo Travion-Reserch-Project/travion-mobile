@@ -187,9 +187,33 @@ export const MapScreen: React.FC<MapScreenProps> = ({ route }) => {
               if (results && results.results && results.results.length > 0) {
                 const address = results.results[0];
                 const locationString = address.formatted_address || 'Current Location';
-                const parts = locationString.split(',');
-                const cityName = parts.length > 1 ? parts[parts.length - 2].trim() : parts[0];
-                setLocationName(cityName);
+                // Extract location names, removing postal codes
+                const parts = locationString.split(',').map(p => p.trim());
+                // Filter and clean location parts
+                const locationParts = parts
+                  .map(p => {
+                    // Remove trailing digits and spaces (postal codes like "Galle 80000" -> "Galle")
+                    return p.replace(/\s*\d+\s*$/, '').trim();
+                  })
+                  .filter(p => {
+                    // Skip if part is only digits (pure postal code like "94102")
+                    if (/^\d+$/.test(p)) return false;
+                    // Skip if part is only 2 chars (state codes like "CA", "NY")
+                    if (/^[A-Z]{2}$/.test(p)) return false;
+                    // Skip empty strings
+                    if (p === '') return false;
+                    return true;
+                  });
+
+                // Get at least 2 location names
+                let displayName = 'Current Location';
+                if (locationParts.length >= 2) {
+                  displayName = `${locationParts[0]}, ${locationParts[1]}`;
+                } else if (locationParts.length === 1) {
+                  displayName = locationParts[0];
+                }
+
+                setLocationName(displayName);
               }
             } catch (err) {
               console.error('Reverse geocoding error:', err);
