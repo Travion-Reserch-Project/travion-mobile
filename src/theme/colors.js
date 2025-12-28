@@ -42,6 +42,13 @@ const colors = {
     default: '#D1D5DB',
     dark: '#9CA3AF',
   },
+
+  // Added for UV screen
+  uv: {
+    ringBg: '#FFE9D6',
+    alertBg: '#FFECEC',
+    alertText: '#FF6B6B',
+  },
 };
 
 module.exports = colors;
