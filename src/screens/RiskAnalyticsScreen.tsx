@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { View, Text, ScrollView, TouchableOpacity, Image } from 'react-native';
 import FontAwesome from 'react-native-vector-icons/FontAwesome';
 
+
 const RiskAnalyticsScreen: React.FC = () => {
   const [tab, setTab] = useState<'Daily' | 'Weekly'>('Daily');
 
