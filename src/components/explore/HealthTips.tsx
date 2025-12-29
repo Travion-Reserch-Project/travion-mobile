@@ -1,10 +1,15 @@
+import { MainStackParamList } from '@navigation/MainNavigator';
+import { useNavigation } from '@react-navigation/native';
+import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import React from 'react';
 import { View, Text, TouchableOpacity } from 'react-native';
 import FontAwesome5 from 'react-native-vector-icons/FontAwesome5';
 
+type NavigationProp = NativeStackNavigationProp<MainStackParamList>;
 export const HealthTips: React.FC = () => {
   const uvIndex = 7;
   const uvLevel = 'Very High';
+  const navigation = useNavigation<NavigationProp>();
 
   return (
     <View className="flex-1 bg-white px-6 pt-6">
@@ -47,7 +52,10 @@ export const HealthTips: React.FC = () => {
       </View>
 
       {/* CTA */}
-      <TouchableOpacity className="bg-primary py-4 rounded-full items-center mt-6">
+      <TouchableOpacity
+        className="bg-primary py-4 rounded-full items-center mt-6"
+        onPress={() => navigation.navigate('SunProtection')}
+      >
         <Text className="text-white text-lg font-bold">Check Risk</Text>
       </TouchableOpacity>
     </View>
