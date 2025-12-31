@@ -58,7 +58,7 @@ export const BottomTabBar: React.FC<BottomTabBarProps> = ({ activeTab, onTabPres
         return (
           <TouchableOpacity
             key={tab.key}
-            className="flex-1 items-center py-2"
+            className={`flex-1 items-center py-2 ${isActive ? 'transform scale-105' : ''}`}
             onPress={() => onTabPress(tab.key)}
           >
             <View className="items-center">
@@ -70,7 +70,7 @@ export const BottomTabBar: React.FC<BottomTabBarProps> = ({ activeTab, onTabPres
               />
               <Text
                 className={`text-xs font-gilroy-medium mt-1 ${
-                  isActive ? 'text-primary' : 'text-gray-500'
+                  isActive ? 'text-primary font-bold' : 'text-gray-500'
                 }`}
               >
                 {tab.label}
