@@ -31,6 +31,7 @@ interface SafetyAlertsProps {
   onViewFullMap?: () => void;
   onReportIncident?: () => void;
   onPoliceHelp?: () => void;
+  onViewAlerts?: () => void;
   onAlertSelected?: (alert: SafetyAlert) => void;
 }
 interface LocationCoords {
@@ -68,6 +69,7 @@ export const SafetyAlerts: React.FC<SafetyAlertsProps> = ({
   onViewFullMap,
   onReportIncident,
   onPoliceHelp,
+  onViewAlerts,
   onAlertSelected,
 }) => {
   const [userLocation, setUserLocation] = useState<LocationCoords | null>(null);
@@ -481,7 +483,7 @@ export const SafetyAlerts: React.FC<SafetyAlertsProps> = ({
               color: '#F97316',
               onPress: onReportIncident,
             },
-            { icon: 'bell', label: 'View Alerts', color: '#F97316' },
+            { icon: 'bell', label: 'View Alerts', color: '#F97316', onPress: onViewAlerts },
             { icon: 'shield-alt', label: 'Police Help', color: '#F97316', onPress: onPoliceHelp },
           ].map((action, index) => (
             <TouchableOpacity
