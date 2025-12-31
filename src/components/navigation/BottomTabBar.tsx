@@ -2,7 +2,7 @@ import React from 'react';
 import { View, TouchableOpacity, Text } from 'react-native';
 import FontAwesome5 from 'react-native-vector-icons/FontAwesome5';
 
-export type TabKey = 'home' | 'explore' | 'alerts' | 'chatbot' | 'profile';
+export type TabKey = 'home' | 'transport' | 'guide' | 'safety' | 'weather';
 
 interface TabItem {
   key: TabKey;
@@ -24,27 +24,27 @@ const tabs: TabItem[] = [
     iconType: 'solid',
   },
   {
-    key: 'chatbot',
-    label: 'Chatbot',
-    icon: 'robot',
+    key: 'transport',
+    label: 'Transport',
+    icon: 'bus',
     iconType: 'solid',
   },
   {
-    key: 'explore',
-    label: 'Explore',
+    key: 'guide',
+    label: 'Guide',
     icon: 'compass',
     iconType: 'regular',
   },
   {
-    key: 'alerts',
-    label: 'Alerts',
-    icon: 'bell',
+    key: 'safety',
+    label: 'Safety',
+    icon: 'shield-alt',
     iconType: 'solid',
   },
   {
-    key: 'profile',
-    label: 'Profile',
-    icon: 'user',
+    key: 'weather',
+    label: 'Weather',
+    icon: 'cloud-showers-heavy',
     iconType: 'solid',
   },
 ];
