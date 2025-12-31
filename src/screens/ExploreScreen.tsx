@@ -8,9 +8,13 @@ import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import type { MainStackParamList } from '../navigation/MainNavigator';
 
 type TabType = 'activities' | 'health' | 'safety';
+
+interface ExploreScreenProps {
+  onNavigateToAlerts?: () => void;
+}
 type NavigationProp = NativeStackNavigationProp<MainStackParamList>;
 
-export const ExploreScreen: React.FC = () => {
+export const ExploreScreen: React.FC<ExploreScreenProps> = ({ onNavigateToAlerts }) => {
   const [activeTab, setActiveTab] = useState<TabType>('activities');
   const [selectedAlert, setSelectedAlert] = useState<SafetyAlert | null>(null);
   const navigation = useNavigation<NavigationProp>();
@@ -29,6 +33,7 @@ export const ExploreScreen: React.FC = () => {
             }
             onReportIncident={() => navigation.navigate('ReportIncidentScreen')}
             onPoliceHelp={() => navigation.navigate('PoliceHelpScreen')}
+            onViewAlerts={onNavigateToAlerts}
             onAlertSelected={alert => setSelectedAlert(alert)}
           />
         );

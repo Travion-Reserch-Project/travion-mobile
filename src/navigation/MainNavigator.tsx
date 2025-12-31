@@ -4,6 +4,8 @@ import { UserProfileSetupScreen, MainAppScreen } from '@screens';
 import { MapScreen } from '@screens/MapScreen';
 import { ReportIncidentScreen } from '@screens/ReportIncidentScreen';
 import { PoliceHelpScreen } from '@screens/PoliceHelpScreen';
+import { AlertsScreen } from '@screens/AlertsScreen';
+import { ProfileScreen } from '@screens/ProfileScreen';
 import { useAuthStore } from '@stores';
 import { View, Text, StyleSheet } from 'react-native';
 import LottieView from 'lottie-react-native';
@@ -16,13 +18,15 @@ const welcomeBackAnimation = require('@assets/animations/success.json');
 export type MainStackParamList = {
   ProfileSetup: undefined;
   WelcomeBack: undefined;
-  MainApp: undefined;
+  MainApp: { userName?: string; userEmail?: string } | undefined;
   MapScreen: {
     alerts?: SafetyAlert[];
     selectedAlert?: SafetyAlert;
   };
   ReportIncidentScreen: undefined;
   PoliceHelpScreen: undefined;
+  AlertsScreen: undefined;
+  ProfileScreen: { userName?: string; userEmail?: string };
 };
 
 const Stack = createNativeStackNavigator<MainStackParamList>();
@@ -68,6 +72,8 @@ export const MainNavigator: React.FC = () => {
           <Stack.Screen name="MapScreen" component={MapScreen} />
           <Stack.Screen name="ReportIncidentScreen" component={ReportIncidentScreen} />
           <Stack.Screen name="PoliceHelpScreen" component={PoliceHelpScreen} />
+          <Stack.Screen name="AlertsScreen" component={AlertsScreen} />
+          <Stack.Screen name="ProfileScreen" component={ProfileScreen} />
         </>
       ) : (
         <>
@@ -76,6 +82,8 @@ export const MainNavigator: React.FC = () => {
           <Stack.Screen name="MapScreen" component={MapScreen} />
           <Stack.Screen name="ReportIncidentScreen" component={ReportIncidentScreen} />
           <Stack.Screen name="PoliceHelpScreen" component={PoliceHelpScreen} />
+          <Stack.Screen name="AlertsScreen" component={AlertsScreen} />
+          <Stack.Screen name="ProfileScreen" component={ProfileScreen} />
         </>
       )}
     </Stack.Navigator>
