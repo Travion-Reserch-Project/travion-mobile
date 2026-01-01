@@ -176,7 +176,7 @@ export const ReportIncidentScreen: React.FC = () => {
     launchImageLibrary(
       {
         mediaType: 'photo',
-        quality: 0.85,
+        quality: 0.8,
         selectionLimit: 1,
       },
       response => {

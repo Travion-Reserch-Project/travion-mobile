@@ -1,6 +1,5 @@
 import React, { useState } from 'react';
 import { View } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { HomeScreen, SafetyScreen, TransportScreen, GuideScreen } from '@screens';
 import { BottomTabBar, TabKey } from '@components/navigation/BottomTabBar';
@@ -44,11 +43,11 @@ export const MainAppScreen: React.FC<Props> = ({ route, navigation }) => {
   };
 
   return (
-    <SafeAreaView className="flex-1 bg-white">
+    <View className="flex-1 bg-white">
       <View className="flex-1">
         {renderScreen()}
         <BottomTabBar activeTab={activeTab} onTabPress={setActiveTab} />
       </View>
-    </SafeAreaView>
+    </View>
   );
 };
