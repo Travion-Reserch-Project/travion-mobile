@@ -31,10 +31,10 @@ export type MainStackParamList = {
 
 const Stack = createNativeStackNavigator<MainStackParamList>();
 
-// Global screen wrapper to apply safe area once for all screens
-const ScreenWithSafeArea = ({ children }: { children: React.ReactNode }) => {
+// Move ScreenWithSafeArea component outside of MainNavigator
+const ScreenWithSafeArea: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   return (
-    <SafeAreaView style={{ flex: 1, backgroundColor: 'white' }} edges={['top']}>
+    <SafeAreaView style={styles.safeArea} edges={['top']}>
       {children}
     </SafeAreaView>
   );
@@ -109,5 +109,9 @@ const styles = StyleSheet.create({
   animation: {
     width: 300,
     height: 300,
+  },
+  safeArea: {
+    flex: 1,
+    backgroundColor: 'white',
   },
 });
