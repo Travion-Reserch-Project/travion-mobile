@@ -31,6 +31,15 @@ export type MainStackParamList = {
 
 const Stack = createNativeStackNavigator<MainStackParamList>();
 
+// Global screen wrapper to apply safe area once for all screens
+const ScreenWithSafeArea = ({ children }: { children: React.ReactNode }) => {
+  return (
+    <SafeAreaView style={{ flex: 1, backgroundColor: 'white' }} edges={['top']}>
+      {children}
+    </SafeAreaView>
+  );
+};
+
 // Simple Welcome Back component
 const WelcomeBackScreen: React.FC = () => {
   const navigation = useNavigation();
@@ -64,7 +73,13 @@ export const MainNavigator: React.FC = () => {
   const hasCompleteProfile = user?.profileStatus === 'Complete';
 
   return (
-    <Stack.Navigator screenOptions={{ headerShown: false }}>
+    <Stack.Navigator
+      screenOptions={{
+        headerShown: false,
+        contentStyle: { flex: 1 },
+      }}
+      screenLayout={({ children }) => <ScreenWithSafeArea>{children}</ScreenWithSafeArea>}
+    >
       {hasCompleteProfile ? (
         <>
           <Stack.Screen name="WelcomeBack" component={WelcomeBackScreen} />
