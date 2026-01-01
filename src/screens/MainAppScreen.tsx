@@ -3,6 +3,7 @@ import { View } from 'react-native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { HomeScreen, SafetyScreen, TransportScreen, GuideScreen } from '@screens';
 import { BottomTabBar, TabKey } from '@components/navigation/BottomTabBar';
+import { TravionBotButton } from '@components/common';
 import type { MainStackParamList } from '../navigation/MainNavigator';
 import RiskAnalyticsScreen from './RiskAnalyticsScreen';
 
@@ -48,6 +49,7 @@ export const MainAppScreen: React.FC<Props> = ({ route, navigation }) => {
         {renderScreen()}
         <BottomTabBar activeTab={activeTab} onTabPress={setActiveTab} />
       </View>
+      <TravionBotButton />
     </View>
   );
 };

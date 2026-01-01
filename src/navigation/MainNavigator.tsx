@@ -6,6 +6,7 @@ import { ReportIncidentScreen } from '@screens/ReportIncidentScreen';
 import { PoliceHelpScreen } from '@screens/PoliceHelpScreen';
 import { AlertsScreen } from '@screens/AlertsScreen';
 import { ProfileScreen } from '@screens/ProfileScreen';
+import { ChatbotScreen } from '@screens/ChatbotScreen';
 import { useAuthStore } from '@stores';
 import { View, Text, StyleSheet } from 'react-native';
 import LottieView from 'lottie-react-native';
@@ -27,14 +28,15 @@ export type MainStackParamList = {
   PoliceHelpScreen: undefined;
   AlertsScreen: undefined;
   ProfileScreen: { userName?: string; userEmail?: string };
+  ChatbotScreen: undefined;
 };
 
 const Stack = createNativeStackNavigator<MainStackParamList>();
 
-// Global screen wrapper to apply safe area once for all screens
-const ScreenWithSafeArea = ({ children }: { children: React.ReactNode }) => {
+// Move ScreenWithSafeArea component outside of MainNavigator
+const ScreenWithSafeArea: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   return (
-    <SafeAreaView style={{ flex: 1, backgroundColor: 'white' }} edges={['top']}>
+    <SafeAreaView style={styles.safeArea} edges={['top']}>
       {children}
     </SafeAreaView>
   );
@@ -89,6 +91,7 @@ export const MainNavigator: React.FC = () => {
           <Stack.Screen name="PoliceHelpScreen" component={PoliceHelpScreen} />
           <Stack.Screen name="AlertsScreen" component={AlertsScreen} />
           <Stack.Screen name="ProfileScreen" component={ProfileScreen} />
+          <Stack.Screen name="ChatbotScreen" component={ChatbotScreen} />
         </>
       ) : (
         <>
@@ -99,6 +102,7 @@ export const MainNavigator: React.FC = () => {
           <Stack.Screen name="PoliceHelpScreen" component={PoliceHelpScreen} />
           <Stack.Screen name="AlertsScreen" component={AlertsScreen} />
           <Stack.Screen name="ProfileScreen" component={ProfileScreen} />
+          <Stack.Screen name="ChatbotScreen" component={ChatbotScreen} />
         </>
       )}
     </Stack.Navigator>
@@ -109,5 +113,9 @@ const styles = StyleSheet.create({
   animation: {
     width: 300,
     height: 300,
+  },
+  safeArea: {
+    flex: 1,
+    backgroundColor: 'white',
   },
 });

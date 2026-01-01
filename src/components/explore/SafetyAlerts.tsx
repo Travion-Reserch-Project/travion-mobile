@@ -419,7 +419,7 @@ export const SafetyAlerts: React.FC<SafetyAlertsProps> = ({
           ) : (
             <MapView
               className="flex-1"
-              provider={PROVIDER_GOOGLE}
+              provider={Platform.OS === 'android' ? PROVIDER_GOOGLE : undefined}
               initialRegion={mapRegion}
               scrollEnabled={false}
               zoomEnabled={false}
