@@ -19,6 +19,7 @@
   "dependencies": {
     "@react-native-async-storage/async-storage": "^2.2.0",
     "@react-native-community/datetimepicker": "^8.5.1",
+    "@react-native-community/geolocation": "^3.4.0",
     "@react-native-google-signin/google-signin": "^16.0.0",
     "@react-native/new-app-screen": "0.82.1",
     "@react-navigation/bottom-tabs": "^7.8.11",
@@ -28,6 +29,10 @@
     "nativewind": "^2.0.11",
     "react": "19.1.1",
     "react-native": "0.82.1",
+    "react-native-config": "^1.6.1",
+    "react-native-geocoding": "^0.5.0",
+    "react-native-image-picker": "^7.2.3",
+    "react-native-maps": "^1.26.19",
     "react-native-modal-datetime-picker": "^18.0.0",
     "react-native-safe-area-context": "^5.6.2",
     "react-native-screens": "^4.18.0",
@@ -59,7 +64,7 @@
     "lint-staged": "^16.2.7",
     "prettier": "2.8.8",
     "react-test-renderer": "19.1.1",
-    "tailwindcss": "^3.3.2",
+    "tailwindcss": "3.3.2",
     "typescript": "^5.8.3"
   },
   "engines": {

@@ -2,12 +2,6 @@ module.exports = {
   presets: ['module:@react-native/babel-preset'],
   plugins: [
     [
-      'nativewind/babel',
-      {
-        exclude: /src\/theme\//,
-      },
-    ],
-    [
       'module-resolver',
       {
         root: ['./src'],
@@ -29,5 +23,6 @@ module.exports = {
         },
       },
     ],
+    'nativewind/babel',
   ],
 };
