@@ -10,12 +10,31 @@ import {
   Platform,
 } from 'react-native';
 import FontAwesome5 from 'react-native-vector-icons/FontAwesome5';
+import { chatService } from '@services';
+
+interface TransportRecommendation {
+  service_id: string;
+  mode: string;
+  operator: string;
+  duration_min: number;
+  distance_km: number;
+  fare_lkr: number;
+  reliability_stars: number;
+  is_recommended: boolean;
+}
 
 interface Message {
   id: string;
   text: string;
   isUser: boolean;
   timestamp: Date;
+  recommendations?: TransportRecommendation[];
+  recommendationData?: {
+    origin?: string;
+    destination?: string;
+    departureDate?: string;
+    departureTime?: string;
+  };
 }
 
 export const ChatbotScreen: React.FC = () => {
@@ -45,7 +64,7 @@ export const ChatbotScreen: React.FC = () => {
     }, 100);
   }, [messages]);
 
-  const handleSendMessage = () => {
+  const handleSendMessage = async () => {
     if (inputText.trim() === '') return;
 
     const userMessage: Message = {
@@ -55,31 +74,77 @@ export const ChatbotScreen: React.FC = () => {
       timestamp: new Date(),
     };
 
+    const messageToSend = inputText;
     setMessages(prev => [...prev, userMessage]);
     setInputText('');
     setIsTyping(true);
 
-    // Simulate AI response
-    setTimeout(() => {
+    try {
+      const response = await chatService.sendMessage(messageToSend);
+
+      let displayText = '';
+      let recommendations: TransportRecommendation[] | undefined;
+      let recommendationData: any;
+
+      if (response.success && response.data) {
+        // Check if we have recommendations (ready status)
+        if (
+          response.data.recommendation?.recommendations &&
+          response.data.recommendation.recommendations.length > 0
+        ) {
+          displayText = `Great! I found ${response.data.recommendation.recommendations.length} transport options for you from ${response.data.recommendation.origin} to ${response.data.recommendation.destination}.`;
+          recommendations = response.data.recommendation.recommendations.map((rec: any) => ({
+            ...rec,
+            reliability_stars:
+              typeof rec.reliability_stars === 'string'
+                ? parseFloat(rec.reliability_stars)
+                : rec.reliability_stars,
+          }));
+          recommendationData = {
+            origin: response.data.recommendation.origin,
+            destination: response.data.recommendation.destination,
+            departureDate: response.data.recommendation.departure_date,
+            departureTime: response.data.recommendation.departure_time,
+          };
+        } else if (response.data.message) {
+          displayText = response.data.message;
+        } else if (response.data.clarificationPrompt) {
+          displayText = response.data.clarificationPrompt;
+        } else if (response.data.nextQuestion) {
+          displayText = response.data.nextQuestion;
+        } else if (response.data.status === 'needs_clarification') {
+          displayText =
+            'I need more information to help you better. ' +
+            (response.data.nextQuestion || 'Please provide more details.');
+        } else {
+          displayText = 'Unable to process your request. Please try again.';
+        }
+      } else {
+        displayText =
+          response.error || "I'm having trouble processing your request. Please try again.";
+      }
+
       const botResponse: Message = {
         id: (Date.now() + 1).toString(),
-        text: getBotResponse(inputText),
+        text: displayText,
+        isUser: false,
+        timestamp: new Date(),
+        recommendations,
+        recommendationData,
+      };
+      setMessages(prev => [...prev, botResponse]);
+    } catch (error) {
+      console.error('Chat error:', error);
+      const errorMessage: Message = {
+        id: (Date.now() + 1).toString(),
+        text: 'Sorry, I encountered an error. Please try again.',
         isUser: false,
         timestamp: new Date(),
       };
-      setMessages(prev => [...prev, botResponse]);
+      setMessages(prev => [...prev, errorMessage]);
+    } finally {
       setIsTyping(false);
-    }, 1500);
-  };
-
-  const getBotResponse = (_input: string): string => {
-    const responses = [
-      "Great question! Based on your preferences, I'd recommend exploring these amazing destinations...",
-      'Let me help you with that. Here are some personalized travel recommendations for you.',
-      "That's an excellent choice! I can suggest some fantastic options that match your travel style.",
-      "I'd be happy to assist you with travel planning. Here's what I recommend...",
-    ];
-    return responses[Math.floor(Math.random() * responses.length)];
+    }
   };
 
   const handleQuickSuggestion = (suggestion: string) => {
@@ -90,43 +155,106 @@ export const ChatbotScreen: React.FC = () => {
     return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
   };
 
-  const renderMessage = (message: Message) => (
-    <View
-      key={message.id}
-      className={`flex-row mb-4 ${message.isUser ? 'justify-end' : 'justify-start'}`}
-    >
-      {!message.isUser && (
-        <View className="w-10 h-10 bg-primary rounded-full items-center justify-center mr-3">
-          <FontAwesome5 name="robot" size={16} color="white" />
-        </View>
-      )}
+  const getTransportIcon = (mode: string): string => {
+    switch (mode.toLowerCase()) {
+      case 'ridehailing':
+        return 'car';
+      case 'bus':
+        return 'bus';
+      case 'train':
+        return 'train';
+      case 'taxi':
+        return 'taxi';
+      default:
+        return 'shuttle-van';
+    }
+  };
 
-      <View
-        className={`max-w-[80%] px-4 py-3 rounded-2xl shadow-sm ${
-          message.isUser
-            ? 'bg-primary rounded-br-md'
-            : 'bg-white border border-gray-200 rounded-bl-md'
-        }`}
-      >
-        <Text
-          className={`text-base font-gilroy-regular ${
-            message.isUser ? 'text-white' : 'text-gray-900'
-          }`}
-        >
-          {message.text}
-        </Text>
-        <Text
-          className={`text-xs font-gilroy-regular mt-1 ${
-            message.isUser ? 'text-white/70' : 'text-gray-500'
-          }`}
-        >
-          {formatTime(message.timestamp)}
-        </Text>
+  const renderRecommendationCard = (rec: TransportRecommendation) => (
+    <View key={rec.service_id} className="bg-white rounded-xl p-4 mb-3 border border-gray-200">
+      <View className="flex-row items-center justify-between mb-2">
+        <View className="flex-row items-center flex-1">
+          <View className="w-12 h-12 bg-primary/10 rounded-full items-center justify-center mr-3">
+            <FontAwesome5 name={getTransportIcon(rec.mode)} size={18} color="#F5840E" />
+          </View>
+          <View className="flex-1">
+            <Text className="text-base font-gilroy-bold text-gray-900">{rec.operator}</Text>
+            <Text className="text-xs font-gilroy-regular text-gray-600 capitalize">{rec.mode}</Text>
+          </View>
+        </View>
+        {rec.is_recommended && (
+          <View className="bg-green-100 px-2 py-1 rounded-full">
+            <Text className="text-xs font-gilroy-bold text-green-700">Recommended</Text>
+          </View>
+        )}
       </View>
 
-      {message.isUser && (
-        <View className="w-10 h-10 bg-gray-600 rounded-full items-center justify-center ml-3">
-          <FontAwesome5 name="user" size={16} color="white" />
+      <View className="border-t border-gray-100 pt-2">
+        <View className="flex-row justify-between mb-2">
+          <View>
+            <Text className="text-xs font-gilroy-regular text-gray-600">Duration</Text>
+            <Text className="text-sm font-gilroy-bold text-gray-900">{rec.duration_min} min</Text>
+          </View>
+          <View>
+            <Text className="text-xs font-gilroy-regular text-gray-600">Distance</Text>
+            <Text className="text-sm font-gilroy-bold text-gray-900">{rec.distance_km} km</Text>
+          </View>
+          <View>
+            <Text className="text-xs font-gilroy-regular text-gray-600">Fare</Text>
+            <Text className="text-sm font-gilroy-bold text-primary">Rs.{rec.fare_lkr}</Text>
+          </View>
+          <View>
+            <Text className="text-xs font-gilroy-regular text-gray-600">Rating</Text>
+            <Text className="text-xs font-gilroy-bold text-amber-600">{rec.reliability_stars}</Text>
+          </View>
+        </View>
+      </View>
+    </View>
+  );
+
+  const renderMessage = (message: Message) => (
+    <View key={message.id}>
+      <View className={`flex-row mb-4 ${message.isUser ? 'justify-end' : 'justify-start'}`}>
+        {!message.isUser && (
+          <View className="w-10 h-10 bg-primary rounded-full items-center justify-center mr-3">
+            <FontAwesome5 name="robot" size={16} color="white" />
+          </View>
+        )}
+
+        <View
+          className={`max-w-[80%] px-4 py-3 rounded-2xl shadow-sm ${
+            message.isUser
+              ? 'bg-primary rounded-br-md'
+              : 'bg-white border border-gray-200 rounded-bl-md'
+          }`}
+        >
+          <Text
+            className={`text-base font-gilroy-regular ${
+              message.isUser ? 'text-white' : 'text-gray-900'
+            }`}
+          >
+            {message.text}
+          </Text>
+          <Text
+            className={`text-xs font-gilroy-regular mt-1 ${
+              message.isUser ? 'text-white/70' : 'text-gray-500'
+            }`}
+          >
+            {formatTime(message.timestamp)}
+          </Text>
+        </View>
+
+        {message.isUser && (
+          <View className="w-10 h-10 bg-gray-600 rounded-full items-center justify-center ml-3">
+            <FontAwesome5 name="user" size={16} color="white" />
+          </View>
+        )}
+      </View>
+
+      {/* Render recommendations if available */}
+      {message.recommendations && message.recommendations.length > 0 && (
+        <View className="mb-4 px-3">
+          {message.recommendations.map(rec => renderRecommendationCard(rec))}
         </View>
       )}
     </View>
