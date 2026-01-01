@@ -1,14 +1,18 @@
 import React from 'react';
-import { View, Text, ScrollView, StatusBar, StyleSheet } from 'react-native';
+import { View, Text, ScrollView, StatusBar, StyleSheet, TouchableOpacity } from 'react-native';
 import FontAwesome5 from 'react-native-vector-icons/FontAwesome5';
 import { useAuthStore } from '@stores';
 
 interface HomeScreenProps {
   userName?: string;
+  onAlertsPress?: () => void;
+  onProfilePress?: () => void;
 }
 
-export const HomeScreen: React.FC<HomeScreenProps> = () => {
+export const HomeScreen: React.FC<HomeScreenProps> = ({ onAlertsPress, onProfilePress }) => {
   const { user } = useAuthStore();
+  const handleAlerts = onAlertsPress || (() => {});
+  const handleProfile = onProfilePress || (() => {});
   return (
     <View className="flex-1 bg-gray-50">
       <StatusBar barStyle="dark-content" backgroundColor="#F9FAFB" />
@@ -21,17 +25,21 @@ export const HomeScreen: React.FC<HomeScreenProps> = () => {
         {/* Header */}
         <View className="bg-white px-6 pt-12 pb-8 rounded-b-3xl shadow-sm">
           <View className="flex-row items-center justify-between mb-4">
-            <View>
+            <TouchableOpacity onPress={handleProfile} activeOpacity={0.7}>
               <Text className="text-lg font-gilroy-regular text-gray-600">Welcome back,</Text>
               <Text className="text-2xl font-gilroy-bold text-gray-900">
                 {user?.userName || 'Traveler'}
               </Text>
-            </View>
+            </TouchableOpacity>
 
             {/* Notification Bell */}
-            <View className="w-12 h-12 bg-primary rounded-full items-center justify-center">
+            <TouchableOpacity
+              className="w-12 h-12 bg-primary rounded-full items-center justify-center"
+              onPress={handleAlerts}
+              activeOpacity={0.7}
+            >
               <FontAwesome5 name="bell" size={18} color="white" />
-            </View>
+            </TouchableOpacity>
           </View>
 
           {/* Search Bar */}

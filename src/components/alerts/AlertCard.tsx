@@ -10,11 +10,9 @@ export interface Alert {
   severity: 'low' | 'medium' | 'high' | 'critical';
   timestamp: string;
   location?: string;
+  district?: string; // Added for location filtering
   isRead: boolean;
-  dataSource?: {
-    reportedBy: string;
-    confidence: string;
-  };
+  reportCount?: number; // Number of tourists who reported this
 }
 
 interface AlertCardProps {
@@ -132,21 +130,14 @@ export const AlertCard: React.FC<AlertCardProps> = ({ alert, onToggleRead }) => 
             {alert.description}
           </Text>
 
-          {/* Data Source Section */}
-          {alert.dataSource && (
+          {/* Tourist Reports Section */}
+          {alert.reportCount && alert.reportCount > 0 && (
             <View className="rounded-xl p-4 mb-4" style={{ backgroundColor: severityStyle.bg }}>
-              <Text className="text-sm font-gilroy-bold text-gray-900 mb-3">DATA SOURCE</Text>
-              <View className="flex-row flex-wrap">
-                <View className="flex-1 min-w-0 mr-2 mb-1">
-                  <Text className="text-sm font-gilroy-medium text-gray-700" numberOfLines={2}>
-                    {alert.dataSource.reportedBy}
-                  </Text>
-                </View>
-                <View className="flex-1 min-w-0 ml-2 mb-1">
-                  <Text className="text-sm font-gilroy-medium text-gray-700" numberOfLines={2}>
-                    {alert.dataSource.confidence}
-                  </Text>
-                </View>
+              <View className="flex-row items-center">
+                <FontAwesome5 name="users" size={14} color="#6B7280" />
+                <Text className="text-sm font-gilroy-bold text-gray-900 ml-2">
+                  Reported by {alert.reportCount} {alert.reportCount === 1 ? 'tourist' : 'tourists'}
+                </Text>
               </View>
             </View>
           )}
@@ -160,16 +151,6 @@ export const AlertCard: React.FC<AlertCardProps> = ({ alert, onToggleRead }) => 
               </Text>
             </View>
           )}
-
-          {/* Action Buttons */}
-          <View className="flex-row space-x-3">
-            <TouchableOpacity className="flex-1 bg-gray-100 rounded-full py-3 items-center">
-              <Text className="text-sm font-gilroy-medium text-gray-700">View Details</Text>
-            </TouchableOpacity>
-            <TouchableOpacity className="flex-1 bg-primary rounded-full py-3 items-center">
-              <Text className="text-sm font-gilroy-medium text-white">Take Action</Text>
-            </TouchableOpacity>
-          </View>
         </View>
       )}
     </View>
