@@ -2,9 +2,10 @@ import React, { useState } from 'react';
 import { View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
-import { HomeScreen, SafetyScreen, TransportScreen, GuideScreen, WeatherScreen } from '@screens';
+import { HomeScreen, SafetyScreen, TransportScreen, GuideScreen } from '@screens';
 import { BottomTabBar, TabKey } from '@components/navigation/BottomTabBar';
 import type { MainStackParamList } from '../navigation/MainNavigator';
+import RiskAnalyticsScreen from './RiskAnalyticsScreen';
 
 type Props = NativeStackScreenProps<MainStackParamList, 'MainApp'>;
 
@@ -30,7 +31,7 @@ export const MainAppScreen: React.FC<Props> = ({ route, navigation }) => {
       case 'safety':
         return <SafetyScreen />;
       case 'weather':
-        return <WeatherScreen />;
+        return <RiskAnalyticsScreen />;
       default:
         return (
           <HomeScreen

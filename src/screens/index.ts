@@ -14,4 +14,3 @@ export * from './ReportIncidentScreen';
 export * from './SafetyScreen';
 export * from './TransportScreen';
 export * from './GuideScreen';
-export * from './WeatherScreen';
