@@ -8,6 +8,7 @@ import {
   ActivityIndicator,
   Animated,
   useWindowDimensions,
+  ScrollView,
 } from 'react-native';
 import FontAwesome5 from 'react-native-vector-icons/FontAwesome5';
 import MapView, { Marker, Circle, PROVIDER_GOOGLE } from 'react-native-maps';
@@ -82,7 +83,7 @@ export const SafetyAlerts: React.FC<SafetyAlertsProps> = ({
   // Reduce effective card width so next card peeks visibly
   const carouselWidth = Math.max(width - 46, 260);
   const cardHeight = 160;
-  const scrollRef = useRef<Animated.ScrollView | null>(null);
+  const scrollRef = useRef<ScrollView | null>(null);
 
   // Check if there are any high or medium risk incidents
   const hasAnyRisk = alerts.some(alert => alert.level === 'high' || alert.level === 'medium');
