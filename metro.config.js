@@ -1,3 +1,8 @@
 const { getDefaultConfig, mergeConfig } = require('@react-native/metro-config');
 
-module.exports = mergeConfig(getDefaultConfig(__dirname), {});
+const config = getDefaultConfig(__dirname);
+
+// Exclude CSS files from being processed
+config.resolver.sourceExts = config.resolver.sourceExts.filter(ext => ext !== 'css');
+
+module.exports = config;
