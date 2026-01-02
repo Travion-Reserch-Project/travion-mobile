@@ -24,6 +24,14 @@ export interface SafetyAlert {
   description: string;
   level: 'low' | 'medium' | 'high';
   location: string;
+  incidentType:
+    | 'Scam'
+    | 'Pickpocket'
+    | 'Theft'
+    | 'Money Theft'
+    | 'Harassment'
+    | 'Bag Snatching'
+    | 'Extortion';
 }
 
 interface SafetyAlertsProps {
@@ -42,17 +50,19 @@ interface LocationCoords {
 const defaultAlerts: SafetyAlert[] = [
   {
     id: '1',
-    title: 'Current Risk Level: High',
-    description: 'Gang activity reported in this area. Avoid traveling alone.',
+    title: 'Scam Risk Level: High',
+    description: 'Scam activity reported in this area. Stay alert and avoid strangers.',
     level: 'high',
     location: 'Current Location',
+    incidentType: 'Scam',
   },
   {
     id: '2',
-    title: 'Current Risk Level: Medium',
+    title: 'Pickpocket Risk Level: Medium',
     description: 'Pickpocketing risk increases at this hour. Stay alert.',
     level: 'medium',
     location: 'Current Location',
+    incidentType: 'Pickpocket',
   },
 ];
 

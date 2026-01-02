@@ -86,6 +86,7 @@ const sampleAlerts: SafetyAlert[] = [
     description: 'Pickpocketing risk increases at this hour.',
     level: 'high',
     location: 'Colombo City Center',
+    incidentType: 'Pickpocket',
   },
   {
     id: '2',
@@ -93,6 +94,7 @@ const sampleAlerts: SafetyAlert[] = [
     description: 'Scam activities reported in this area.',
     level: 'high',
     location: 'Colombo City Center',
+    incidentType: 'Scam',
   },
   {
     id: '3',
@@ -100,6 +102,7 @@ const sampleAlerts: SafetyAlert[] = [
     description: 'Harassment incidents reported nearby.',
     level: 'medium',
     location: 'Colombo City Center',
+    incidentType: 'Harassment',
   },
   {
     id: '4',
@@ -107,6 +110,7 @@ const sampleAlerts: SafetyAlert[] = [
     description: 'Money theft incidents in this location.',
     level: 'high',
     location: 'Colombo City Center',
+    incidentType: 'Money Theft',
   },
 ];
 
