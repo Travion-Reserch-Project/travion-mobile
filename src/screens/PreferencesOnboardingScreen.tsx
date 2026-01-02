@@ -41,7 +41,8 @@ const PREFERENCE_CATEGORIES: PreferenceCategory[] = [
     id: 'history',
     title: 'History & Culture',
     subtitle: 'Ancient ruins, temples, museums',
-    description: 'How interested are you in exploring historical sites, ancient civilizations, and cultural heritage?',
+    description:
+      'How interested are you in exploring historical sites, ancient civilizations, and cultural heritage?',
     icon: '🏛️',
     color: '#8B5CF6',
     examples: ['Sigiriya Rock', 'Temple of the Tooth', 'Galle Fort'],
@@ -128,12 +129,15 @@ export const PreferencesOnboardingScreen: React.FC = () => {
     }
   };
 
-  const handlePreferenceChange = useCallback((categoryId: keyof TravelPreferenceScores, value: number) => {
-    setPreferences(prev => ({
-      ...prev,
-      [categoryId]: value,
-    }));
-  }, []);
+  const handlePreferenceChange = useCallback(
+    (categoryId: keyof TravelPreferenceScores, value: number) => {
+      setPreferences(prev => ({
+        ...prev,
+        [categoryId]: value,
+      }));
+    },
+    [],
+  );
 
   const handleSubmitPreferences = async () => {
     try {
@@ -155,11 +159,9 @@ export const PreferencesOnboardingScreen: React.FC = () => {
       goToNext();
     } catch (error: any) {
       console.error('Failed to save preferences:', error);
-      Alert.alert(
-        'Oops!',
-        error.message || 'Failed to save your preferences. Please try again.',
-        [{ text: 'OK' }]
-      );
+      Alert.alert('Oops!', error.message || 'Failed to save your preferences. Please try again.', [
+        { text: 'OK' },
+      ]);
     } finally {
       setIsSubmitting(false);
     }
@@ -176,7 +178,7 @@ export const PreferencesOnboardingScreen: React.FC = () => {
   const handleSkip = () => {
     Alert.alert(
       'Skip Preferences?',
-      'You can always set your preferences later in settings. We\'ll use default preferences for now.',
+      "You can always set your preferences later in settings. We'll use default preferences for now.",
       [
         { text: 'Cancel', style: 'cancel' },
         {
@@ -194,18 +196,13 @@ export const PreferencesOnboardingScreen: React.FC = () => {
             });
           },
         },
-      ]
+      ],
     );
   };
 
   const renderIntroSlide = () => (
     <View className="flex-1 justify-center items-center px-6" style={{ width }}>
-      <LottieView
-        source={discoverAnimation}
-        autoPlay
-        loop
-        style={styles.introAnimation}
-      />
+      <LottieView source={discoverAnimation} autoPlay loop style={styles.introAnimation} />
       <Text className="text-3xl font-gilroy-bold text-gray-900 text-center mb-4">
         Personalize Your Journey
       </Text>
@@ -214,9 +211,7 @@ export const PreferencesOnboardingScreen: React.FC = () => {
       </Text>
       <View className="flex-row items-center gap-2 mb-4">
         <Text className="text-2xl">🎯</Text>
-        <Text className="text-sm font-gilroy-medium text-gray-600">
-          Takes only 2 minutes
-        </Text>
+        <Text className="text-sm font-gilroy-medium text-gray-600">Takes only 2 minutes</Text>
       </View>
     </View>
   );
@@ -229,7 +224,7 @@ export const PreferencesOnboardingScreen: React.FC = () => {
         icon={category.icon}
         color={category.color}
         value={preferences[category.id]}
-        onValueChange={(value) => handlePreferenceChange(category.id, value)}
+        onValueChange={value => handlePreferenceChange(category.id, value)}
       />
       <View className="px-6 mt-4">
         <Text className="text-xs font-gilroy-medium text-gray-400 text-center mb-2">
@@ -242,10 +237,7 @@ export const PreferencesOnboardingScreen: React.FC = () => {
               className="px-3 py-1 rounded-full"
               style={{ backgroundColor: `${category.color}15` }}
             >
-              <Text
-                className="text-xs font-gilroy-medium"
-                style={{ color: category.color }}
-              >
+              <Text className="text-xs font-gilroy-medium" style={{ color: category.color }}>
                 {example}
               </Text>
             </View>
@@ -264,7 +256,7 @@ export const PreferencesOnboardingScreen: React.FC = () => {
         Here's what we learned about you
       </Text>
 
-      {PREFERENCE_CATEGORIES.map((category) => {
+      {PREFERENCE_CATEGORIES.map(category => {
         const value = preferences[category.id];
         const percentage = Math.round(value * 100);
         return (
@@ -272,14 +264,9 @@ export const PreferencesOnboardingScreen: React.FC = () => {
             <View className="flex-row items-center justify-between mb-2">
               <View className="flex-row items-center">
                 <Text className="text-2xl mr-2">{category.icon}</Text>
-                <Text className="text-base font-gilroy-medium text-gray-800">
-                  {category.title}
-                </Text>
+                <Text className="text-base font-gilroy-medium text-gray-800">{category.title}</Text>
               </View>
-              <Text
-                className="text-base font-gilroy-bold"
-                style={{ color: category.color }}
-              >
+              <Text className="text-base font-gilroy-bold" style={{ color: category.color }}>
                 {percentage}%
               </Text>
             </View>
@@ -298,7 +285,8 @@ export const PreferencesOnboardingScreen: React.FC = () => {
 
       <View className="mt-8 p-4 bg-orange-50 rounded-2xl">
         <Text className="text-sm font-gilroy-medium text-orange-800 text-center">
-          ✨ Based on your preferences, we'll recommend the best places to visit, optimal times to go, and activities you'll love!
+          ✨ Based on your preferences, we'll recommend the best places to visit, optimal times to
+          go, and activities you'll love!
         </Text>
       </View>
     </View>
@@ -476,4 +464,3 @@ const styles = StyleSheet.create({
 });
 
 export default PreferencesOnboardingScreen;
-
