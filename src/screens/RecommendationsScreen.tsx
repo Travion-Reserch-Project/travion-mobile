@@ -36,7 +36,11 @@ interface RecommendationWithImage extends SimpleRecommendationLocation {
   imageUrl: string | null;
 }
 
-export const RecommendationsScreen: React.FC = () => {
+interface RecommendationsScreenProps {
+  navigation?: any;
+}
+
+export const RecommendationsScreen: React.FC<RecommendationsScreenProps> = ({ navigation }) => {
   // User can be used for personalized preferences in the future
   const { user } = useAuthStore();
   void user; // Suppress unused warning
@@ -148,7 +152,6 @@ export const RecommendationsScreen: React.FC = () => {
       setCurrentLocation({ latitude: defaultLat, longitude: defaultLng, address: 'Colombo, Sri Lanka' });
       fetchRecommendations(defaultLat, defaultLng);
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // Fetch recommendations from API
@@ -205,7 +208,20 @@ export const RecommendationsScreen: React.FC = () => {
     getCurrentLocation();
   }, [getCurrentLocation]);
 
-  // Open location in maps
+  // Navigate to location details
+  const handleLocationPress = (item: RecommendationWithImage) => {
+    if (navigation) {
+      navigation.navigate('LocationDetails', {
+        locationName: item.name,
+        distance: item.distance_km,
+        matchScore: item.similarity_score,
+        userLatitude: currentLocation?.latitude,
+        userLongitude: currentLocation?.longitude,
+      });
+    }
+  };
+
+  // Open location in maps (secondary action)
   const openInMaps = (lat: number, lng: number, name: string) => {
     const scheme = Platform.select({
       ios: 'maps:0,0?q=',
@@ -287,7 +303,7 @@ export const RecommendationsScreen: React.FC = () => {
       key={`${item.name}-${index}`}
       className="mx-4 mb-4 bg-white rounded-2xl shadow-sm overflow-hidden"
       activeOpacity={0.9}
-      onPress={() => openInMaps(item.latitude, item.longitude, item.name)}
+      onPress={() => handleLocationPress(item)}
     >
       {/* Image */}
       <View className="relative">

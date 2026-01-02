@@ -1,6 +1,7 @@
 // Common types for the application
 
 export interface User {
+  preferences: { history: number; adventure: number; nature: number; relaxation: number; };
   userId: string;
   name: string;
   userName?: string;

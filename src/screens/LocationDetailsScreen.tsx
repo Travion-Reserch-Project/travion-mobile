@@ -15,8 +15,12 @@ import {
 import FontAwesome5 from 'react-native-vector-icons/FontAwesome5';
 import MaterialCommunityIcons from 'react-native-vector-icons/MaterialCommunityIcons';
 import Ionicons from 'react-native-vector-icons/Ionicons';
+import LinearGradient from 'react-native-linear-gradient';
 import LottieView from 'lottie-react-native';
 import { aiService, locationService } from '@services/api';
+import { useAuthStore } from '@stores';
+import { haversineDistance, calculateMatchScore } from '@utils';
+import type { TravelPreferenceScores } from '@types';
 import type {
   SimpleCrowdPredictionResponse,
   SimpleGoldenHourResponse,
@@ -65,7 +69,8 @@ export const LocationDetailsScreen: React.FC<LocationDetailsScreenProps> = ({
   route,
   navigation,
 }) => {
-  const { locationName, distance, matchScore } = route.params;
+  const { locationName, distance: providedDistance, matchScore: providedMatchScore, userLatitude, userLongitude } = route.params;
+  const { user } = useAuthStore();
 
   const [isLoading, setIsLoading] = useState(true);
   const [locationDetails, setLocationDetails] = useState<LocationDetailsResponse | null>(null);
@@ -74,6 +79,10 @@ export const LocationDetailsScreen: React.FC<LocationDetailsScreenProps> = ({
   const [description, setDescription] = useState<SimpleDescriptionResponse | null>(null);
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
   const [isFavorite, setIsFavorite] = useState(false);
+
+  // Calculated values when not provided
+  const [calculatedDistance, setCalculatedDistance] = useState<number | undefined>(providedDistance);
+  const [calculatedMatchScore, setCalculatedMatchScore] = useState<number | undefined>(providedMatchScore);
 
   const scrollY = useRef(new Animated.Value(0)).current;
   const imageScrollRef = useRef<ScrollView>(null);
@@ -106,7 +115,6 @@ export const LocationDetailsScreen: React.FC<LocationDetailsScreenProps> = ({
 
   useEffect(() => {
     loadLocationData();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   useEffect(() => {
@@ -117,7 +125,7 @@ export const LocationDetailsScreen: React.FC<LocationDetailsScreenProps> = ({
         useNativeDriver: true,
       }).start();
     }
-  }, [isLoading, fadeAnim]);
+  }, [isLoading]);
 
   const loadLocationData = async () => {
     try {
@@ -137,6 +145,30 @@ export const LocationDetailsScreen: React.FC<LocationDetailsScreenProps> = ({
           .catch(() => null),
       ]);
 
+
+      // Calculate distance if not provided and we have user location
+      if (providedDistance === undefined && userLatitude && userLongitude && details) {
+        const dist = haversineDistance(
+          userLatitude,
+          userLongitude,
+          details.coordinates.latitude,
+          details.coordinates.longitude
+        );
+        setCalculatedDistance(dist);
+      }
+
+      // Calculate match score if not provided and we have user preferences
+      if (providedMatchScore === undefined && user && details) {
+        // Get user preferences from profile or use defaults
+        const userPrefs: TravelPreferenceScores = user.preferences || {
+          history: 0.5,
+          adventure: 0.5,
+          nature: 0.5,
+          relaxation: 0.5,
+        };
+        const match = calculateMatchScore(userPrefs, details.preferenceScores);
+        setCalculatedMatchScore(match);
+      }
       setLocationDetails(details);
       setCrowdData(crowd);
       setGoldenHourData(goldenHour);
@@ -176,6 +208,10 @@ export const LocationDetailsScreen: React.FC<LocationDetailsScreenProps> = ({
       </View>
     );
   }
+
+  // Use calculated values as fallback
+  const distance = calculatedDistance;
+  const matchScore = calculatedMatchScore;
 
   if (!locationDetails) {
     return (
@@ -425,7 +461,7 @@ export const LocationDetailsScreen: React.FC<LocationDetailsScreenProps> = ({
                 {goldenHourData?.sunrise || '6:00'}
               </Text>
               <Text style={[styles.statSubtext, { color: '#92400E' }]}>
-                to {goldenHourData?.sunrise_end || '7:00'}
+                Golden Hour
               </Text>
             </View>
 
@@ -439,7 +475,7 @@ export const LocationDetailsScreen: React.FC<LocationDetailsScreenProps> = ({
                 {goldenHourData?.sunset || '5:30'}
               </Text>
               <Text style={[styles.statSubtext, { color: '#9A3412' }]}>
-                to {goldenHourData?.sunset_end || '6:30'}
+                to {goldenHourData?.golden_hour_evening || '6:30'}
               </Text>
             </View>
           </View>
@@ -521,14 +557,14 @@ export const LocationDetailsScreen: React.FC<LocationDetailsScreenProps> = ({
                     <View style={styles.goldenTimeItem}>
                       <FontAwesome5 name="sunrise" size={14} color="#EA580C" />
                       <Text style={styles.goldenTimeText}>
-                        {goldenHourData?.sunrise || '6:00'} - {goldenHourData?.sunrise_end || '7:00'}
+                        {goldenHourData?.sunrise || '6:00'} - {goldenHourData?.golden_hour_morning || '7:00'}
                       </Text>
                     </View>
                     <View style={styles.goldenTimeDivider} />
                     <View style={styles.goldenTimeItem}>
                       <FontAwesome5 name="sunset" size={14} color="#DC2626" />
                       <Text style={styles.goldenTimeText}>
-                        {goldenHourData?.sunset || '5:30'} - {goldenHourData?.sunset_end || '6:30'}
+                        {goldenHourData?.sunset || '5:30'} - {goldenHourData?.golden_hour_evening || '6:30'}
                       </Text>
                     </View>
                   </View>
