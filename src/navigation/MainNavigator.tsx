@@ -55,7 +55,7 @@ export const MainNavigator: React.FC = () => {
 
   return (
     <Stack.Navigator screenOptions={{ headerShown: false }}>
-      {hasCompleteProfile ? (
+      {true ? (
         <>
           <Stack.Screen name="WelcomeBack" component={WelcomeBackScreen} />
           <Stack.Screen name="MainApp" component={MainAppScreen} />
