@@ -2,7 +2,7 @@ import React from 'react';
 import { View, TouchableOpacity, Text } from 'react-native';
 import FontAwesome5 from 'react-native-vector-icons/FontAwesome5';
 
-export type TabKey = 'home' | 'explore' | 'alerts' | 'chatbot' | 'profile';
+export type TabKey = 'home' | 'transport' | 'guide' | 'safety' | 'weather';
 
 interface TabItem {
   key: TabKey;
@@ -24,27 +24,27 @@ const tabs: TabItem[] = [
     iconType: 'solid',
   },
   {
-    key: 'chatbot',
-    label: 'Chatbot',
-    icon: 'robot',
+    key: 'transport',
+    label: 'Transport',
+    icon: 'bus',
     iconType: 'solid',
   },
   {
-    key: 'explore',
-    label: 'Explore',
+    key: 'guide',
+    label: 'Guide',
     icon: 'compass',
     iconType: 'regular',
   },
   {
-    key: 'alerts',
-    label: 'Alerts',
-    icon: 'bell',
+    key: 'safety',
+    label: 'Safety',
+    icon: 'shield-alt',
     iconType: 'solid',
   },
   {
-    key: 'profile',
-    label: 'Profile',
-    icon: 'user',
+    key: 'weather',
+    label: 'Weather',
+    icon: 'cloud-showers-heavy',
     iconType: 'solid',
   },
 ];
@@ -58,7 +58,7 @@ export const BottomTabBar: React.FC<BottomTabBarProps> = ({ activeTab, onTabPres
         return (
           <TouchableOpacity
             key={tab.key}
-            className="flex-1 items-center py-2"
+            className={`flex-1 items-center py-2 ${isActive ? 'transform scale-105' : ''}`}
             onPress={() => onTabPress(tab.key)}
           >
             <View className="items-center">
@@ -70,7 +70,7 @@ export const BottomTabBar: React.FC<BottomTabBarProps> = ({ activeTab, onTabPres
               />
               <Text
                 className={`text-xs font-gilroy-medium mt-1 ${
-                  isActive ? 'text-primary' : 'text-gray-500'
+                  isActive ? 'text-primary font-bold' : 'text-gray-500'
                 }`}
               >
                 {tab.label}
