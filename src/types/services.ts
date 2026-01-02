@@ -1,3 +1,11 @@
+// Travel preference scores (0-1 scale)
+export interface TravelPreferenceScores {
+  history: number;     // Interest in historical/cultural sites
+  adventure: number;   // Interest in adventure activities
+  nature: number;      // Interest in nature/wildlife
+  relaxation: number;  // Interest in relaxation/spiritual experiences
+}
+
 export interface UserPreferences {
   language: string;
   currency: string;
@@ -10,6 +18,8 @@ export interface UserPreferences {
     profileVisible: boolean;
     dataSharing: boolean;
   };
+  // Travel preferences for AI recommendations
+  travelPreferences?: TravelPreferenceScores;
 }
 
 export interface UserProfileData {

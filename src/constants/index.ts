@@ -1,15 +1,9 @@
-import { Platform } from 'react-native';
-
 export const APP_NAME = 'Travion';
 export const APP_VERSION = '1.0.0';
 
 // API Configuration
 export const API_CONFIG = {
-  BASE_URL: __DEV__
-    ? Platform.OS === 'android'
-      ? 'http://10.0.2.2:3001'
-      : 'http://localhost:3001'
-    : 'https://api.travion.online',
+  BASE_URL:'http://10.137.13.70:3001',
   API_VERSION: '/api/v1',
   TIMEOUT: 30000,
   USE_COOKIES: true,

@@ -1,6 +1,12 @@
 import React from 'react';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
-import { UserProfileSetupScreen, MainAppScreen } from '@screens';
+import {
+  UserProfileSetupScreen,
+  MainAppScreen,
+  PreferencesOnboardingScreen,
+  LocationDetailsScreen,
+  LocationChatScreen,
+} from '@screens';
 import { MapScreen } from '@screens/MapScreen';
 import { ReportIncidentScreen } from '@screens/ReportIncidentScreen';
 import { PoliceHelpScreen } from '@screens/PoliceHelpScreen';
@@ -17,6 +23,7 @@ const welcomeBackAnimation = require('@assets/animations/success.json');
 
 export type MainStackParamList = {
   ProfileSetup: undefined;
+  PreferencesOnboarding: undefined;
   WelcomeBack: undefined;
   MainApp: { userName?: string; userEmail?: string } | undefined;
   MapScreen: {
@@ -27,6 +34,16 @@ export type MainStackParamList = {
   PoliceHelpScreen: undefined;
   AlertsScreen: undefined;
   ProfileScreen: { userName?: string; userEmail?: string };
+  LocationDetails: {
+    locationName: string;
+    distance?: number;
+    matchScore?: number;
+    userLatitude?: number;
+    userLongitude?: number;
+  };
+  LocationChat: {
+    locationName: string;
+  };
 };
 
 const Stack = createNativeStackNavigator<MainStackParamList>();
@@ -60,32 +77,62 @@ const WelcomeBackScreen: React.FC = () => {
 export const MainNavigator: React.FC = () => {
   const { user } = useAuthStore();
 
-  // Simple logic: if user has profileStatus 'Complete', show welcome back, otherwise profile setup
+  // Check profile completion status
   const hasCompleteProfile = user?.profileStatus === 'Complete';
+  // Check if travel preferences have been set
+  const hasSetPreferences = user?.hasSetPreferences === true;
+
+  // Determine the initial route based on user state
+  const getInitialRoute = (): keyof MainStackParamList => {
+    if (!hasCompleteProfile) {
+      // User needs to complete profile first
+      return 'ProfileSetup';
+    }
+    if (!hasSetPreferences) {
+      // User has profile but needs to set travel preferences
+      return 'PreferencesOnboarding';
+    }
+    // User is fully set up, show welcome back
+    return 'WelcomeBack';
+  };
+
+  const initialRoute = getInitialRoute();
+
+  console.log('MainNavigator state:', {
+    hasCompleteProfile,
+    hasSetPreferences,
+    initialRoute,
+    userProfileStatus: user?.profileStatus,
+  });
 
   return (
-    <Stack.Navigator screenOptions={{ headerShown: false }}>
-      {hasCompleteProfile ? (
-        <>
-          <Stack.Screen name="WelcomeBack" component={WelcomeBackScreen} />
-          <Stack.Screen name="MainApp" component={MainAppScreen} />
-          <Stack.Screen name="MapScreen" component={MapScreen} />
-          <Stack.Screen name="ReportIncidentScreen" component={ReportIncidentScreen} />
-          <Stack.Screen name="PoliceHelpScreen" component={PoliceHelpScreen} />
-          <Stack.Screen name="AlertsScreen" component={AlertsScreen} />
-          <Stack.Screen name="ProfileScreen" component={ProfileScreen} />
-        </>
-      ) : (
-        <>
-          <Stack.Screen name="ProfileSetup" component={UserProfileSetupScreen} />
-          <Stack.Screen name="MainApp" component={MainAppScreen} />
-          <Stack.Screen name="MapScreen" component={MapScreen} />
-          <Stack.Screen name="ReportIncidentScreen" component={ReportIncidentScreen} />
-          <Stack.Screen name="PoliceHelpScreen" component={PoliceHelpScreen} />
-          <Stack.Screen name="AlertsScreen" component={AlertsScreen} />
-          <Stack.Screen name="ProfileScreen" component={ProfileScreen} />
-        </>
-      )}
+    <Stack.Navigator
+      screenOptions={{ headerShown: false }}
+      initialRouteName={initialRoute}
+    >
+      <Stack.Screen name="ProfileSetup" component={UserProfileSetupScreen} />
+      <Stack.Screen name="PreferencesOnboarding" component={PreferencesOnboardingScreen} />
+      <Stack.Screen name="WelcomeBack" component={WelcomeBackScreen} />
+      <Stack.Screen name="MainApp" component={MainAppScreen} />
+      <Stack.Screen name="MapScreen" component={MapScreen} />
+      <Stack.Screen name="ReportIncidentScreen" component={ReportIncidentScreen} />
+      <Stack.Screen name="PoliceHelpScreen" component={PoliceHelpScreen} />
+      <Stack.Screen name="AlertsScreen" component={AlertsScreen} />
+      <Stack.Screen name="ProfileScreen" component={ProfileScreen} />
+      <Stack.Screen
+        name="LocationDetails"
+        component={LocationDetailsScreen}
+        options={{
+          animation: 'slide_from_right',
+        }}
+      />
+      <Stack.Screen
+        name="LocationChat"
+        component={LocationChatScreen}
+        options={{
+          animation: 'slide_from_bottom',
+        }}
+      />
     </Stack.Navigator>
   );
 };

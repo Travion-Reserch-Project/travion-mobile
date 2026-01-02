@@ -32,6 +32,20 @@ export abstract class BaseApiService {
       throw new Error('No data received from server');
     }
 
+    // Backend wraps responses in { success, message, data }
+    // The client also wraps in ApiResponse, so we need to extract the inner data
+    const serverResponse = response.data as any;
+
+    // Check if this is a wrapped response from our backend
+    if (serverResponse && typeof serverResponse === 'object' && 'data' in serverResponse) {
+      // Backend response structure: { success: true, message: "...", data: { ... } }
+      if (!serverResponse.success) {
+        throw new Error(serverResponse.message || 'API request failed');
+      }
+      return serverResponse.data as T;
+    }
+
+    // If not wrapped, return as-is (for external APIs or different response formats)
     return response.data;
   }
 

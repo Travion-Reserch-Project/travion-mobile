@@ -15,3 +15,8 @@ export * from './SafetyScreen';
 export * from './TransportScreen';
 export * from './GuideScreen';
 export * from './WeatherScreen';
+export * from './PreferencesOnboardingScreen';
+export * from './TourGuideScreen';
+export * from './RecommendationsScreen';
+export * from './LocationDetailsScreen';
+export * from './LocationChatScreen';

@@ -5,4 +5,7 @@ export const config = {
   GOOGLE_ANDROID_CLIENT_ID: 'YOUR_GOOGLE_ANDROID_CLIENT_ID.apps.googleusercontent.com',
 };
 
+// Export Google Maps configuration
+export * from './maps';
+
 // You can override these values with environment variables or a .env file
