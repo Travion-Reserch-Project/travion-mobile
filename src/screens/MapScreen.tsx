@@ -62,13 +62,13 @@ const getRiskLevelColor = (level: string) => {
 const getRiskRadius = (level: string) => {
   switch (level) {
     case 'high':
-      return 600; // 600m radius for high risk
+      return 300; // 300m radius for high risk
     case 'medium':
-      return 400; // 400m radius for medium risk
+      return 200; // 200m radius for medium risk
     case 'low':
-      return 200; // 200m radius for low risk
+      return 200; // 100m radius for low risk
     default:
-      return 300;
+      return 150;
   }
 };
 
@@ -177,12 +177,17 @@ export const MapScreen: React.FC<MapScreenProps> = ({ route }) => {
             const newLocation = { latitude, longitude };
             setUserLocation(newLocation);
 
-            // Set map region to user location
+            // Set map region to user location with appropriate zoom based on risk circle
+            const radius = getRiskRadius(displayRiskLevel);
+            const paddingFactor = 6.0;
+            const degreesPerMeter = 0.00001;
+            const delta = radius * degreesPerMeter * paddingFactor;
+
             setMapRegion({
               latitude,
               longitude,
-              latitudeDelta: 0.05,
-              longitudeDelta: 0.05,
+              latitudeDelta: delta,
+              longitudeDelta: delta,
             });
 
             // Reverse geocode to get location name
@@ -238,6 +243,7 @@ export const MapScreen: React.FC<MapScreenProps> = ({ route }) => {
     };
 
     requestLocationPermission();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const handleCirclePress = () => {
@@ -468,7 +474,13 @@ export const MapScreen: React.FC<MapScreenProps> = ({ route }) => {
               >
                 {/* Header */}
                 <View className="flex-row justify-between items-center mb-3">
-                  <Text className="text-base font-gilroy-bold text-gray-900">High Risk Area</Text>
+                  <Text className="text-base font-gilroy-bold text-gray-900">
+                    {displayRiskLevel === 'low'
+                      ? 'Safe Area'
+                      : displayRiskLevel === 'medium'
+                      ? 'Medium Risk Area'
+                      : 'High Risk Area'}
+                  </Text>
                   <TouchableOpacity onPress={() => setShowRiskCircle(false)}>
                     <FontAwesome5 name="times" size={14} color="#9CA3AF" />
                   </TouchableOpacity>
@@ -485,7 +497,7 @@ export const MapScreen: React.FC<MapScreenProps> = ({ route }) => {
                     >
                       {/* Incident name */}
                       <Text className="text-sm font-gilroy-medium text-gray-800 flex-1">
-                        {alert.title}
+                        {alert.incidentType || alert.title}
                       </Text>
 
                       {/* Risk level badge */}
