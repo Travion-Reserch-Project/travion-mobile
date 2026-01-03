@@ -9,6 +9,8 @@ export interface SimpleRecommendationRequest {
   preferences?: TravelPreferenceScores;
   max_distance_km?: number;
   top_k?: number;
+  outdoor_only?: boolean | null;  // true = outdoor only, false = indoor only, null/undefined = both
+  min_match_score?: number;  // Minimum match score threshold (0.0 to 1.0)
 }
 
 // Simple Recommendation Location
@@ -66,6 +68,13 @@ export interface SimpleGoldenHourRequest {
   location_name: string;
 }
 
+// Golden Hour Time Window
+export interface GoldenHourWindow {
+  start: string;
+  end: string;
+  duration_minutes?: number;
+}
+
 // Simple Golden Hour Response
 export interface SimpleGoldenHourResponse {
   location_name: string;
@@ -76,8 +85,8 @@ export interface SimpleGoldenHourResponse {
   };
   sunrise: string;
   sunset: string;
-  golden_hour_morning: string;
-  golden_hour_evening: string;
+  golden_hour_morning: GoldenHourWindow;
+  golden_hour_evening: GoldenHourWindow;
   current_lighting: string;
   recommended_time: string;
   tips: string[];
@@ -133,10 +142,19 @@ class AIService extends BaseApiService {
     request: SimpleRecommendationRequest
   ): Promise<SimpleRecommendationResponse> {
     try {
+      console.log('AIService.getSimpleRecommendations - Request:', JSON.stringify(request));
       const response = await this.publicPost<SimpleRecommendationResponse>('/simple/recommend', request);
-      return this.handleApiResponse(response);
-    } catch (error) {
+      console.log('AIService.getSimpleRecommendations - Raw response success:', response?.success);
+      const result = this.handleApiResponse(response);
+      console.log('AIService.getSimpleRecommendations - Processed result:', {
+        success: result?.success,
+        total_found: result?.total_found,
+        recommendations_count: result?.recommendations?.length,
+      });
+      return result;
+    } catch (error: any) {
       console.error('Simple recommendations failed:', error);
+      console.error('Error details:', error?.message, error?.code, error?.status);
       throw error;
     }
   }

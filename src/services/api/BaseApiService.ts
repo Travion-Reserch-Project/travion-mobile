@@ -10,16 +10,24 @@ export abstract class BaseApiService {
   }
 
   //Get authenticated headers for API requests
+  //Note: apiClient also adds auth headers via interceptor, but we add them here
+  //for explicit control. If tokens are not available, return empty headers
+  //and let the server respond with 401 which will be handled by apiClient interceptor.
   protected async getAuthHeaders(): Promise<Record<string, string>> {
-    const tokens = await AuthUtils.getStoredTokens();
-    if (!tokens || !tokens.accessToken || tokens.accessToken === '') {
-      throw new Error('Authentication required');
-    }
-
-    return {
-      Authorization: `Bearer ${tokens.accessToken}`,
+    const headers: Record<string, string> = {
       'Content-Type': 'application/json',
     };
+    
+    try {
+      const tokens = await AuthUtils.getStoredTokens();
+      if (tokens?.accessToken) {
+        headers.Authorization = `Bearer ${tokens.accessToken}`;
+      }
+    } catch (error) {
+      console.warn('Failed to get auth tokens:', error);
+    }
+    
+    return headers;
   }
 
   //Handle API response with consistent error handling and data extraction

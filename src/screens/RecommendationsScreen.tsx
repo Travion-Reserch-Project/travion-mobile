@@ -162,6 +162,14 @@ export const RecommendationsScreen: React.FC<RecommendationsScreenProps> = ({ na
     try {
       const preferences = getUserPreferences();
 
+      console.log('Fetching recommendations with:', {
+        latitude: lat,
+        longitude: lng,
+        preferences,
+        max_distance_km: 100,
+        top_k: 10,
+      });
+
       // Get recommendations
       const response = await aiService.getSimpleRecommendations({
         latitude: lat,
@@ -169,6 +177,12 @@ export const RecommendationsScreen: React.FC<RecommendationsScreenProps> = ({ na
         preferences,
         max_distance_km: 100,
         top_k: 10,
+      });
+
+      console.log('Recommendations API response:', {
+        success: response?.success,
+        total_found: response?.total_found,
+        recommendations_count: response?.recommendations?.length,
       });
 
       if (response.recommendations && response.recommendations.length > 0) {
@@ -185,12 +199,19 @@ export const RecommendationsScreen: React.FC<RecommendationsScreenProps> = ({ na
         );
 
         setRecommendations(recommendationsWithImages);
+        console.log('Set recommendations:', recommendationsWithImages.length);
       } else {
+        console.log('No recommendations found in response');
         setRecommendations([]);
       }
-    } catch (err) {
+    } catch (err: any) {
       console.error('Fetch recommendations error:', err);
-      setError('Failed to load recommendations. Please try again.');
+      console.error('Error details:', {
+        message: err?.message,
+        status: err?.status,
+        code: err?.code,
+      });
+      setError(err?.message || 'Failed to load recommendations. Please try again.');
     } finally {
       setLoading(false);
       setRefreshing(false);

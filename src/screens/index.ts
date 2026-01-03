@@ -20,3 +20,4 @@ export * from './TourGuideScreen';
 export * from './RecommendationsScreen';
 export * from './LocationDetailsScreen';
 export * from './LocationChatScreen';
+export * from './TourPlanChatScreen';

@@ -84,6 +84,25 @@ const CROWD_COLORS: Record<string, { color: string; bg: string }> = {
   EXTREME: { color: '#DC2626', bg: '#FEE2E2' },
 };
 
+// Distance options for search radius
+const DISTANCE_OPTIONS = [10, 25, 50, 100, 250];
+
+// Location type filter options
+type LocationTypeFilter = 'all' | 'outdoor' | 'indoor';
+
+interface LocationTypeOption {
+  key: LocationTypeFilter;
+  label: string;
+  icon: string;
+  iconFamily: 'fa5' | 'mci';
+}
+
+const LOCATION_TYPE_OPTIONS: LocationTypeOption[] = [
+  { key: 'all', label: 'All Places', icon: 'globe-americas', iconFamily: 'fa5' },
+  { key: 'outdoor', label: 'Outdoor', icon: 'tree', iconFamily: 'fa5' },
+  { key: 'indoor', label: 'Indoor', icon: 'home', iconFamily: 'fa5' },
+];
+
 // Extended location with image
 interface RecommendationWithImage extends SimpleRecommendationLocation {
   imageUrl: string | null;
@@ -217,14 +236,23 @@ const LocationCard: React.FC<LocationCardProps> = ({
                 <Text className="ml-1.5 text-sm font-gilroy-medium text-white">
                   {location.distance_km.toFixed(1)} km away
                 </Text>
-                {location.is_outdoor && (
-                  <View className="ml-3 flex-row items-center">
-                    <MaterialCommunityIcons name="nature" size={14} color="#10B981" />
-                    <Text className="ml-1 text-xs font-gilroy-medium text-green-400">
-                      Outdoor
-                    </Text>
-                  </View>
-                )}
+                <View className="ml-3 flex-row items-center bg-white/20 px-2 py-0.5 rounded-full">
+                  {location.is_outdoor ? (
+                    <>
+                      <MaterialCommunityIcons name="tree" size={12} color="#10B981" />
+                      <Text className="ml-1 text-xs font-gilroy-medium text-green-400">
+                        Outdoor
+                      </Text>
+                    </>
+                  ) : (
+                    <>
+                      <FontAwesome5 name="home" size={10} color="#60A5FA" />
+                      <Text className="ml-1 text-xs font-gilroy-medium text-blue-400">
+                        Indoor
+                      </Text>
+                    </>
+                  )}
+                </View>
               </View>
             </View>
           </View>
@@ -354,6 +382,9 @@ export const TourGuideScreen: React.FC<TourGuideScreenProps> = ({
   });
   const [error, setError] = useState<string | null>(null);
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
+  const [selectedDistance, setSelectedDistance] = useState<number>(50); // Default 50km
+  const [selectedLocationType, setSelectedLocationType] = useState<LocationTypeFilter>('all');
+  const [showFilters, setShowFilters] = useState(false);
 
   // Search state
   const [searchQuery, setSearchQuery] = useState('');
@@ -361,6 +392,7 @@ export const TourGuideScreen: React.FC<TourGuideScreenProps> = ({
   const [isSearching, setIsSearching] = useState(false);
   const [showSearchResults, setShowSearchResults] = useState(false);
   const searchTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const preferencesLoadedRef = useRef(false);
 
   const loadPreferences = async () => {
     try {
@@ -558,17 +590,32 @@ export const TourGuideScreen: React.FC<TourGuideScreenProps> = ({
     );
   };
 
-  const fetchRecommendations = async (lat: number, lng: number) => {
+  const fetchRecommendations = async (
+    lat: number,
+    lng: number,
+    distanceOverride?: number,
+    locationTypeOverride?: LocationTypeFilter
+  ) => {
     try {
       setIsLoading(true);
       setError(null);
+
+      // Use override if provided, otherwise use state value
+      const maxDistance = distanceOverride ?? selectedDistance;
+      const locationType = locationTypeOverride ?? selectedLocationType;
+
+      // Convert location type to outdoor_only parameter
+      // true = outdoor only, false = indoor only, null/undefined = both
+      const outdoorOnly = locationType === 'all' ? null : locationType === 'outdoor';
 
       const response = await aiService.getSimpleRecommendations({
         latitude: lat,
         longitude: lng,
         preferences: preferences,
-        max_distance_km: 30,
-        top_k: 10,
+        max_distance_km: maxDistance,
+        top_k: 20,  // Max allowed by backend validation
+        outdoor_only: outdoorOnly,
+        min_match_score: 0.35,  // Only show 35%+ matches
       });
 
       if (response.recommendations && response.recommendations.length > 0) {
@@ -605,7 +652,7 @@ export const TourGuideScreen: React.FC<TourGuideScreenProps> = ({
       getCurrentLocation();
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [userLocation, preferences]);
+  }, [userLocation, preferences, selectedDistance, selectedLocationType]);
 
   const handleLocationPress = (location: SimpleRecommendationLocation) => {
     if (navigation) {
@@ -619,14 +666,13 @@ export const TourGuideScreen: React.FC<TourGuideScreenProps> = ({
     }
   };
 
-  const filteredRecommendations = selectedCategory
-    ? recommendations.filter(
-      (loc) =>
-        loc.preference_scores[
-        selectedCategory as keyof typeof loc.preference_scores
-        ] > 0.5
-    )
-    : recommendations;
+  // Filter recommendations by category (min_match_score and outdoor_only handled server-side)
+  const filteredRecommendations = recommendations.filter((loc) => {
+    if (!selectedCategory) return true;
+    return loc.preference_scores[
+      selectedCategory as keyof typeof loc.preference_scores
+    ] > 0.5;
+  });
 
   const getGreeting = () => {
     const hour = new Date().getHours();
@@ -637,13 +683,14 @@ export const TourGuideScreen: React.FC<TourGuideScreenProps> = ({
 
   // Load user preferences on mount
   useEffect(() => {
-    loadPreferences();
-  }, []);
-
-  // Get location and fetch recommendations on mount
-  useEffect(() => {
+    const initPreferences = async () => {
+      await loadPreferences();
+      preferencesLoadedRef.current = true;
+      // Now request location and fetch recommendations
+      requestLocationPermission();
+    };
+    initPreferences();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    requestLocationPermission();
   }, []);
 
   const renderHeader = () => (
@@ -824,53 +871,224 @@ export const TourGuideScreen: React.FC<TourGuideScreenProps> = ({
     );
   };
 
-  const renderCategoryFilter = () => (
-    <View className="py-4">
+  // Render smart filter panel with AI theme
+  const renderSmartFilters = () => (
+    <View className="bg-white mx-4 rounded-2xl shadow-sm overflow-hidden mb-4">
+      {/* Filter Header with Toggle */}
+      <TouchableOpacity
+        className="flex-row items-center justify-between p-4 border-b border-gray-100"
+        onPress={() => setShowFilters(!showFilters)}
+        activeOpacity={0.7}
+      >
+        <View className="flex-row items-center">
+          <View className="w-10 h-10 rounded-xl items-center justify-center" style={{ backgroundColor: '#FFF3E0' }}>
+            <FontAwesome5 name="sliders-h" size={16} color="#F5840E" />
+          </View>
+          <View className="ml-3">
+            <Text className="text-base font-gilroy-bold text-gray-900">Smart Filters</Text>
+            <Text className="text-xs font-gilroy-regular text-gray-500 mt-0.5">
+              {selectedDistance}km • {LOCATION_TYPE_OPTIONS.find(o => o.key === selectedLocationType)?.label}
+              {selectedCategory ? ` • ${selectedCategory}` : ''}
+            </Text>
+          </View>
+        </View>
+        <View className="flex-row items-center">
+          <View className="bg-primary/10 px-2.5 py-1 rounded-full mr-2">
+            <Text className="text-xs font-gilroy-bold text-primary">
+              {filteredRecommendations.length} results
+            </Text>
+          </View>
+          <Ionicons
+            name={showFilters ? 'chevron-up' : 'chevron-down'}
+            size={20}
+            color="#9CA3AF"
+          />
+        </View>
+      </TouchableOpacity>
+
+      {/* Expandable Filter Content */}
+      {showFilters && (
+        <View className="p-4">
+          {/* Location Type Filter (Indoor/Outdoor) */}
+          <View className="mb-4">
+            <View className="flex-row items-center mb-3">
+              <MaterialCommunityIcons name="map-marker-radius" size={16} color="#6B7280" />
+              <Text className="ml-2 text-sm font-gilroy-bold text-gray-700">Location Type</Text>
+            </View>
+            <View className="flex-row bg-gray-100 rounded-xl p-1">
+              {LOCATION_TYPE_OPTIONS.map((option) => (
+                <TouchableOpacity
+                  key={option.key}
+                  className={`flex-1 flex-row items-center justify-center py-2.5 rounded-lg ${
+                    selectedLocationType === option.key ? 'bg-white shadow-sm' : ''
+                  }`}
+                  onPress={() => {
+                    setSelectedLocationType(option.key);
+                    if (userLocation) {
+                      fetchRecommendations(
+                        userLocation.latitude,
+                        userLocation.longitude,
+                        selectedDistance,
+                        option.key
+                      );
+                    }
+                  }}
+                >
+                  <FontAwesome5
+                    name={option.icon}
+                    size={12}
+                    color={selectedLocationType === option.key ? '#F5840E' : '#9CA3AF'}
+                  />
+                  <Text
+                    className={`ml-1.5 text-sm font-gilroy-medium ${
+                      selectedLocationType === option.key ? 'text-primary' : 'text-gray-500'
+                    }`}
+                  >
+                    {option.label}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+          </View>
+
+          {/* Distance Filter */}
+          <View className="mb-4">
+            <View className="flex-row items-center mb-3">
+              <FontAwesome5 name="route" size={14} color="#6B7280" />
+              <Text className="ml-2 text-sm font-gilroy-bold text-gray-700">Search Radius</Text>
+            </View>
+            <View className="flex-row flex-wrap gap-2">
+              {DISTANCE_OPTIONS.map((distance) => (
+                <TouchableOpacity
+                  key={distance}
+                  className={`px-4 py-2.5 rounded-xl ${
+                    selectedDistance === distance
+                      ? 'bg-primary'
+                      : 'bg-gray-100'
+                  }`}
+                  onPress={() => {
+                    setSelectedDistance(distance);
+                    if (userLocation) {
+                      fetchRecommendations(userLocation.latitude, userLocation.longitude, distance);
+                    }
+                  }}
+                >
+                  <Text
+                    className={`text-sm font-gilroy-medium ${
+                      selectedDistance === distance ? 'text-white' : 'text-gray-600'
+                    }`}
+                  >
+                    {distance} km
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+          </View>
+
+          {/* Category Filter */}
+          <View>
+            <View className="flex-row items-center mb-3">
+              <Ionicons name="sparkles" size={16} color="#6B7280" />
+              <Text className="ml-2 text-sm font-gilroy-bold text-gray-700">Experience Type</Text>
+            </View>
+            <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+              <TouchableOpacity
+                className={`mr-2 px-4 py-2.5 rounded-xl flex-row items-center ${
+                  selectedCategory === null ? 'bg-primary' : 'bg-gray-100'
+                }`}
+                onPress={() => setSelectedCategory(null)}
+              >
+                <Ionicons
+                  name="apps"
+                  size={14}
+                  color={selectedCategory === null ? 'white' : '#6B7280'}
+                />
+                <Text
+                  className={`ml-1.5 text-sm font-gilroy-medium ${
+                    selectedCategory === null ? 'text-white' : 'text-gray-600'
+                  }`}
+                >
+                  All
+                </Text>
+              </TouchableOpacity>
+
+              {Object.entries(CATEGORY_CONFIG).map(([key, config]) => (
+                <TouchableOpacity
+                  key={key}
+                  className="mr-2 px-4 py-2.5 rounded-xl flex-row items-center"
+                  style={{
+                    backgroundColor: selectedCategory === key ? config.color : config.bgColor,
+                  }}
+                  onPress={() => setSelectedCategory(selectedCategory === key ? null : key)}
+                >
+                  <FontAwesome5
+                    name={config.icon}
+                    size={12}
+                    color={selectedCategory === key ? 'white' : config.color}
+                  />
+                  <Text
+                    className="ml-1.5 text-sm font-gilroy-medium capitalize"
+                    style={{ color: selectedCategory === key ? 'white' : config.color }}
+                  >
+                    {key}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </ScrollView>
+          </View>
+        </View>
+      )}
+    </View>
+  );
+
+  // Quick filter chips (always visible)
+  const renderQuickFilterChips = () => (
+    <View className="py-3">
       <ScrollView
         horizontal
         showsHorizontalScrollIndicator={false}
         contentContainerStyle={{ paddingHorizontal: 16 }}
       >
+        {/* AI Recommended Chip */}
         <TouchableOpacity
-          className={`mr-3 px-5 py-2.5 rounded-full flex-row items-center ${selectedCategory === null ? 'bg-primary' : 'bg-white border border-gray-200'
-            }`}
+          className={`mr-2 px-4 py-2.5 rounded-full flex-row items-center ${
+            selectedCategory === null ? 'bg-primary' : 'bg-white border border-gray-200'
+          }`}
           onPress={() => setSelectedCategory(null)}
         >
-          <Ionicons
-            name="sparkles"
-            size={16}
-            color={selectedCategory === null ? 'white' : '#6B7280'}
+          <FontAwesome5
+            name="magic"
+            size={12}
+            color={selectedCategory === null ? 'white' : '#F5840E'}
           />
           <Text
-            className={`ml-2 font-gilroy-medium ${selectedCategory === null ? 'text-white' : 'text-gray-600'
-              }`}
+            className={`ml-2 text-sm font-gilroy-medium ${
+              selectedCategory === null ? 'text-white' : 'text-primary'
+            }`}
           >
-            For You
+            AI Picks
           </Text>
         </TouchableOpacity>
 
+        {/* Category Chips */}
         {Object.entries(CATEGORY_CONFIG).map(([key, config]) => (
           <TouchableOpacity
             key={key}
-            className={`mr-3 px-5 py-2.5 rounded-full flex-row items-center ${selectedCategory === key ? '' : 'bg-white border border-gray-200'
-              }`}
-            style={
-              selectedCategory === key
-                ? { backgroundColor: config.color }
-                : undefined
-            }
-            onPress={() =>
-              setSelectedCategory(selectedCategory === key ? null : key)
-            }
+            className={`mr-2 px-4 py-2.5 rounded-full flex-row items-center ${
+              selectedCategory === key ? '' : 'bg-white border border-gray-200'
+            }`}
+            style={selectedCategory === key ? { backgroundColor: config.color } : undefined}
+            onPress={() => setSelectedCategory(selectedCategory === key ? null : key)}
           >
             <FontAwesome5
               name={config.icon}
-              size={14}
+              size={12}
               color={selectedCategory === key ? 'white' : config.color}
             />
             <Text
-              className={`ml-2 font-gilroy-medium capitalize ${selectedCategory === key ? 'text-white' : ''
-                }`}
+              className={`ml-2 text-sm font-gilroy-medium capitalize ${
+                selectedCategory === key ? 'text-white' : ''
+              }`}
               style={selectedCategory !== key ? { color: config.color } : undefined}
             >
               {key}
@@ -933,22 +1151,40 @@ export const TourGuideScreen: React.FC<TourGuideScreenProps> = ({
       activeOpacity={0.9}
       onPress={onChatbotPress}
     >
-      <View className="rounded-2xl p-4 flex-row items-center" style={styles.aiBanner}>
-        <View
-          className="w-14 h-14 rounded-2xl items-center justify-center"
-          style={{ backgroundColor: 'rgba(255,255,255,0.2)' }}
-        >
-          <FontAwesome5 name="magic" size={22} color="white" />
+      <View className="rounded-3xl overflow-hidden" style={styles.aiBanner}>
+        {/* Decorative Elements */}
+        <View className="absolute top-0 right-0 w-32 h-32 rounded-full opacity-10" style={{ backgroundColor: 'white', transform: [{ translateX: 40 }, { translateY: -40 }] }} />
+        <View className="absolute bottom-0 left-0 w-24 h-24 rounded-full opacity-10" style={{ backgroundColor: 'white', transform: [{ translateX: -30 }, { translateY: 30 }] }} />
+
+        <View className="p-5 flex-row items-center">
+          <View
+            className="w-16 h-16 rounded-2xl items-center justify-center"
+            style={{ backgroundColor: 'rgba(255,255,255,0.2)' }}
+          >
+            <LottieView
+              source={require('@assets/animations/onbord1.json')}
+              autoPlay
+              loop
+              style={{ width: 50, height: 50 }}
+            />
+          </View>
+          <View className="flex-1 ml-4">
+            <View className="flex-row items-center">
+              <Text className="text-white font-gilroy-bold text-lg">
+                Your AI Travel Companion
+              </Text>
+              <View className="ml-2 bg-white/20 px-2 py-0.5 rounded-full">
+                <Text className="text-white text-xs font-gilroy-medium">SMART</Text>
+              </View>
+            </View>
+            <Text style={{ color: 'rgba(255,255,255,0.85)' }} className="font-gilroy-regular text-sm mt-1">
+              Ask anything • Plan trips • Get local insights
+            </Text>
+          </View>
+          <View className="w-10 h-10 bg-white/20 rounded-full items-center justify-center">
+            <FontAwesome5 name="comments" size={16} color="white" />
+          </View>
         </View>
-        <View className="flex-1 ml-4">
-          <Text className="text-white font-gilroy-bold text-lg">
-            Ask Your AI Guide
-          </Text>
-          <Text style={{ color: 'rgba(255,255,255,0.8)' }} className="font-gilroy-regular text-sm mt-1">
-            Get personalized tips, itineraries & local secrets
-          </Text>
-        </View>
-        <FontAwesome5 name="chevron-right" size={16} color="white" />
       </View>
     </TouchableOpacity>
   );
@@ -1036,27 +1272,34 @@ export const TourGuideScreen: React.FC<TourGuideScreenProps> = ({
             />
           }
         >
-          {renderCategoryFilter()}
+          {renderQuickFilterChips()}
+          {renderSmartFilters()}
           {renderQuickStats()}
           {renderAIAssistantBanner()}
 
           {/* Section Header */}
           <View className="flex-row items-center justify-between px-4 mb-4 mt-2">
-            <View>
-              <Text className="text-xl font-gilroy-bold text-gray-900">
-                Recommended For You
-              </Text>
-              <Text className="text-sm font-gilroy-regular text-gray-500 mt-1">
-                Based on your preferences & location
-              </Text>
+            <View className="flex-row items-center">
+              <View className="w-10 h-10 bg-primary/10 rounded-xl items-center justify-center mr-3">
+                <FontAwesome5 name="brain" size={16} color="#F5840E" />
+              </View>
+              <View>
+                <View className="flex-row items-center">
+                  <Text className="text-lg font-gilroy-bold text-gray-900">
+                    AI Recommendations
+                  </Text>
+                  <View className="ml-2 w-2 h-2 bg-green-500 rounded-full" />
+                </View>
+                <Text className="text-xs font-gilroy-regular text-gray-500 mt-0.5">
+                  Personalized for your preferences
+                </Text>
+              </View>
             </View>
             <TouchableOpacity
-              className="bg-primary/10 px-3 py-1.5 rounded-full"
+              className="w-10 h-10 bg-gray-100 rounded-xl items-center justify-center"
               onPress={handleRefresh}
             >
-              <Text className="text-primary font-gilroy-medium text-sm">
-                Refresh
-              </Text>
+              <Ionicons name="refresh" size={18} color="#6B7280" />
             </TouchableOpacity>
           </View>
 
@@ -1096,7 +1339,12 @@ const styles = StyleSheet.create({
     backgroundColor: '#F5840E',
   },
   aiBanner: {
-    backgroundColor: '#667EEA',
+    backgroundColor: '#6366F1', // Indigo color for AI theme
+    shadowColor: '#6366F1',
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.3,
+    shadowRadius: 16,
+    elevation: 8,
   },
 });
 

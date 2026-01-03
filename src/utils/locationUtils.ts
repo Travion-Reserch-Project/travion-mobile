@@ -75,7 +75,84 @@ export const cosineSimilarity = (vecA: number[], vecB: number[]): number => {
 };
 
 /**
+ * Calculate weighted preference match score.
+ * 
+ * IMPROVED ALGORITHM:
+ * - For categories user IS interested in (pref >= 0.5): 
+ *   REWARD locations that have this category strongly.
+ * - For categories user is NOT interested in (pref < 0.5):
+ *   PENALIZE locations that have what user doesn't want.
+ * 
+ * @param userPreferences - User's travel preferences (0 = not interested, 1 = very interested)
+ * @param locationPreferences - Location's category scores (0-1)
+ * @returns Match score between 0 and 1
+ */
+export const calculateWeightedMatchScore = (
+  userPreferences: { history: number; adventure: number; nature: number; relaxation: number },
+  locationPreferences: { history: number; adventure: number; nature: number; relaxation: number }
+): number => {
+  const categories = ['history', 'adventure', 'nature', 'relaxation'] as const;
+  
+  let weightedMatch = 0;
+  let totalWeight = 0;
+  
+  for (const category of categories) {
+    const userPref = userPreferences[category];
+    const locScore = locationPreferences[category];
+    
+    if (userPref >= 0.5) {
+      // User IS interested in this category
+      const interestLevel = (userPref - 0.5) * 2; // Scale to 0-1
+      
+      // Reward: how well does location satisfy this interest?
+      let satisfaction = locScore;
+      
+      // Boost for strong matches (both user and location high)
+      if (locScore >= 0.5) {
+        const boost = 1.0 + (interestLevel * (locScore - 0.5) * 0.5);
+        satisfaction *= boost;
+      }
+      
+      const weight = userPref;
+      weightedMatch += satisfaction * weight;
+      totalWeight += weight;
+    } else {
+      // User is NOT interested (pref < 0.5)
+      const disinterestLevel = (0.5 - userPref) * 2; // Scale to 0-1
+      
+      let categoryScore: number;
+      if (locScore >= 0.5) {
+        // Location has something user doesn't want - penalty!
+        const penalty = locScore * disinterestLevel;
+        categoryScore = Math.exp(-2.5 * penalty);
+      } else {
+        // Location doesn't have what user doesn't want - neutral/slight positive
+        categoryScore = 0.7;
+      }
+      
+      const weight = 1.0 - userPref;
+      weightedMatch += categoryScore * weight;
+      totalWeight += weight;
+    }
+  }
+  
+  if (totalWeight === 0) {
+    return 0.5; // Neutral score if no significant preferences
+  }
+  
+  // Normalize
+  const rawScore = weightedMatch / totalWeight;
+  
+  // Sigmoid smoothing for better distribution
+  const k = 5.0;
+  const smoothedScore = 1.0 / (1.0 + Math.exp(-k * (rawScore - 0.5)));
+  
+  return Math.max(0, Math.min(1, smoothedScore));
+};
+
+/**
  * Calculate match score between user preferences and location preferences.
+ * Uses weighted preference matching for accurate alignment.
  * @param userPreferences - User's travel preferences {history, adventure, nature, relaxation}
  * @param locationPreferences - Location's preference scores {history, adventure, nature, relaxation}
  * @returns Match score between 0 and 1
@@ -84,18 +161,6 @@ export const calculateMatchScore = (
   userPreferences: { history: number; adventure: number; nature: number; relaxation: number },
   locationPreferences: { history: number; adventure: number; nature: number; relaxation: number }
 ): number => {
-  const userVec = [
-    userPreferences.history,
-    userPreferences.adventure,
-    userPreferences.nature,
-    userPreferences.relaxation,
-  ];
-  const locationVec = [
-    locationPreferences.history,
-    locationPreferences.adventure,
-    locationPreferences.nature,
-    locationPreferences.relaxation,
-  ];
-
-  return cosineSimilarity(userVec, locationVec);
+  // Use the new weighted algorithm that properly handles preferences
+  return calculateWeightedMatchScore(userPreferences, locationPreferences);
 };

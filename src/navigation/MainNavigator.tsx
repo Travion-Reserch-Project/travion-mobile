@@ -6,6 +6,7 @@ import {
   PreferencesOnboardingScreen,
   LocationDetailsScreen,
   LocationChatScreen,
+  TourPlanChatScreen,
 } from '@screens';
 import { MapScreen } from '@screens/MapScreen';
 import { ReportIncidentScreen } from '@screens/ReportIncidentScreen';
@@ -18,6 +19,7 @@ import LottieView from 'lottie-react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
 import type { SafetyAlert } from '@components/explore/SafetyAlerts';
+import type { SelectedLocation } from '@services/api';
 
 const welcomeBackAnimation = require('@assets/animations/success.json');
 
@@ -43,6 +45,12 @@ export type MainStackParamList = {
   };
   LocationChat: {
     locationName: string;
+  };
+  TourPlanChat: {
+    selectedLocations: SelectedLocation[];
+    startDate: string;
+    endDate: string;
+    preferences?: string[];
   };
 };
 
@@ -129,6 +137,13 @@ export const MainNavigator: React.FC = () => {
       <Stack.Screen
         name="LocationChat"
         component={LocationChatScreen}
+        options={{
+          animation: 'slide_from_bottom',
+        }}
+      />
+      <Stack.Screen
+        name="TourPlanChat"
+        component={TourPlanChatScreen}
         options={{
           animation: 'slide_from_bottom',
         }}

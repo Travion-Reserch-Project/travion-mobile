@@ -4,6 +4,7 @@ export { userService } from './UserService';
 export { aiService } from './AIService';
 export { locationService } from './LocationService';
 export { chatService } from './ChatService';
+export { tourPlanService } from './TourPlanService';
 export { BaseApiService } from './BaseApiService';
 export { CookieManager } from '../../utils/cookieManager';
 
@@ -16,6 +17,7 @@ export type {
   SimpleCrowdPredictionResponse,
   SimpleGoldenHourRequest,
   SimpleGoldenHourResponse,
+  GoldenHourWindow,
   SimpleDescriptionRequest,
   SimpleDescriptionResponse,
 } from './AIService';
@@ -26,3 +28,16 @@ export type {
   LocationDetailsResponse,
   BulkLocationImagesResponse,
 } from './LocationService';
+
+// Re-export Tour Plan service types
+export type {
+  SelectedLocation,
+  ItinerarySlot,
+  TourPlanMetadata,
+  ConstraintViolation,
+  GeneratePlanRequest,
+  RefinePlanRequest,
+  AcceptPlanRequest,
+  TourPlanResponse,
+  AcceptPlanResponse,
+} from './TourPlanService';
