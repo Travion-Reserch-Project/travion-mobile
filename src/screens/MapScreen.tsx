@@ -78,13 +78,13 @@ const getHighestRiskLevel = (alertsList: SafetyAlert[]): 'high' | 'medium' | 'lo
   return 'low';
 };
 
-// Sample alerts for demo
+// Sample alerts for demo - showing all 7 risk types for safe area display
 const sampleAlerts: SafetyAlert[] = [
   {
     id: '1',
     title: 'Pickpocketing',
     description: 'Pickpocketing risk increases at this hour.',
-    level: 'high',
+    level: 'low',
     location: 'Colombo City Center',
     incidentType: 'Pickpocket',
   },
@@ -92,7 +92,7 @@ const sampleAlerts: SafetyAlert[] = [
     id: '2',
     title: 'Scam',
     description: 'Scam activities reported in this area.',
-    level: 'high',
+    level: 'low',
     location: 'Colombo City Center',
     incidentType: 'Scam',
   },
@@ -100,7 +100,7 @@ const sampleAlerts: SafetyAlert[] = [
     id: '3',
     title: 'Harassment',
     description: 'Harassment incidents reported nearby.',
-    level: 'medium',
+    level: 'low',
     location: 'Colombo City Center',
     incidentType: 'Harassment',
   },
@@ -108,9 +108,33 @@ const sampleAlerts: SafetyAlert[] = [
     id: '4',
     title: 'Money Theft',
     description: 'Money theft incidents in this location.',
-    level: 'high',
+    level: 'low',
     location: 'Colombo City Center',
     incidentType: 'Money Theft',
+  },
+  {
+    id: '5',
+    title: 'Theft',
+    description: 'Theft incidents in this location.',
+    level: 'low',
+    location: 'Colombo City Center',
+    incidentType: 'Theft',
+  },
+  {
+    id: '6',
+    title: 'Bag Snatching',
+    description: 'Bag snatching incidents reported.',
+    level: 'low',
+    location: 'Colombo City Center',
+    incidentType: 'Bag Snatching',
+  },
+  {
+    id: '7',
+    title: 'Extortion',
+    description: 'Extortion incidents in this location.',
+    level: 'low',
+    location: 'Colombo City Center',
+    incidentType: 'Extortion',
   },
 ];
 
@@ -149,6 +173,20 @@ export const MapScreen: React.FC<MapScreenProps> = ({ route }) => {
     const riskOrder = { high: 0, medium: 1, low: 2 };
     return riskOrder[a.level] - riskOrder[b.level];
   });
+
+  // For safe areas, show all 7 incident types
+  const displayAlerts =
+    displayRiskLevel === 'low'
+      ? [
+          { id: '1', incidentType: 'Scam' as const, level: 'low' as const },
+          { id: '2', incidentType: 'Pickpocket' as const, level: 'low' as const },
+          { id: '3', incidentType: 'Theft' as const, level: 'low' as const },
+          { id: '4', incidentType: 'Money Theft' as const, level: 'low' as const },
+          { id: '5', incidentType: 'Harassment' as const, level: 'low' as const },
+          { id: '6', incidentType: 'Bag Snatching' as const, level: 'low' as const },
+          { id: '7', incidentType: 'Extortion' as const, level: 'low' as const },
+        ]
+      : sortedAlerts;
 
   // Get current location
   useEffect(() => {
@@ -488,11 +526,11 @@ export const MapScreen: React.FC<MapScreenProps> = ({ route }) => {
 
                 {/* Incident list */}
                 <View>
-                  {sortedAlerts.map((alert, index) => (
+                  {displayAlerts.map((alert, index) => (
                     <View
                       key={alert.id}
                       className={`flex-row items-center justify-between py-2 ${
-                        index < sortedAlerts.length - 1 ? 'border-b border-gray-100' : ''
+                        index < displayAlerts.length - 1 ? 'border-b border-gray-100' : ''
                       }`}
                     >
                       {/* Incident name */}
