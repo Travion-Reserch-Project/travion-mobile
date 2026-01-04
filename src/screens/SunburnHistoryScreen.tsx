@@ -1,16 +1,24 @@
-import React, { useState } from 'react';
+import React, { useCallback, useState } from 'react';
 import { View, Text, TouchableOpacity, StatusBar, ScrollView } from 'react-native';
 import FontAwesome from 'react-native-vector-icons/FontAwesome';
-import { useNavigation } from '@react-navigation/native';
+import { useNavigation, useRoute, RouteProp } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { MainStackParamList } from '@navigation/MainNavigator';
 
 type NavigationProp = NativeStackNavigationProp<MainStackParamList, 'SunburnHistory'>;
+type RouteProps = RouteProp<MainStackParamList, 'SkinAnalysisResult'>;
 
 const SunburnHistoryScreen: React.FC = () => {
   const navigation = useNavigation<NavigationProp>();
+  const route = useRoute<RouteProps>();
   const [burnFrequency, setBurnFrequency] = useState('Sometimes');
   const [tanResponse, setTanResponse] = useState('Slight Tan');
+
+  const { imageUri, skinType } = route.params;
+
+  const handleSave = useCallback(() => {
+    navigation.navigate('SkinHelthProfile', { imageUri, skinType });
+  }, [navigation, imageUri, skinType]);
 
   return (
     <View className="flex-1 bg-white px-6">
@@ -117,7 +125,10 @@ const SunburnHistoryScreen: React.FC = () => {
         </TouchableOpacity>
 
         {/* CTA */}
-        <TouchableOpacity className="bg-primary rounded-full px-8 py-3 flex-row items-center justify-center shadow-lg mb-5">
+        <TouchableOpacity
+          onPress={handleSave}
+          className="bg-primary rounded-full px-8 py-3 flex-row items-center justify-center shadow-lg mb-5"
+        >
           <Text className="text-white font-extrabold text-lg mr-3">Save & Continue</Text>
           <FontAwesome name="arrow-right" size={16} color="#fff" />
         </TouchableOpacity>

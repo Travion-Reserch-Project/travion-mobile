@@ -19,6 +19,7 @@ import HealthProfileLanding from '@screens/HealthProfileLanding';
 import SkinAnalysisScreen from '@screens/SkinAnalysisScreen';
 import SkinAnalysisResultScreen from '@screens/SkinAnalysisResultScreen';
 import SunburnHistoryScreen from '@screens/SunburnHistoryScreen';
+import SkinHelthProfileScreen from '@screens/SkinHelthProfileScreen';
 
 const welcomeBackAnimation = require('@assets/animations/success.json');
 
@@ -40,7 +41,8 @@ export type MainStackParamList = {
   HealthProfileLanding: undefined;
   SkinAnalysis: undefined;
   SkinAnalysisResult: { imageUri: string; skinType: number };
-  SunburnHistory: undefined;
+  SunburnHistory: { imageUri: string; skinType: number };
+  SkinHelthProfile: { imageUri: string; skinType: number };
 };
 
 const Stack = createNativeStackNavigator<MainStackParamList>();
@@ -79,7 +81,7 @@ export const MainNavigator: React.FC = () => {
 
   return (
     <Stack.Navigator screenOptions={{ headerShown: false }}>
-      {true ? (
+      {hasCompleteProfile ? (
         <>
           <Stack.Screen name="WelcomeBack" component={WelcomeBackScreen} />
           <Stack.Screen name="MainApp" component={MainAppScreen} />
@@ -95,6 +97,7 @@ export const MainNavigator: React.FC = () => {
           <Stack.Screen name="SkinAnalysis" component={SkinAnalysisScreen} />
           <Stack.Screen name="SkinAnalysisResult" component={SkinAnalysisResultScreen} />
           <Stack.Screen name="SunburnHistory" component={SunburnHistoryScreen} />
+          <Stack.Screen name="SkinHelthProfile" component={SkinHelthProfileScreen} />
         </>
       ) : (
         <>

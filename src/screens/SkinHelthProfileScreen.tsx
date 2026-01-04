@@ -50,7 +50,7 @@ const SKIN_TYPE_INFO: Record<
   },
 };
 
-const SkinAnalysisResultScreen: React.FC = () => {
+const SkinHelthProfileScreen: React.FC = () => {
   const navigation = useNavigation<NavigationProp>();
   const route = useRoute<RouteProps>();
   const { imageUri, skinType } = route.params;
@@ -65,7 +65,7 @@ const SkinAnalysisResultScreen: React.FC = () => {
         <TouchableOpacity className="mr-4" onPress={() => navigation.navigate('SkinAnalysis')}>
           <FontAwesome name="arrow-left" size={18} color="#0f172a" />
         </TouchableOpacity>
-        <Text className="text-lg font-bold text-slate-900">Analysis Complete</Text>
+        <Text className="text-lg font-bold text-slate-900">Health Profile</Text>
       </View>
 
       <ScrollView
@@ -80,7 +80,6 @@ const SkinAnalysisResultScreen: React.FC = () => {
             {/* Confidence Badge */}
             <View className="absolute bottom-4 bg-white px-4 py-2 rounded-full flex-row items-center shadow">
               <FontAwesome name="check-circle" size={14} color="#f97316" />
-              <Text className="ml-2 font-semibold text-slate-900">98% Confidence</Text>
             </View>
           </View>
         </View>
@@ -109,11 +108,6 @@ const SkinAnalysisResultScreen: React.FC = () => {
                 }`}
               />
             ))}
-          </View>
-
-          {/* Active Indicator */}
-          <View className="absolute left-[42%] top-[28px]">
-            <View className="w-4 h-4 bg-primary rounded-full border-2 border-white" />
           </View>
 
           {/* Label */}
@@ -153,29 +147,8 @@ const SkinAnalysisResultScreen: React.FC = () => {
           </View>
         </View>
       </ScrollView>
-
-      {/* Bottom Actions */}
-      <View className="absolute bottom-0 left-0 right-0 px-6 pb-6 bg-white">
-        <TouchableOpacity
-          className="bg-primary rounded-full px-8 py-3 flex-row items-center justify-center shadow-lg mb-5"
-          onPress={() =>
-            navigation.navigate('SunburnHistory', {
-              imageUri,
-              skinType,
-            })
-          }
-        >
-          <Text className="text-white font-extrabold text-lg mr-2">Confirm</Text>
-          <FontAwesome name="check" size={18} color="#fff" />
-        </TouchableOpacity>
-
-        <TouchableOpacity className="flex-row justify-center items-center mb-4">
-          <FontAwesome name="refresh" size={16} color="#64748b" />
-          <Text className="ml-2 text-slate-500 font-semibold">Retake Image</Text>
-        </TouchableOpacity>
-      </View>
     </View>
   );
 };
 
-export default SkinAnalysisResultScreen;
+export default SkinHelthProfileScreen;
