@@ -14,3 +14,7 @@ export * from './ReportIncidentScreen';
 export * from './SafetyScreen';
 export * from './TransportScreen';
 export * from './GuideScreen';
+export * from './FareGuideScreen';
+export * from './KeyContactsScreen';
+export * from './RoadIssueReportScreen';
+export * from './IncidentMapScreen';

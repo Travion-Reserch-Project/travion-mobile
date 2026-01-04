@@ -106,16 +106,17 @@ export const ChatbotScreen: React.FC = () => {
             departureDate: response.data.recommendation.departure_date,
             departureTime: response.data.recommendation.departure_time,
           };
-        } else if (response.data.message) {
-          displayText = response.data.message;
+        } else if (response.data.nextQuestion) {
+          // Prefer the direct next question when provided
+          displayText = response.data.nextQuestion;
         } else if (response.data.clarificationPrompt) {
           displayText = response.data.clarificationPrompt;
-        } else if (response.data.nextQuestion) {
-          displayText = response.data.nextQuestion;
         } else if (response.data.status === 'needs_clarification') {
           displayText =
             'I need more information to help you better. ' +
             (response.data.nextQuestion || 'Please provide more details.');
+        } else if (response.data.message) {
+          displayText = response.data.message;
         } else {
           displayText = 'Unable to process your request. Please try again.';
         }
@@ -171,11 +172,24 @@ export const ChatbotScreen: React.FC = () => {
   };
 
   const renderRecommendationCard = (rec: TransportRecommendation) => (
-    <View key={rec.service_id} className="bg-white rounded-xl p-4 mb-3 border border-gray-200">
+    <View
+      key={rec.service_id}
+      className={`rounded-xl p-4 mb-3 border-2 ${
+        rec.is_recommended ? 'bg-green-50 border-green-400' : 'bg-white border-gray-200'
+      }`}
+    >
       <View className="flex-row items-center justify-between mb-2">
         <View className="flex-row items-center flex-1">
-          <View className="w-12 h-12 bg-primary/10 rounded-full items-center justify-center mr-3">
-            <FontAwesome5 name={getTransportIcon(rec.mode)} size={18} color="#F5840E" />
+          <View
+            className={`w-12 h-12 rounded-full items-center justify-center mr-3 ${
+              rec.is_recommended ? 'bg-green-100' : 'bg-primary/10'
+            }`}
+          >
+            <FontAwesome5
+              name={getTransportIcon(rec.mode)}
+              size={18}
+              color={rec.is_recommended ? '#16A34A' : '#F5840E'}
+            />
           </View>
           <View className="flex-1">
             <Text className="text-base font-gilroy-bold text-gray-900">{rec.operator}</Text>
@@ -183,31 +197,10 @@ export const ChatbotScreen: React.FC = () => {
           </View>
         </View>
         {rec.is_recommended && (
-          <View className="bg-green-100 px-2 py-1 rounded-full">
-            <Text className="text-xs font-gilroy-bold text-green-700">Recommended</Text>
+          <View className="bg-green-500 px-3 py-1.5 rounded-full">
+            <Text className="text-xs font-gilroy-bold text-white">✓ Recommended</Text>
           </View>
         )}
-      </View>
-
-      <View className="border-t border-gray-100 pt-2">
-        <View className="flex-row justify-between mb-2">
-          <View>
-            <Text className="text-xs font-gilroy-regular text-gray-600">Duration</Text>
-            <Text className="text-sm font-gilroy-bold text-gray-900">{rec.duration_min} min</Text>
-          </View>
-          <View>
-            <Text className="text-xs font-gilroy-regular text-gray-600">Distance</Text>
-            <Text className="text-sm font-gilroy-bold text-gray-900">{rec.distance_km} km</Text>
-          </View>
-          <View>
-            <Text className="text-xs font-gilroy-regular text-gray-600">Fare</Text>
-            <Text className="text-sm font-gilroy-bold text-primary">Rs.{rec.fare_lkr}</Text>
-          </View>
-          <View>
-            <Text className="text-xs font-gilroy-regular text-gray-600">Rating</Text>
-            <Text className="text-xs font-gilroy-bold text-amber-600">{rec.reliability_stars}</Text>
-          </View>
-        </View>
       </View>
     </View>
   );
