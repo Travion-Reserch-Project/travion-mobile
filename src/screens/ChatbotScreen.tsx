@@ -8,9 +8,21 @@ import {
   TouchableOpacity,
   KeyboardAvoidingView,
   Platform,
+  ActivityIndicator,
+  Modal,
 } from 'react-native';
 import FontAwesome5 from 'react-native-vector-icons/FontAwesome5';
 import { chatService } from '@services';
+import { useAuthStore } from '@stores';
+
+interface Timetable {
+  departure_time: string;
+  arrival_time: string;
+  duration: string;
+  stops: number;
+  seat_availability: number;
+  price: number;
+}
 
 interface TransportRecommendation {
   service_id: string;
@@ -48,7 +60,12 @@ export const ChatbotScreen: React.FC = () => {
   ]);
   const [inputText, setInputText] = useState('');
   const [isTyping, setIsTyping] = useState(false);
+  const [timetableModalVisible, setTimetableModalVisible] = useState(false);
+  const [timetables, setTimetables] = useState<Timetable[]>([]);
+  const [timetableLoading, setTimetableLoading] = useState(false);
+  const [selectedService, setSelectedService] = useState<TransportRecommendation | null>(null);
   const scrollViewRef = useRef<ScrollView>(null);
+  const { tokens } = useAuthStore();
 
   const quickSuggestions = [
     'Best destinations for winter',
@@ -87,12 +104,33 @@ export const ChatbotScreen: React.FC = () => {
       let recommendationData: any;
 
       if (response.success && response.data) {
-        // Check if we have recommendations (ready status)
+        // Check if we have recommendations in response.data.recommendations (flat structure)
         if (
+          response.data.recommendations &&
+          Array.isArray(response.data.recommendations) &&
+          response.data.recommendations.length > 0
+        ) {
+          displayText = `Great! I found ${response.data.recommendations.length} transport options for you.`;
+          recommendations = response.data.recommendations.map((rec: any) => ({
+            ...rec,
+            reliability_stars:
+              typeof rec.reliability_stars === 'string'
+                ? parseFloat(rec.reliability_stars)
+                : rec.reliability_stars,
+          }));
+          recommendationData = {
+            origin: (response.data as any).origin || 'Colombo',
+            destination: (response.data as any).destination || 'Destination',
+            departureDate: (response.data as any).departure_date || '2026-03-04',
+            departureTime: (response.data as any).departure_time || '15:00',
+          };
+        }
+        // Also check nested structure response.data.recommendation.recommendations
+        else if (
           response.data.recommendation?.recommendations &&
           response.data.recommendation.recommendations.length > 0
         ) {
-          displayText = `Great! I found ${response.data.recommendation.recommendations.length} transport options for you from ${response.data.recommendation.origin} to ${response.data.recommendation.destination}.`;
+          displayText = `Great! I found ${response.data.recommendation.recommendations.length} transport options for you.`;
           recommendations = response.data.recommendation.recommendations.map((rec: any) => ({
             ...rec,
             reliability_stars:
@@ -101,10 +139,10 @@ export const ChatbotScreen: React.FC = () => {
                 : rec.reliability_stars,
           }));
           recommendationData = {
-            origin: response.data.recommendation.origin,
-            destination: response.data.recommendation.destination,
-            departureDate: response.data.recommendation.departure_date,
-            departureTime: response.data.recommendation.departure_time,
+            origin: response.data.recommendation.origin || 'Colombo',
+            destination: response.data.recommendation.destination || 'Destination',
+            departureDate: response.data.recommendation.departure_date || '2026-03-04',
+            departureTime: response.data.recommendation.departure_time || '15:00',
           };
         } else if (response.data.nextQuestion) {
           // Prefer the direct next question when provided
@@ -152,6 +190,35 @@ export const ChatbotScreen: React.FC = () => {
     setInputText(suggestion);
   };
 
+  const fetchTimetables = async (service: TransportRecommendation, recommendationData: any) => {
+    setTimetableLoading(true);
+    setSelectedService(service);
+    try {
+      const response = await fetch(
+        `http://localhost:3001/api/v1/chat/timetable?service_id=${service.service_id}&departure_date=${recommendationData.departureDate}&departure_time=${recommendationData.departureTime}`,
+        {
+          method: 'GET',
+          headers: {
+            Authorization: `Bearer ${tokens?.accessToken}`,
+            'Content-Type': 'application/json',
+          },
+        },
+      );
+
+      if (response.ok) {
+        const data = await response.json();
+        setTimetables(data.timetables || []);
+        setTimetableModalVisible(true);
+      } else {
+        console.error('Failed to fetch timetables:', response.statusText);
+      }
+    } catch (error) {
+      console.error('Error fetching timetables:', error);
+    } finally {
+      setTimetableLoading(false);
+    }
+  };
+
   const formatTime = (date: Date) => {
     return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
   };
@@ -171,7 +238,7 @@ export const ChatbotScreen: React.FC = () => {
     }
   };
 
-  const renderRecommendationCard = (rec: TransportRecommendation) => (
+  const renderRecommendationCard = (rec: TransportRecommendation, recommendationData?: any) => (
     <View
       key={rec.service_id}
       className={`rounded-xl p-4 mb-3 border-2 ${
@@ -202,6 +269,17 @@ export const ChatbotScreen: React.FC = () => {
           </View>
         )}
       </View>
+
+      {/* View Timetable Button */}
+      <TouchableOpacity
+        className="bg-primary rounded-lg py-2 px-4 mt-3"
+        onPress={() => recommendationData && fetchTimetables(rec, recommendationData)}
+      >
+        <View className="flex-row items-center justify-center">
+          <FontAwesome5 name="clock" size={14} color="white" />
+          <Text className="text-white font-gilroy-bold ml-2">View Timetable</Text>
+        </View>
+      </TouchableOpacity>
     </View>
   );
 
@@ -247,9 +325,38 @@ export const ChatbotScreen: React.FC = () => {
       {/* Render recommendations if available */}
       {message.recommendations && message.recommendations.length > 0 && (
         <View className="mb-4 px-3">
-          {message.recommendations.map(rec => renderRecommendationCard(rec))}
+          {message.recommendations.map(rec =>
+            renderRecommendationCard(rec, message.recommendationData),
+          )}
         </View>
       )}
+
+      {/* Show timetable button even if recommendations structure isn't populated */}
+      {!message.isUser &&
+        message.text.includes('transport options') &&
+        message.recommendationData && (
+          <TouchableOpacity
+            className="mx-3 mt-3 mb-4 bg-primary rounded-lg py-3 px-4"
+            onPress={() => {
+              const dummyService: TransportRecommendation = {
+                service_id: 'SLR_Colombo_Fort_Maradana',
+                mode: 'bus',
+                operator: 'SLTB',
+                duration_min: 45,
+                distance_km: 12,
+                fare_lkr: 85,
+                reliability_stars: 4,
+                is_recommended: true,
+              };
+              fetchTimetables(dummyService, message.recommendationData);
+            }}
+          >
+            <View className="flex-row items-center justify-center">
+              <FontAwesome5 name="clock" size={16} color="white" />
+              <Text className="text-white font-gilroy-bold ml-2">View Timetables</Text>
+            </View>
+          </TouchableOpacity>
+        )}
     </View>
   );
 
@@ -352,6 +459,93 @@ export const ChatbotScreen: React.FC = () => {
           </View>
         </View>
       </KeyboardAvoidingView>
+
+      {/* Timetable Modal */}
+      <Modal visible={timetableModalVisible} animationType="slide" transparent={true}>
+        <View className="flex-1 bg-black/50">
+          <View className="flex-1 bg-white rounded-t-3xl mt-16">
+            {/* Modal Header */}
+            <View className="flex-row items-center justify-between px-6 py-4 border-b border-gray-200">
+              <Text className="text-lg font-gilroy-bold text-gray-900">
+                {selectedService?.operator} - Timetable
+              </Text>
+              <TouchableOpacity onPress={() => setTimetableModalVisible(false)}>
+                <FontAwesome5 name="times" size={20} color="#666" />
+              </TouchableOpacity>
+            </View>
+
+            {/* Timetable List */}
+            {timetableLoading ? (
+              <View className="flex-1 items-center justify-center">
+                <ActivityIndicator size="large" color="#F5840E" />
+                <Text className="text-gray-600 mt-3 font-gilroy-regular">
+                  Loading timetables...
+                </Text>
+              </View>
+            ) : timetables.length > 0 ? (
+              <ScrollView className="flex-1 px-6 py-4" showsVerticalScrollIndicator={false}>
+                {timetables.map((timetable, index) => (
+                  <View
+                    key={index}
+                    className="bg-gray-50 rounded-xl p-4 mb-3 border border-gray-200"
+                  >
+                    <View className="flex-row items-center justify-between mb-3">
+                      <View>
+                        <Text className="text-base font-gilroy-bold text-gray-900">
+                          {timetable.departure_time}
+                        </Text>
+                        <Text className="text-xs font-gilroy-regular text-gray-600">Departure</Text>
+                      </View>
+                      <View className="flex-row items-center">
+                        <View className="w-8 h-0.5 bg-primary mr-2" />
+                        <Text className="text-xs font-gilroy-regular text-gray-600">
+                          {timetable.duration}
+                        </Text>
+                        <View className="w-8 h-0.5 bg-primary ml-2" />
+                      </View>
+                      <View>
+                        <Text className="text-base font-gilroy-bold text-gray-900">
+                          {timetable.arrival_time}
+                        </Text>
+                        <Text className="text-xs font-gilroy-regular text-gray-600">Arrival</Text>
+                      </View>
+                    </View>
+
+                    <View className="flex-row items-center justify-between pt-3 border-t border-gray-300">
+                      <View className="flex-row items-center">
+                        <FontAwesome5 name="chair" size={12} color="#666" />
+                        <Text className="text-xs font-gilroy-regular text-gray-600 ml-2">
+                          {timetable.seat_availability} seats
+                        </Text>
+                      </View>
+                      <Text className="text-base font-gilroy-bold text-primary">
+                        Rs. {timetable.price}
+                      </Text>
+                    </View>
+                  </View>
+                ))}
+              </ScrollView>
+            ) : (
+              <View className="flex-1 items-center justify-center px-6">
+                <FontAwesome5 name="calendar-times" size={48} color="#ccc" />
+                <Text className="text-center text-gray-600 mt-4 font-gilroy-regular">
+                  No timetables available for this service.
+                </Text>
+              </View>
+            )}
+
+            {/* Close Button */}
+            <View className="px-6 py-4 border-t border-gray-200">
+              <TouchableOpacity
+                className="bg-primary rounded-lg py-3"
+                onPress={() => setTimetableModalVisible(false)}
+              >
+                <Text className="text-white font-gilroy-bold text-center">Close</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 };

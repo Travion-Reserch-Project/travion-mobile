@@ -7,10 +7,6 @@ import { PoliceHelpScreen } from '@screens/PoliceHelpScreen';
 import { AlertsScreen } from '@screens/AlertsScreen';
 import { ProfileScreen } from '@screens/ProfileScreen';
 import { ChatbotScreen } from '@screens/ChatbotScreen';
-import { FareGuideScreen } from '@screens/FareGuideScreen';
-import { KeyContactsScreen } from '@screens/KeyContactsScreen';
-import { RoadIssueReportScreen } from '@screens/RoadIssueReportScreen';
-import { IncidentMapScreen } from '@screens/IncidentMapScreen';
 import { useAuthStore } from '@stores';
 import { View, Text, StyleSheet } from 'react-native';
 import LottieView from 'lottie-react-native';
@@ -33,10 +29,6 @@ export type MainStackParamList = {
   AlertsScreen: undefined;
   ProfileScreen: { userName?: string; userEmail?: string };
   ChatbotScreen: undefined;
-  FareGuideScreen: undefined;
-  KeyContactsScreen: undefined;
-  RoadIssueReportScreen: undefined;
-  IncidentMapScreen: undefined;
 };
 
 const Stack = createNativeStackNavigator<MainStackParamList>();
@@ -100,10 +92,6 @@ export const MainNavigator: React.FC = () => {
           <Stack.Screen name="AlertsScreen" component={AlertsScreen} />
           <Stack.Screen name="ProfileScreen" component={ProfileScreen} />
           <Stack.Screen name="ChatbotScreen" component={ChatbotScreen} />
-          <Stack.Screen name="FareGuideScreen" component={FareGuideScreen} />
-          <Stack.Screen name="KeyContactsScreen" component={KeyContactsScreen} />
-          <Stack.Screen name="RoadIssueReportScreen" component={RoadIssueReportScreen} />
-          <Stack.Screen name="IncidentMapScreen" component={IncidentMapScreen} />
         </>
       ) : (
         <>
@@ -115,10 +103,6 @@ export const MainNavigator: React.FC = () => {
           <Stack.Screen name="AlertsScreen" component={AlertsScreen} />
           <Stack.Screen name="ProfileScreen" component={ProfileScreen} />
           <Stack.Screen name="ChatbotScreen" component={ChatbotScreen} />
-          <Stack.Screen name="FareGuideScreen" component={FareGuideScreen} />
-          <Stack.Screen name="KeyContactsScreen" component={KeyContactsScreen} />
-          <Stack.Screen name="RoadIssueReportScreen" component={RoadIssueReportScreen} />
-          <Stack.Screen name="IncidentMapScreen" component={IncidentMapScreen} />
         </>
       )}
     </Stack.Navigator>
