@@ -1,18 +1,24 @@
 import React from 'react';
 import { View, Text, TouchableOpacity, StatusBar, TextInput } from 'react-native';
 import FontAwesome from 'react-native-vector-icons/FontAwesome';
+import { MainStackParamList } from '@navigation/MainNavigator';
+import { useNavigation } from '@react-navigation/native';
+import { NativeStackNavigationProp } from '@react-navigation/native-stack';
+
+type NavigationProp = NativeStackNavigationProp<MainStackParamList>;
 
 const HealthProfileSetupScreen: React.FC = () => {
+  const navigation = useNavigation<NavigationProp>();
   return (
-    <View className="flex-1 bg-[#0f0f0f] px-6">
-      <StatusBar barStyle="light-content" backgroundColor="#0f0f0f" />
+    <View className="flex-1 bg-white px-6">
+      <StatusBar barStyle="dark-content" backgroundColor="#ffffff" />
 
       {/* Header */}
-      <View className="flex-row items-center mt-6 mb-8">
+      <View className="flex-row items-center mt-11 mb-8">
         <TouchableOpacity className="mr-4">
-          <FontAwesome name="arrow-left" size={18} color="#fff" />
+          <FontAwesome name="arrow-left" size={18} color="#0f172a" />
         </TouchableOpacity>
-        <Text className="text-white text-lg font-bold">Profile Setup</Text>
+        <Text className="text-slate-900 text-lg font-bold">Profile Setup</Text>
       </View>
 
       {/* Progress Dots */}
@@ -23,36 +29,38 @@ const HealthProfileSetupScreen: React.FC = () => {
       </View>
 
       {/* Title */}
-      <Text className="text-white text-3xl font-extrabold mb-3">Let's get to know you</Text>
-      <Text className="text-gray-400 text-base mb-10">
+      <Text className="text-slate-900 text-3xl font-extrabold mb-3">Let's get to know you</Text>
+      <Text className="text-slate-600 text-base mb-10">
         We need a few details to personalize your UV safety plan and predictions.
       </Text>
 
       {/* Image Upload */}
       <View className="items-center mb-10">
-        <View className="w-44 h-44 rounded-full border-2 border-dashed border-gray-600 items-center justify-center bg-[#1a1a1a]">
-          <FontAwesome name="camera" size={32} color="#fff" />
+        <View className="relative">
+          <View className="w-44 h-44 rounded-full border-2 border-dashed border-orange-200 items-center justify-center bg-orange-50">
+            <FontAwesome name="camera" size={32} color="#f97316" />
+          </View>
+
+          {/* Edit Button */}
+          <TouchableOpacity className="absolute -bottom-2 -right-2 bg-orange-500 w-12 h-12 rounded-full items-center justify-center border-4 border-white shadow-lg">
+            <FontAwesome name="pencil" size={18} color="#fff" />
+          </TouchableOpacity>
         </View>
 
-        {/* Edit Button */}
-        <TouchableOpacity className="absolute bottom-2 right-[38%] bg-orange-500 w-12 h-12 rounded-full items-center justify-center border-4 border-[#0f0f0f]">
-          <FontAwesome name="pencil" size={18} color="#fff" />
-        </TouchableOpacity>
-
-        <Text className="text-white mt-5 font-semibold">Tap to add photo</Text>
+        <Text className="text-slate-900 mt-5 font-semibold">Tap to add photo</Text>
       </View>
 
       {/* Age Input */}
-      <Text className="text-white mb-2 font-semibold">How old are you?</Text>
+      <Text className="text-slate-900 mb-2 font-semibold">How old are you?</Text>
 
-      <View className="flex-row items-center bg-[#1a1a1a] rounded-full px-5 py-4 mb-4">
+      <View className="flex-row items-center bg-gray-100 rounded-full px-5 py-2 mb-4">
         <TextInput
           placeholder="16+"
           placeholderTextColor="#6b7280"
           keyboardType="numeric"
-          className="flex-1 text-white text-base"
+          className="flex-1 text-slate-900 text-base"
         />
-        <FontAwesome name="calendar" size={18} color="#9ca3af" />
+        <FontAwesome name="calendar" size={18} color="#64748b" />
       </View>
 
       {/* Info */}
@@ -60,20 +68,23 @@ const HealthProfileSetupScreen: React.FC = () => {
         <View className="bg-orange-500 w-6 h-6 rounded-full items-center justify-center mr-3 mt-0.5">
           <FontAwesome name="shield" size={12} color="#000" />
         </View>
-        <Text className="text-gray-400 text-sm flex-1">
+        <Text className="text-slate-600 text-sm flex-1">
           Strictly for tourists aged 16+. Used to calculate skin sensitivity and sun exposure
           limits.
         </Text>
       </View>
 
       {/* CTA */}
-      <TouchableOpacity className="bg-orange-500 rounded-full py-5 flex-row justify-center items-center shadow-lg mb-4">
-        <Text className="text-black font-extrabold text-lg mr-3">Upload Image & Continue</Text>
-        <FontAwesome name="arrow-right" size={18} color="#000" />
+      <TouchableOpacity
+        className="bg-primary rounded-full px-10 py-4 flex-row items-center justify-center shadow-lg"
+        onPress={() => navigation.navigate('SkinAnalysis')}
+      >
+        <Text className="text-white font-extrabold text-lg mr-3">Upload Image & Continue</Text>
+        <FontAwesome name="arrow-right" size={18} color="#fff" />
       </TouchableOpacity>
 
       {/* Privacy */}
-      <Text className="text-center text-gray-500 text-xs tracking-widest">
+      <Text className="text-center text-gray-500 text-xs tracking-widest mt-6">
         YOUR HEALTH DATA IS PRIVATE
       </Text>
     </View>

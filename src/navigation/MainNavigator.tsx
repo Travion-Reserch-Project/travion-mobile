@@ -16,6 +16,9 @@ import SunProtectionScreen from '@screens/SunProtectionScreen';
 import SafetyAdvisorScreen from '@screens/SafetyAdvisorScreen';
 import HealthProfileSetup from '@screens/HealthProfileSetupScreen';
 import HealthProfileLanding from '@screens/HealthProfileLanding';
+import SkinAnalysisScreen from '@screens/SkinAnalysisScreen';
+import SkinAnalysisResultScreen from '@screens/SkinAnalysisResultScreen';
+import SunburnHistoryScreen from '@screens/SunburnHistoryScreen';
 
 const welcomeBackAnimation = require('@assets/animations/success.json');
 
@@ -35,6 +38,9 @@ export type MainStackParamList = {
   SafetyAdvisor: undefined;
   HealthProfileSetup: undefined;
   HealthProfileLanding: undefined;
+  SkinAnalysis: undefined;
+  SkinAnalysisResult: { imageUri: string; skinType: number };
+  SunburnHistory: undefined;
 };
 
 const Stack = createNativeStackNavigator<MainStackParamList>();
@@ -86,6 +92,9 @@ export const MainNavigator: React.FC = () => {
           <Stack.Screen name="SafetyAdvisor" component={SafetyAdvisorScreen} />
           <Stack.Screen name="HealthProfileSetup" component={HealthProfileSetup} />
           <Stack.Screen name="HealthProfileLanding" component={HealthProfileLanding} />
+          <Stack.Screen name="SkinAnalysis" component={SkinAnalysisScreen} />
+          <Stack.Screen name="SkinAnalysisResult" component={SkinAnalysisResultScreen} />
+          <Stack.Screen name="SunburnHistory" component={SunburnHistoryScreen} />
         </>
       ) : (
         <>
