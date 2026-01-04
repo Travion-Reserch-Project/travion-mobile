@@ -234,9 +234,7 @@ export const SafetyAlerts: React.FC<SafetyAlertsProps> = ({
     if (onAlertSelected && selectedAlert) {
       onAlertSelected(selectedAlert);
     }
-    // Only trigger when index changes, not when alert object reference changes
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selectedAlertIndex]);
+  }, [onAlertSelected, selectedAlert]);
 
   // Notify parent when alerts are loaded/changed
   useEffect(() => {
