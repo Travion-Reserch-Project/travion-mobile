@@ -1,107 +1,76 @@
+import { MainStackParamList } from '@navigation/MainNavigator';
+import { useNavigation } from '@react-navigation/native';
+import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import React from 'react';
-import { View, Text } from 'react-native';
+import { View, Text, TouchableOpacity } from 'react-native';
 import FontAwesome5 from 'react-native-vector-icons/FontAwesome5';
 
-interface HealthTip {
-  id: string;
-  title: string;
-  description: string;
-  icon: string;
-  category: string;
-}
+type NavigationProp = NativeStackNavigationProp<MainStackParamList>;
+export const HealthTips: React.FC = () => {
+  const uvIndex = 7;
+  const uvLevel = 'Very High';
+  const navigation = useNavigation<NavigationProp>();
 
-interface HealthTipsProps {
-  tips?: HealthTip[];
-}
-
-const defaultTips: HealthTip[] = [
-  {
-    id: '1',
-    title: 'Stay Hydrated',
-    description:
-      'Drink plenty of water, especially in hot climates. Carry a reusable water bottle.',
-    icon: 'tint',
-    category: 'Wellness',
-  },
-  {
-    id: '2',
-    title: 'Get Travel Insurance',
-    description: 'Protect yourself with comprehensive travel insurance before departure.',
-    icon: 'shield-alt',
-    category: 'Insurance',
-  },
-  {
-    id: '3',
-    title: 'Pack Essential Medicines',
-    description: 'Bring prescription medications and basic first-aid supplies.',
-    icon: 'pills',
-    category: 'Medical',
-  },
-  {
-    id: '4',
-    title: 'Sun Protection',
-    description: 'Use sunscreen with SPF 30+ and wear protective clothing in sunny areas.',
-    icon: 'sun',
-    category: 'Wellness',
-  },
-];
-
-export const HealthTips: React.FC<HealthTipsProps> = ({ tips = defaultTips }) => {
   return (
-    <View className="px-6">
-      <Text className="text-xl font-gilroy-bold text-gray-900 mb-6">Health Tips & Suggestions</Text>
+    <View className="flex-1 bg-white px-6 pt-6">
+      {/* Location */}
+      <Text className="text-primary text-sm font-semibold mb-1">AUTO-DETECTED</Text>
+      <Text className="text-3xl font-bold text-gray-900 mb-6">Mirissa, Sri Lanka</Text>
 
-      {tips.map(tip => (
-        <View key={tip.id} className="bg-white rounded-2xl p-4 mb-4 shadow-sm">
-          <View className="flex-row items-start">
-            <View className="w-12 h-12 bg-green-100 rounded-full items-center justify-center mr-4">
-              <FontAwesome5 name={tip.icon} size={18} color="#10B981" />
-            </View>
-            <View className="flex-1">
-              <View className="flex-row items-center justify-between mb-2">
-                <Text className="text-lg font-gilroy-bold text-gray-900">{tip.title}</Text>
-                <View className="bg-green-100 px-3 py-1 rounded-full">
-                  <Text className="text-xs font-gilroy-medium text-green-700">{tip.category}</Text>
-                </View>
-              </View>
-              <Text className="text-sm font-gilroy-regular text-gray-600 leading-5">
-                {tip.description}
-              </Text>
-            </View>
-          </View>
-        </View>
-      ))}
+      {/* UV Ring */}
+      <View className="items-center justify-center mb-6">
+        <View className="w-64 h-64 rounded-full border-[16px] border-gray-200 items-center justify-center">
+          {/* Fake progress overlay */}
+          <View className="absolute w-64 h-64 rounded-full border-[16px] border-primary" />
 
-      {/* Additional Health Resources */}
-      <View className="bg-gradient-to-r from-green-50 to-blue-50 rounded-2xl p-6 mt-4">
-        <View className="flex-row items-center mb-3">
-          <FontAwesome5 name="heartbeat" size={20} color="#10B981" />
-          <Text className="text-lg font-gilroy-bold text-gray-900 ml-2">Health Resources</Text>
-        </View>
-        <Text className="text-sm font-gilroy-regular text-gray-600 mb-4">
-          Access emergency contacts, nearby hospitals, and health services in your current location.
-        </Text>
-        <View className="flex-row justify-between">
-          <View className="flex-1 items-center mx-2">
-            <View className="w-12 h-12 bg-red-100 rounded-full items-center justify-center mb-2">
-              <FontAwesome5 name="ambulance" size={16} color="#DC2626" />
-            </View>
-            <Text className="text-xs font-gilroy-medium text-gray-700 text-center">Emergency</Text>
-          </View>
-          <View className="flex-1 items-center mx-2">
-            <View className="w-12 h-12 bg-blue-100 rounded-full items-center justify-center mb-2">
-              <FontAwesome5 name="hospital" size={16} color="#2563EB" />
-            </View>
-            <Text className="text-xs font-gilroy-medium text-gray-700 text-center">Hospitals</Text>
-          </View>
-          <View className="flex-1 items-center mx-2">
-            <View className="w-12 h-12 bg-green-100 rounded-full items-center justify-center mb-2">
-              <FontAwesome5 name="user-md" size={16} color="#10B981" />
-            </View>
-            <Text className="text-xs font-gilroy-medium text-gray-700 text-center">Doctors</Text>
+          <View className="items-center">
+            <Text className="text-5xl font-bold text-gray-900">{uvIndex}</Text>
+            <Text className="text-sm text-gray-500">UV INDEX</Text>
+            <Text className="text-primary font-semibold mt-1">{uvLevel}</Text>
           </View>
         </View>
       </View>
+
+      {/* Alert */}
+      <View className="bg-orange-100 px-6 py-2 rounded-full self-center mb-6 flex-row items-center">
+        <FontAwesome5 name="exclamation-triangle" size={14} color="#EA580C" />
+        <Text className="text-orange-600 font-semibold ml-2">Protection Required</Text>
+      </View>
+
+      {/* Conditions Header */}
+      <View className="flex-row justify-between mb-4">
+        <Text className="text-base font-semibold text-gray-900">Current Conditions</Text>
+        <Text className="text-sm text-gray-400">Updated 5m ago</Text>
+      </View>
+
+      {/* Conditions Grid */}
+      <View className="flex-row flex-wrap justify-between">
+        <ConditionCard icon="temperature-high" title="Temperature" value="32°C" />
+        <ConditionCard icon="tint" title="Humidity" value="78%" />
+        <ConditionCard icon="cloud-sun" title="Sky Condition" value="Partly Cloudy" />
+        <ConditionCard icon="clock" title="Local Time" value="14:30" />
+      </View>
+
+      {/* CTA */}
+      <TouchableOpacity
+        className="bg-primary py-4 rounded-full items-center mt-6"
+        onPress={() => navigation.navigate('SunProtection')}
+      >
+        <Text className="text-white text-lg font-bold">Check Risk</Text>
+      </TouchableOpacity>
+    </View>
+  );
+};
+
+/**
+ * Reusable condition card
+ */
+const ConditionCard = ({ title, value, icon }: { title: string; value: string; icon: string }) => {
+  return (
+    <View className="w-[48%] bg-gray-50 p-5 rounded-2xl mb-4">
+      <FontAwesome5 name={icon} size={18} color="#2563EB" />
+      <Text className="text-xl font-bold text-gray-900 mt-2">{value}</Text>
+      <Text className="text-sm text-gray-500 mt-1">{title}</Text>
     </View>
   );
 };

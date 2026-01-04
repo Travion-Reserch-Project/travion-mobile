@@ -1,10 +1,13 @@
 import React, { useState } from 'react';
 import { View, StatusBar } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { HomeScreen, SafetyScreen, TransportScreen, TourGuideScreen, WeatherScreen } from '@screens';
 import { BottomTabBar, TabKey } from '@components/navigation';
+import { View } from 'react-native';
+import type { NativeStackScreenProps } from '@react-navigation/native-stack';
+import { TravionBotButton } from '@components/common';
 import type { MainStackParamList } from '../navigation/MainNavigator';
+import RiskAnalyticsScreen from './RiskAnalyticsScreen';
 
 type Props = NativeStackScreenProps<MainStackParamList, 'MainApp'>;
 
@@ -30,7 +33,7 @@ export const MainAppScreen: React.FC<Props> = ({ route, navigation }) => {
       case 'safety':
         return <SafetyScreen />;
       case 'weather':
-        return <WeatherScreen />;
+        return <RiskAnalyticsScreen />;
       default:
         return (
           <HomeScreen
@@ -43,13 +46,12 @@ export const MainAppScreen: React.FC<Props> = ({ route, navigation }) => {
   };
 
   return (
-    <SafeAreaView className="flex-1 bg-white" edges={['bottom']}>
-      <StatusBar barStyle="dark-content" backgroundColor="#FFFFFF" />
-
+ <View className="flex-1 bg-white">
       <View className="flex-1">
         {renderScreen()}
         <BottomTabBar activeTab={activeTab} onTabPress={setActiveTab} />
       </View>
-    </SafeAreaView>
+      <TravionBotButton />
+    </View>
   );
 };

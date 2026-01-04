@@ -59,6 +59,11 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
           <View className="bg-white rounded-2xl mb-4 overflow-hidden">
             {[
               { icon: 'edit', title: 'Edit Profile', subtitle: 'Update your personal information' },
+              {
+                icon: 'heartbeat',
+                title: 'Set Up Health Profile',
+                subtitle: 'Add skin image for UV & health analysis',
+              },
               { icon: 'cog', title: 'Settings', subtitle: 'App preferences and notifications' },
               { icon: 'heart', title: 'Favorites', subtitle: 'Your saved destinations' },
             ].map((item, index) => (

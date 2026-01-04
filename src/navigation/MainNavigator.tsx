@@ -13,6 +13,7 @@ import { ReportIncidentScreen } from '@screens/ReportIncidentScreen';
 import { PoliceHelpScreen } from '@screens/PoliceHelpScreen';
 import { AlertsScreen } from '@screens/AlertsScreen';
 import { ProfileScreen } from '@screens/ProfileScreen';
+import { ChatbotScreen } from '@screens/ChatbotScreen';
 import { useAuthStore } from '@stores';
 import { View, Text, StyleSheet } from 'react-native';
 import LottieView from 'lottie-react-native';
@@ -52,9 +53,19 @@ export type MainStackParamList = {
     endDate: string;
     preferences?: string[];
   };
+  ChatbotScreen: undefined;
 };
 
 const Stack = createNativeStackNavigator<MainStackParamList>();
+
+// Move ScreenWithSafeArea component outside of MainNavigator
+const ScreenWithSafeArea: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+  return (
+    <SafeAreaView style={styles.safeArea} edges={['top']}>
+      {children}
+    </SafeAreaView>
+  );
+};
 
 // Simple Welcome Back component
 const WelcomeBackScreen: React.FC = () => {
@@ -148,6 +159,35 @@ export const MainNavigator: React.FC = () => {
           animation: 'slide_from_bottom',
         }}
       />
+      screenOptions={{
+        headerShown: false,
+        contentStyle: { flex: 1 },
+      }}
+      screenLayout={({ children }) => <ScreenWithSafeArea>{children}</ScreenWithSafeArea>}
+    >
+      {hasCompleteProfile ? (
+        <>
+          <Stack.Screen name="WelcomeBack" component={WelcomeBackScreen} />
+          <Stack.Screen name="MainApp" component={MainAppScreen} />
+          <Stack.Screen name="MapScreen" component={MapScreen} />
+          <Stack.Screen name="ReportIncidentScreen" component={ReportIncidentScreen} />
+          <Stack.Screen name="PoliceHelpScreen" component={PoliceHelpScreen} />
+          <Stack.Screen name="AlertsScreen" component={AlertsScreen} />
+          <Stack.Screen name="ProfileScreen" component={ProfileScreen} />
+          <Stack.Screen name="ChatbotScreen" component={ChatbotScreen} />
+        </>
+      ) : (
+        <>
+          <Stack.Screen name="ProfileSetup" component={UserProfileSetupScreen} />
+          <Stack.Screen name="MainApp" component={MainAppScreen} />
+          <Stack.Screen name="MapScreen" component={MapScreen} />
+          <Stack.Screen name="ReportIncidentScreen" component={ReportIncidentScreen} />
+          <Stack.Screen name="PoliceHelpScreen" component={PoliceHelpScreen} />
+          <Stack.Screen name="AlertsScreen" component={AlertsScreen} />
+          <Stack.Screen name="ProfileScreen" component={ProfileScreen} />
+          <Stack.Screen name="ChatbotScreen" component={ChatbotScreen} />
+        </>
+      )}
     </Stack.Navigator>
   );
 };
@@ -156,5 +196,9 @@ const styles = StyleSheet.create({
   animation: {
     width: 300,
     height: 300,
+  },
+  safeArea: {
+    flex: 1,
+    backgroundColor: 'white',
   },
 });
