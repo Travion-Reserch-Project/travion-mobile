@@ -1,18 +1,23 @@
 import React from 'react';
-import { View, Text, StatusBar, ScrollView, Alert } from 'react-native';
+import { View, Text, StatusBar, ScrollView, Alert, TouchableOpacity } from 'react-native';
 import FontAwesome5 from 'react-native-vector-icons/FontAwesome5';
 import { Button } from '@components/common';
 import { useAuthStore } from '@stores';
+import { useNavigation } from '@react-navigation/native';
+import { MainStackParamList } from '@navigation/MainNavigator';
+import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 
 interface ProfileScreenProps {
   userName?: string;
   userEmail?: string;
 }
+type NavigationProp = NativeStackNavigationProp<MainStackParamList>;
 
 export const ProfileScreen: React.FC<ProfileScreenProps> = ({
   userEmail = 'travel@example.com',
 }) => {
   const { logout, user } = useAuthStore();
+  const navigation = useNavigation<NavigationProp>();
 
   const handleSignOut = () => {
     Alert.alert('Sign Out', 'Are you sure you want to sign out?', [
@@ -32,6 +37,11 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
         },
       },
     ]);
+  };
+
+  const navigate = (href?: string) => {
+    if (!href) return;
+    navigation.navigate(href as any);
   };
   return (
     <View className="flex-1 bg-gray-50">
@@ -59,11 +69,20 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
           <View className="bg-white rounded-2xl mb-4 overflow-hidden">
             {[
               { icon: 'edit', title: 'Edit Profile', subtitle: 'Update your personal information' },
-              { icon: 'heartbeat', title: 'Set Up Health Profile', subtitle: 'Add skin image for UV & health analysis'},
+              {
+                icon: 'heartbeat',
+                title: 'Set Up Health Profile',
+                subtitle: 'Add skin image for UV & health analysis',
+                href: 'HealthProfileLanding',
+              },
               { icon: 'cog', title: 'Settings', subtitle: 'App preferences and notifications' },
               { icon: 'heart', title: 'Favorites', subtitle: 'Your saved destinations' },
             ].map((item, index) => (
-              <View key={index} className="px-6 py-4 border-b border-gray-100 last:border-b-0">
+              <TouchableOpacity
+                key={index}
+                className="px-6 py-4 border-b border-gray-100 last:border-b-0"
+                onPress={() => navigate(item.href)}
+              >
                 <View className="flex-row items-center">
                   <View className="w-12 h-12 bg-gray-100 rounded-full items-center justify-center">
                     <FontAwesome5 name={item.icon} size={18} color="#6B7280" />
@@ -76,7 +95,7 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
                   </View>
                   <FontAwesome5 name="chevron-right" size={14} color="#9CA3AF" />
                 </View>
-              </View>
+              </TouchableOpacity>
             ))}
           </View>
 
