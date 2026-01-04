@@ -12,6 +12,10 @@ import LottieView from 'lottie-react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
 import type { SafetyAlert } from '@components/explore/SafetyAlerts';
+import SunProtectionScreen from '@screens/SunProtectionScreen';
+import SafetyAdvisorScreen from '@screens/SafetyAdvisorScreen';
+import HealthProfileSetup from '@screens/HealthProfileSetupScreen';
+import HealthProfileLanding from '@screens/HealthProfileLanding';
 
 const welcomeBackAnimation = require('@assets/animations/success.json');
 
@@ -27,6 +31,10 @@ export type MainStackParamList = {
   PoliceHelpScreen: undefined;
   AlertsScreen: undefined;
   ProfileScreen: { userName?: string; userEmail?: string };
+  SunProtection: undefined;
+  SafetyAdvisor: undefined;
+  HealthProfileSetup: undefined;
+  HealthProfileLanding: undefined;
 };
 
 const Stack = createNativeStackNavigator<MainStackParamList>();
@@ -74,6 +82,10 @@ export const MainNavigator: React.FC = () => {
           <Stack.Screen name="PoliceHelpScreen" component={PoliceHelpScreen} />
           <Stack.Screen name="AlertsScreen" component={AlertsScreen} />
           <Stack.Screen name="ProfileScreen" component={ProfileScreen} />
+          <Stack.Screen name="SunProtection" component={SunProtectionScreen} />
+          <Stack.Screen name="SafetyAdvisor" component={SafetyAdvisorScreen} />
+          <Stack.Screen name="HealthProfileSetup" component={HealthProfileSetup} />
+          <Stack.Screen name="HealthProfileLanding" component={HealthProfileLanding} />
         </>
       ) : (
         <>
