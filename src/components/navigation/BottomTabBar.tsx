@@ -44,7 +44,7 @@ const tabs: TabItem[] = [
   {
     key: 'weather',
     label: 'Weather',
-    icon: 'cloud-showers-heavy',
+    icon: 'cloud-sun',
     iconType: 'solid',
   },
 ];
