@@ -164,7 +164,7 @@ const SafetyAdvisorScreen: React.FC = () => {
       </View>
 
       {/* Bottom Navigation */}
-      <View className="flex-row justify-around items-center h-14 bg-white border-t border-gray-200">
+      {/* <View className="flex-row justify-around items-center h-14 bg-white border-t border-gray-200">
         <View className="items-center">
           <FontAwesome name="home" size={20} color="#FF8C1A" />
           <Text className="text-xs text-[#FF8C1A] mt-1">Home</Text>
@@ -179,7 +179,7 @@ const SafetyAdvisorScreen: React.FC = () => {
           <FontAwesome name="user" size={20} color="#9CA3AF" />
           <Text className="text-xs text-gray-400 mt-1">Profile</Text>
         </View>
-      </View>
+      </View> */}
     </SafeAreaView>
   );
 };
