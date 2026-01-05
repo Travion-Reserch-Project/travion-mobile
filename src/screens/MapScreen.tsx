@@ -278,9 +278,10 @@ export const MapScreen: React.FC<MapScreenProps> = ({ route }) => {
       <View
         className="absolute left-0 right-0 top-0"
         style={{
-          backgroundColor: 'rgba(255,255,255,0.95)',
+          backgroundColor: 'rgba(255,255,255,0.85)',
           borderBottomLeftRadius: 26,
           borderBottomRightRadius: 26,
+          backdropFilter: 'blur(10px)', // gives a glass look on iOS
           shadowColor: '#000',
           shadowOpacity: 0.18,
           shadowRadius: 12,
@@ -328,7 +329,7 @@ export const MapScreen: React.FC<MapScreenProps> = ({ route }) => {
           <View className="flex-1 relative" style={{ marginTop: HEADER_HEIGHT }}>
             <MapView
               ref={mapRef}
-              provider={Platform.OS === 'android' ? PROVIDER_GOOGLE : undefined}
+              provider={PROVIDER_GOOGLE}
               initialRegion={mapRegion}
               className="flex-1"
             >

@@ -65,7 +65,8 @@ export const UserProfileSetupScreen: React.FC<UserProfileSetupProps> = () => {
     if (showCompletion) {
       const timer = setTimeout(() => {
         updateProfileStatusToComplete();
-        navigation.navigate('MainApp' as never);
+        // Navigate to preferences onboarding instead of MainApp
+        navigation.navigate('PreferencesOnboarding' as never);
       }, 4000);
       return () => clearTimeout(timer);
     }
@@ -73,7 +74,8 @@ export const UserProfileSetupScreen: React.FC<UserProfileSetupProps> = () => {
 
   const handleGetStarted = async () => {
     await updateProfileStatusToComplete();
-    navigation.navigate('MainApp' as never);
+    // Navigate to preferences onboarding instead of MainApp
+    navigation.navigate('PreferencesOnboarding' as never);
   };
 
   if (showCompletion) {

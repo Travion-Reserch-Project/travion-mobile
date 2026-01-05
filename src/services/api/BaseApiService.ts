@@ -10,16 +10,24 @@ export abstract class BaseApiService {
   }
 
   //Get authenticated headers for API requests
+  //Note: apiClient also adds auth headers via interceptor, but we add them here
+  //for explicit control. If tokens are not available, return empty headers
+  //and let the server respond with 401 which will be handled by apiClient interceptor.
   protected async getAuthHeaders(): Promise<Record<string, string>> {
-    const tokens = await AuthUtils.getStoredTokens();
-    if (!tokens || !tokens.accessToken || tokens.accessToken === '') {
-      throw new Error('Authentication required');
-    }
-
-    return {
-      Authorization: `Bearer ${tokens.accessToken}`,
+    const headers: Record<string, string> = {
       'Content-Type': 'application/json',
     };
+    
+    try {
+      const tokens = await AuthUtils.getStoredTokens();
+      if (tokens?.accessToken) {
+        headers.Authorization = `Bearer ${tokens.accessToken}`;
+      }
+    } catch (error) {
+      console.warn('Failed to get auth tokens:', error);
+    }
+    
+    return headers;
   }
 
   //Handle API response with consistent error handling and data extraction
@@ -32,6 +40,20 @@ export abstract class BaseApiService {
       throw new Error('No data received from server');
     }
 
+    // Backend wraps responses in { success, message, data }
+    // The client also wraps in ApiResponse, so we need to extract the inner data
+    const serverResponse = response.data as any;
+
+    // Check if this is a wrapped response from our backend
+    if (serverResponse && typeof serverResponse === 'object' && 'data' in serverResponse) {
+      // Backend response structure: { success: true, message: "...", data: { ... } }
+      if (!serverResponse.success) {
+        throw new Error(serverResponse.message || 'API request failed');
+      }
+      return serverResponse.data as T;
+    }
+
+    // If not wrapped, return as-is (for external APIs or different response formats)
     return response.data;
   }
 
