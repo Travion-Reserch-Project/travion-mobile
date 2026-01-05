@@ -13,6 +13,7 @@ import {
 } from 'react-native';
 import FontAwesome5 from 'react-native-vector-icons/FontAwesome5';
 import { chatService } from '@services';
+import { API_CONFIG } from '@constants';
 import { useAuthStore } from '@stores';
 
 interface Timetable {
@@ -194,8 +195,9 @@ export const ChatbotScreen: React.FC = () => {
     setTimetableLoading(true);
     setSelectedService(service);
     try {
+      const baseUrl = `${API_CONFIG.BASE_URL}${API_CONFIG.API_VERSION}`;
       const response = await fetch(
-        `http://localhost:3001/api/v1/chat/timetable?service_id=${service.service_id}&departure_date=${recommendationData.departureDate}&departure_time=${recommendationData.departureTime}`,
+        `${baseUrl}/chat/timetable?service_id=${service.service_id}&departure_date=${recommendationData.departureDate}&departure_time=${recommendationData.departureTime}`,
         {
           method: 'GET',
           headers: {
