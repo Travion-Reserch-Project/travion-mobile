@@ -57,6 +57,8 @@ const BURN_FREQUENCY_ICON: Record<string, string> = {
   Often: 'fire',
 };
 
+const contentContainerStyle = { paddingBottom: 200 };
+
 const SkinHelthProfileScreen: React.FC = () => {
   const navigation = useNavigation<NavigationProp>();
   const route = useRoute<RouteProps>();
@@ -80,7 +82,7 @@ const SkinHelthProfileScreen: React.FC = () => {
 
       <ScrollView
         showsVerticalScrollIndicator={false}
-        contentContainerStyle={{ paddingBottom: 200 }}
+        contentContainerStyle={contentContainerStyle}
       >
         {/* Image Result */}
         <View className="items-center mt-8">
