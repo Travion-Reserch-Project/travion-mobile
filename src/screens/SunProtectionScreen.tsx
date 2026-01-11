@@ -23,7 +23,7 @@ const SunProtectionScreen: React.FC = () => {
             </View>
             <View>
               <Text className="text-xs text-gray-400 uppercase">Current Location</Text>
-              <Text className="text-lg font-bold text-gray-900">Bali, Indonesia</Text>
+              <Text className="text-lg font-bold text-gray-900">Mirissa, Sri Lanka</Text>
             </View>
           </View>
           <Text className="text-orange-500 font-semibold">Edit</Text>
@@ -31,19 +31,69 @@ const SunProtectionScreen: React.FC = () => {
 
         {/* ================= RISK METER ================= */}
         <View className="items-center mt-10 mb-6">
-          <View className="w-72 h-36 overflow-hidden relative">
-            <View className="absolute bottom-0 w-72 h-72 rounded-full bg-gray-200" />
-
-            <View className="absolute bottom-0 left-0 w-72 h-72 overflow-hidden">
-              <View
-                className="w-72 h-72 rounded-full bg-primary"
-                style={{ transform: [{ rotate: '-45deg' }] }}
-              />
+          <View className="w-56 h-32 relative overflow-hidden">
+            {/* Gauge background arc - gray (left side) */}
+            <View
+              className="absolute w-56 h-56 rounded-full"
+              style={{
+                borderWidth: 14,
+                borderColor: '#e5e7eb',
+                borderBottomColor: 'transparent',
+                top: 0,
+                left: 0,
+              }}
+            />
+            {/* Gauge progress arc - orange (right side for high risk) */}
+            <View
+              className="absolute w-56 h-56 rounded-full"
+              style={{
+                borderWidth: 14,
+                borderColor: 'transparent',
+                borderTopColor: '#f97316',
+                borderRightColor: '#f97316',
+                top: 0,
+                left: 0,
+              }}
+            />
+            {/* Needle indicator */}
+            <View
+              className="absolute"
+              style={{
+                width: 3,
+                height: 80,
+                backgroundColor: '#f97316',
+                left: '50%',
+                bottom: 0,
+                marginLeft: -1.5,
+                transformOrigin: 'bottom',
+                transform: [{ rotate: '50deg' }],
+                borderRadius: 2,
+              }}
+            />
+            {/* Needle center circle */}
+            <View
+              className="absolute bg-white rounded-full"
+              style={{
+                width: 16,
+                height: 16,
+                left: '50%',
+                bottom: -2,
+                marginLeft: -8,
+                borderWidth: 3,
+                borderColor: '#f97316',
+              }}
+            />
+            {/* Warning icon in center */}
+            <View
+              className="absolute bg-orange-100 p-3 rounded-full"
+              style={{
+                left: '50%',
+                top: 35,
+                marginLeft: -22,
+              }}
+            >
+              <FontAwesome name="exclamation-triangle" size={20} color="#f97316" />
             </View>
-          </View>
-
-          <View className="absolute top-20 bg-orange-100 p-3 rounded-full">
-            <FontAwesome name="exclamation-triangle" size={22} color="#f97316" />
           </View>
         </View>
 
