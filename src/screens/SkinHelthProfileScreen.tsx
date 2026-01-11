@@ -5,8 +5,8 @@ import { useNavigation, useRoute, RouteProp } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { MainStackParamList } from '@navigation/MainNavigator';
 
-type NavigationProp = NativeStackNavigationProp<MainStackParamList, 'SkinAnalysisResult'>;
-type RouteProps = RouteProp<MainStackParamList, 'SkinAnalysisResult'>;
+type NavigationProp = NativeStackNavigationProp<MainStackParamList, 'SkinHelthProfile'>;
+type RouteProps = RouteProp<MainStackParamList, 'SkinHelthProfile'>;
 
 const SKIN_TYPE_INFO: Record<
   number,
@@ -50,10 +50,17 @@ const SKIN_TYPE_INFO: Record<
   },
 };
 
+const BURN_FREQUENCY_ICON: Record<string, string> = {
+  Never: 'shield',
+  Rarely: 'sun-o',
+  Sometimes: 'cloud',
+  Often: 'fire',
+};
+
 const SkinHelthProfileScreen: React.FC = () => {
   const navigation = useNavigation<NavigationProp>();
   const route = useRoute<RouteProps>();
-  const { imageUri, skinType } = route.params;
+  const { imageUri, skinType, burnFrequency, tanResponse, sunburnTanTimes } = route.params;
   const skinInfo = SKIN_TYPE_INFO[skinType] || SKIN_TYPE_INFO[3];
 
   return (
@@ -62,7 +69,10 @@ const SkinHelthProfileScreen: React.FC = () => {
 
       {/* Header */}
       <View className="flex-row items-center px-6 pt-10 pb-4">
-        <TouchableOpacity className="mr-4" onPress={() => navigation.navigate('SkinAnalysis')}>
+        <TouchableOpacity
+          className="mr-4"
+          onPress={() => navigation.navigate('SkinAnalysis', { imageUri: '' })}
+        >
           <FontAwesome name="arrow-left" size={18} color="#0f172a" />
         </TouchableOpacity>
         <Text className="text-lg font-bold text-slate-900">Health Profile</Text>
@@ -146,7 +156,64 @@ const SkinHelthProfileScreen: React.FC = () => {
             </View>
           </View>
         </View>
+
+        {/* Sunburn History Card */}
+        <View className="px-6 mt-8">
+          <View className="bg-gray-100 rounded-3xl p-6">
+            <View className="flex-row items-center mb-4">
+              <View className="bg-white p-3 rounded-full mr-3">
+                <FontAwesome name="history" size={18} color="#f97316" />
+              </View>
+              <Text className="text-lg font-bold text-slate-900">Sunburn History</Text>
+            </View>
+
+            {/* Skin Product Usage */}
+            <View className="flex-row justify-between mb-4">
+              <View className="flex-1 bg-white rounded-2xl p-4 mr-2">
+                <View className="flex-row items-center mb-2">
+                  <FontAwesome
+                    name={BURN_FREQUENCY_ICON[burnFrequency] || 'sun-o'}
+                    size={14}
+                    color="#f97316"
+                  />
+                  <Text className="text-xs text-slate-400 font-semibold ml-2">SKIN PRODUCTS</Text>
+                </View>
+                <Text className="text-base font-extrabold text-slate-900">{burnFrequency}</Text>
+              </View>
+
+              <View className="flex-1 bg-white rounded-2xl p-4 ml-2">
+                <View className="flex-row items-center mb-2">
+                  <FontAwesome name="eye" size={14} color="#f97316" />
+                  <Text className="text-xs text-slate-400 font-semibold ml-2">SUN PROTECTION</Text>
+                </View>
+                <Text className="text-base font-extrabold text-slate-900">{tanResponse}</Text>
+              </View>
+            </View>
+
+            {/* Sunburn/Tan Times */}
+            <View className="bg-white rounded-2xl p-4">
+              <View className="flex-row items-center mb-2">
+                <FontAwesome name="sun-o" size={14} color="#f97316" />
+                <Text className="text-xs text-slate-400 font-semibold ml-2">
+                  {skinType === 1 || skinType === 2 ? 'SUNBURN TIMES' : 'TANNING TIMES'}
+                </Text>
+              </View>
+              <Text className="text-base font-extrabold text-slate-900">{sunburnTanTimes}</Text>
+            </View>
+          </View>
+        </View>
       </ScrollView>
+
+      {/* Bottom Action */}
+      <View className="absolute bottom-0 left-0 right-0 px-6 pb-6 bg-white">
+        <TouchableOpacity
+          className="bg-primary rounded-full px-8 py-4 flex-row items-center justify-center shadow-lg"
+          onPress={() => navigation.navigate('MainApp')}
+        >
+          <Text className="text-white font-extrabold text-lg mr-2">Continue to Weather</Text>
+          <FontAwesome name="arrow-right" size={18} color="#fff" />
+        </TouchableOpacity>
+      </View>
     </View>
   );
 };
