@@ -1,14 +1,32 @@
-import React from 'react';
-import { View, Text, TouchableOpacity, StatusBar, TextInput } from 'react-native';
+import React, { useState } from 'react';
+import { View, Text, TouchableOpacity, StatusBar, TextInput, Alert, Image } from 'react-native';
 import FontAwesome from 'react-native-vector-icons/FontAwesome';
 import { MainStackParamList } from '@navigation/MainNavigator';
-import { useNavigation } from '@react-navigation/native';
+import { RouteProp, useNavigation, useRoute } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 
 type NavigationProp = NativeStackNavigationProp<MainStackParamList>;
+type RouteProps = RouteProp<MainStackParamList, 'HealthProfileSetup'>;
 
 const HealthProfileSetupScreen: React.FC = () => {
   const navigation = useNavigation<NavigationProp>();
+  const [age, setAge] = useState('');
+  const route = useRoute<RouteProps>();
+  const { imageUri } = route.params;
+
+  const handleContinue = () => {
+    if (!age.trim()) {
+      Alert.alert('Age Required', 'Please enter your age to continue.');
+      return;
+    }
+    const ageNum = parseInt(age, 10);
+    if (isNaN(ageNum) || ageNum < 16) {
+      Alert.alert('Invalid Age', 'You must be at least 16 years old to use this app.');
+      return;
+    }
+    navigation.navigate('SkinAnalysis', { imageUri: imageUri ?? '' });
+  };
+
   return (
     <View className="flex-1 bg-white px-6">
       <StatusBar barStyle="dark-content" backgroundColor="#ffffff" />
@@ -36,13 +54,27 @@ const HealthProfileSetupScreen: React.FC = () => {
 
       {/* Image Upload */}
       <View className="items-center mb-10">
-        <View className="relative">
-          <View className="w-44 h-44 rounded-full border-2 border-dashed border-orange-200 items-center justify-center bg-orange-50">
-            <FontAwesome name="camera" size={32} color="#f97316" />
-          </View>
+        <View className="relative" style={{ overflow: 'visible' }}>
+          {imageUri ? (
+            <Image
+              source={{ uri: imageUri }}
+              className="w-72 h-72 rounded-full"
+              resizeMode="cover"
+            />
+          ) : (
+            <TouchableOpacity
+              className="w-44 h-44 rounded-full border-2 border-dashed border-gray-300 items-center justify-center bg-orange-50"
+              onPress={() => navigation.navigate('FaceCapture')}
+            >
+              <FontAwesome name="camera" size={32} color="#f97316" />
+            </TouchableOpacity>
+          )}
 
           {/* Edit Button */}
-          <TouchableOpacity className="absolute -bottom-2 -right-2 bg-orange-500 w-12 h-12 rounded-full items-center justify-center border-4 border-white shadow-lg">
+          <TouchableOpacity
+            className="absolute bottom-0 right-0 w-12 h-12 rounded-full items-center justify-center border-4 border-white shadow-lg"
+            style={{ backgroundColor: '#f97316' }}
+          >
             <FontAwesome name="pencil" size={18} color="#fff" />
           </TouchableOpacity>
         </View>
@@ -59,6 +91,8 @@ const HealthProfileSetupScreen: React.FC = () => {
           placeholderTextColor="#6b7280"
           keyboardType="numeric"
           className="flex-1 text-slate-900 text-base"
+          value={age}
+          onChangeText={setAge}
         />
         <FontAwesome name="calendar" size={18} color="#64748b" />
       </View>
@@ -77,7 +111,7 @@ const HealthProfileSetupScreen: React.FC = () => {
       {/* CTA */}
       <TouchableOpacity
         className="bg-primary rounded-full px-10 py-4 flex-row items-center justify-center shadow-lg"
-        onPress={() => navigation.navigate('SkinAnalysis')}
+        onPress={handleContinue}
       >
         <Text className="text-white font-extrabold text-lg mr-3">Upload Image & Continue</Text>
         <FontAwesome name="arrow-right" size={18} color="#fff" />
