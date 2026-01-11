@@ -1,24 +1,38 @@
 import React, { useCallback, useState } from 'react';
-import { View, Text, TouchableOpacity, StatusBar, ScrollView } from 'react-native';
+import { View, Text, TouchableOpacity, StatusBar, ScrollView, Modal } from 'react-native';
 import FontAwesome from 'react-native-vector-icons/FontAwesome';
 import { useNavigation, useRoute, RouteProp } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { MainStackParamList } from '@navigation/MainNavigator';
 
 type NavigationProp = NativeStackNavigationProp<MainStackParamList, 'SunburnHistory'>;
-type RouteProps = RouteProp<MainStackParamList, 'SkinAnalysisResult'>;
+type RouteProps = RouteProp<MainStackParamList, 'SunburnHistory'>;
 
 const SunburnHistoryScreen: React.FC = () => {
   const navigation = useNavigation<NavigationProp>();
   const route = useRoute<RouteProps>();
-  const [burnFrequency, setBurnFrequency] = useState('Sometimes');
-  const [tanResponse, setTanResponse] = useState('Slight Tan');
 
-  const { imageUri, skinType } = route.params;
+  const [burnFrequency, setBurnFrequency] = useState('Sometimes');
+  const [tanResponse, setTanResponse] = useState('Sometimes');
+  const [sunburnTanTimes, setSunburnTanTimes] = useState('One');
+  const [showTimesDropdown, setShowTimesDropdown] = useState(false);
+
+  const imageUri = route.params?.imageUri ?? '';
+  const skinType = route.params?.skinType ?? 3;
+
+  const timesOptions = ['One', 'Two', 'Three', 'Four', 'Five+'];
+
+  const isSunburnType = skinType === 1 || skinType === 2;
 
   const handleSave = useCallback(() => {
-    navigation.navigate('SkinHelthProfile', { imageUri, skinType });
-  }, [navigation, imageUri, skinType]);
+    navigation.navigate('SkinHelthProfile', {
+      imageUri,
+      skinType,
+      burnFrequency,
+      tanResponse,
+      sunburnTanTimes,
+    });
+  }, [navigation, imageUri, skinType, burnFrequency, tanResponse, sunburnTanTimes]);
 
   return (
     <View className="flex-1 bg-white px-6">
@@ -51,7 +65,7 @@ const SunburnHistoryScreen: React.FC = () => {
 
         {/* Question 1 */}
         <Text className="text-slate-900 text-lg font-bold mb-4">
-          How often do you get sunburned?
+          How often do you use skin products?
         </Text>
 
         <View className="flex-row flex-wrap justify-between mb-8">
@@ -87,10 +101,10 @@ const SunburnHistoryScreen: React.FC = () => {
 
         {/* Question 2 */}
         <Text className="text-slate-900 text-lg font-bold mb-4">
-          When you tan, how does your skin respond?
+          How often do you use sunglasses / hat / shade?
         </Text>
 
-        {['No Tan', 'Slight Tan', 'Moderate Tan', 'Easy Tan'].map(item => {
+        {['Never', 'Rarely', 'Sometimes', 'Often'].map(item => {
           const active = tanResponse === item;
           return (
             <TouchableOpacity
@@ -115,14 +129,73 @@ const SunburnHistoryScreen: React.FC = () => {
 
         {/* Question 3 */}
         <Text className="text-slate-900 text-lg font-bold mt-8 mb-4">
-          When was your last severe sunburn?
+          {isSunburnType
+            ? 'How many times have you been sunburned?'
+            : 'How many times have you been tanned?'}
         </Text>
 
-        <TouchableOpacity className="flex-row items-center bg-gray-100 rounded-full px-5 py-4 mb-10">
-          <FontAwesome name="calendar" size={16} color="#64748b" />
-          <Text className="text-slate-900 ml-3 flex-1">1 – 6 months ago</Text>
+        <TouchableOpacity
+          className="flex-row items-center bg-gray-100 rounded-full px-5 py-4 mb-10"
+          onPress={() => setShowTimesDropdown(true)}
+        >
+          <FontAwesome name="sun-o" size={16} color="#64748b" />
+          <Text className="text-slate-900 ml-3 flex-1 font-semibold">{sunburnTanTimes}</Text>
           <FontAwesome name="chevron-down" size={14} color="#64748b" />
         </TouchableOpacity>
+
+        {/* Times Dropdown Modal */}
+        <Modal
+          visible={showTimesDropdown}
+          transparent
+          animationType="slide"
+          onRequestClose={() => setShowTimesDropdown(false)}
+        >
+          <TouchableOpacity
+            className="flex-1 bg-black/50 justify-end"
+            activeOpacity={1}
+            onPress={() => setShowTimesDropdown(false)}
+          >
+            <View className="bg-white rounded-t-3xl px-6 pt-6 pb-10">
+              <View className="flex-row items-center justify-between mb-6">
+                <Text className="text-slate-900 text-lg font-bold">
+                  {isSunburnType
+                    ? 'How many times have you been sunburned?'
+                    : 'How many times have you been tanned?'}
+                </Text>
+                <TouchableOpacity onPress={() => setShowTimesDropdown(false)}>
+                  <FontAwesome name="times" size={20} color="#64748b" />
+                </TouchableOpacity>
+              </View>
+
+              {timesOptions.map(item => {
+                const active = sunburnTanTimes === item;
+                return (
+                  <TouchableOpacity
+                    key={item}
+                    onPress={() => {
+                      setSunburnTanTimes(item);
+                      setShowTimesDropdown(false);
+                    }}
+                    className={`flex-row items-center px-5 py-4 rounded-full mb-3 ${
+                      active ? 'border-2 border-orange-500 bg-gray-50' : 'bg-gray-100'
+                    }`}
+                  >
+                    <FontAwesome name="sun-o" size={16} color={active ? '#f97316' : '#64748b'} />
+                    <Text className="text-slate-900 ml-3 font-semibold flex-1">{item}</Text>
+
+                    <View
+                      className={`w-5 h-5 rounded-full border-2 ${
+                        active ? 'border-orange-500 bg-orange-500' : 'border-gray-500'
+                      } items-center justify-center`}
+                    >
+                      {active && <FontAwesome name="check" size={10} color="#000" />}
+                    </View>
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
+          </TouchableOpacity>
+        </Modal>
 
         {/* CTA */}
         <TouchableOpacity
