@@ -62,7 +62,10 @@ const SkinAnalysisResultScreen: React.FC = () => {
 
       {/* Header */}
       <View className="flex-row items-center px-6 pt-10 pb-4">
-        <TouchableOpacity className="mr-4" onPress={() => navigation.navigate('SkinAnalysis')}>
+        <TouchableOpacity
+          className="mr-4"
+          onPress={() => navigation.navigate('SkinAnalysis', { imageUri: '' })}
+        >
           <FontAwesome name="arrow-left" size={18} color="#0f172a" />
         </TouchableOpacity>
         <Text className="text-lg font-bold text-slate-900">Analysis Complete</Text>
@@ -169,7 +172,14 @@ const SkinAnalysisResultScreen: React.FC = () => {
           <FontAwesome name="check" size={18} color="#fff" />
         </TouchableOpacity>
 
-        <TouchableOpacity className="flex-row justify-center items-center mb-4">
+        <TouchableOpacity
+          activeOpacity={0.7}
+          className="flex-row justify-center items-center mb-4 py-3"
+          onPress={() => {
+            console.log('Retake Image pressed');
+            navigation.push('FaceCapture');
+          }}
+        >
           <FontAwesome name="refresh" size={16} color="#64748b" />
           <Text className="ml-2 text-slate-500 font-semibold">Retake Image</Text>
         </TouchableOpacity>
