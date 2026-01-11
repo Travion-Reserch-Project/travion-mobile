@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   View,
   Text,
@@ -11,15 +11,19 @@ import {
 } from 'react-native';
 import FontAwesome from 'react-native-vector-icons/FontAwesome';
 import { MainStackParamList } from '@navigation/MainNavigator';
-import { useNavigation } from '@react-navigation/native';
+import { RouteProp, useNavigation, useRoute } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { launchCamera, launchImageLibrary, ImagePickerResponse } from 'react-native-image-picker';
 
 // Use the stack navigation type for this screen so navigate/goBack are scoped correctly
 type NavigationProp = NativeStackNavigationProp<MainStackParamList, 'SkinAnalysis'>;
+type RouteProps = RouteProp<MainStackParamList, 'SkinAnalysis'>;
 
 const SkinAnalysisScreen: React.FC = () => {
   const navigation = useNavigation<NavigationProp>();
+  const route = useRoute<RouteProps>();
+  const { imageUri } = route.params;
+
   const [selectedImage, setSelectedImage] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
 
@@ -102,6 +106,12 @@ const SkinAnalysisScreen: React.FC = () => {
     }
   };
 
+  useEffect(() => {
+    if (imageUri) {
+      setSelectedImage(imageUri);
+    }
+  }, [imageUri]);
+
   return (
     <View className="flex-1 bg-white px-6">
       <StatusBar barStyle="dark-content" backgroundColor="#ffffff" />
@@ -110,7 +120,9 @@ const SkinAnalysisScreen: React.FC = () => {
       <View className="flex-row items-center mt-10 mb-10">
         <TouchableOpacity
           className="mr-4"
-          onPress={() => navigation.navigate('HealthProfileSetup')}
+          onPress={() =>
+            navigation.navigate('HealthProfileSetup', { imageUri: selectedImage ?? '' })
+          }
         >
           <FontAwesome name="arrow-left" size={18} color="#0f172a" />
         </TouchableOpacity>
