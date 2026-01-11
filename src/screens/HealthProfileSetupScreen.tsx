@@ -54,7 +54,7 @@ const HealthProfileSetupScreen: React.FC = () => {
 
       {/* Image Upload */}
       <View className="items-center mb-10">
-        <View className="relative" style={{ overflow: 'visible' }}>
+        <View className="relative overflow-visible">
           {imageUri ? (
             <Image
               source={{ uri: imageUri }}
@@ -72,8 +72,7 @@ const HealthProfileSetupScreen: React.FC = () => {
 
           {/* Edit Button */}
           <TouchableOpacity
-            className="absolute bottom-0 right-0 w-12 h-12 rounded-full items-center justify-center border-4 border-white shadow-lg"
-            style={{ backgroundColor: '#f97316' }}
+            className="absolute bottom-0 right-0 w-12 h-12 rounded-full items-center justify-center border-4 border-white shadow-lg bg-orange-500"
           >
             <FontAwesome name="pencil" size={18} color="#fff" />
           </TouchableOpacity>
