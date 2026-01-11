@@ -50,6 +50,8 @@ const SKIN_TYPE_INFO: Record<
   },
 };
 
+const contentContainerStyle = { paddingBottom: 208 };
+
 const SkinAnalysisResultScreen: React.FC = () => {
   const navigation = useNavigation<NavigationProp>();
   const route = useRoute<RouteProps>();
@@ -73,7 +75,7 @@ const SkinAnalysisResultScreen: React.FC = () => {
 
       <ScrollView
         showsVerticalScrollIndicator={false}
-        contentContainerStyle={{ paddingBottom: 200 }}
+        contentContainerStyle={contentContainerStyle}
       >
         {/* Image Result */}
         <View className="items-center mt-8">
