@@ -128,8 +128,7 @@ const FaceCaptureScreen: React.FC = () => {
 
               {/* Continue Button */}
               <TouchableOpacity
-                className="w-20 h-20 rounded-full items-center justify-center border-4 border-gray-300 shadow-lg"
-                style={{ backgroundColor: '#22c55e' }}
+                className="w-20 h-20 rounded-full items-center justify-center border-4 border-gray-300 shadow-lg bg-green-500"
                 onPress={handleContinue}
               >
                 <FontAwesome name="check" size={26} color="#fff" />
@@ -151,8 +150,7 @@ const FaceCaptureScreen: React.FC = () => {
 
               {/* Capture Button */}
               <TouchableOpacity
-                className="w-20 h-20 rounded-full items-center justify-center border-4 border-gray-300 shadow-lg"
-                style={{ backgroundColor: '#f97316' }}
+                className="w-20 h-20 rounded-full items-center justify-center border-4 border-gray-300 shadow-lg bg-orange-500"
                 onPress={handleCameraCapture}
               >
                 <FontAwesome name="camera" size={26} color="#fff" />
