@@ -20,6 +20,7 @@ import SkinAnalysisScreen from '@screens/SkinAnalysisScreen';
 import SkinAnalysisResultScreen from '@screens/SkinAnalysisResultScreen';
 import SunburnHistoryScreen from '@screens/SunburnHistoryScreen';
 import SkinHelthProfileScreen from '@screens/SkinHelthProfileScreen';
+import FaceCaptureScreen from '@screens/FaceCaptureScreen';
 
 const welcomeBackAnimation = require('@assets/animations/success.json');
 
@@ -37,12 +38,19 @@ export type MainStackParamList = {
   ProfileScreen: { userName?: string; userEmail?: string };
   SunProtection: undefined;
   SafetyAdvisor: undefined;
-  HealthProfileSetup: undefined;
+  HealthProfileSetup: { imageUri?: string };
   HealthProfileLanding: undefined;
-  SkinAnalysis: undefined;
+  SkinAnalysis: { imageUri?: string };
   SkinAnalysisResult: { imageUri: string; skinType: number };
   SunburnHistory: { imageUri: string; skinType: number };
-  SkinHelthProfile: { imageUri: string; skinType: number };
+  SkinHelthProfile: {
+    imageUri: string;
+    skinType: number;
+    burnFrequency: string;
+    tanResponse: string;
+    sunburnTanTimes: string;
+  };
+  FaceCapture: undefined;
 };
 
 const Stack = createNativeStackNavigator<MainStackParamList>();
@@ -98,6 +106,7 @@ export const MainNavigator: React.FC = () => {
           <Stack.Screen name="SkinAnalysisResult" component={SkinAnalysisResultScreen} />
           <Stack.Screen name="SunburnHistory" component={SunburnHistoryScreen} />
           <Stack.Screen name="SkinHelthProfile" component={SkinHelthProfileScreen} />
+          <Stack.Screen name="FaceCapture" component={FaceCaptureScreen} />
         </>
       ) : (
         <>
