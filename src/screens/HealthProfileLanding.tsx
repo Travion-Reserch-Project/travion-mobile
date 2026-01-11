@@ -13,7 +13,7 @@ const HealthProfileLandingScreen: React.FC = () => {
       <StatusBar barStyle="dark-content" backgroundColor="#ffffff" />
 
       {/* Header */}
-      <View className="flex-row items-center justify-between px-6 pt-6 pb-4">
+      <View className="flex-row items-center justify-between px-6 pt-10 pb-4">
         <View className="flex-row items-center">
           <FontAwesome name="sun-o" size={22} color="#f97316" />
           <Text className="ml-3 text-xl font-bold text-slate-900">Safety Advisor</Text>
@@ -79,7 +79,7 @@ const HealthProfileLandingScreen: React.FC = () => {
 
             <TouchableOpacity
               className="bg-primary rounded-full px-10 py-5 flex-row items-center shadow-lg"
-              onPress={() => navigation.navigate('HealthProfileSetup')}
+              onPress={() => navigation.navigate('HealthProfileSetup', { imageUri: '' })}
             >
               <Text className="text-white font-extrabold text-lg mr-3">Get Started</Text>
               <FontAwesome name="arrow-right" size={18} color="#fff" />
