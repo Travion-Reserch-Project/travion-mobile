@@ -24,6 +24,7 @@ import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import type { MainStackParamList } from '../navigation/MainNavigator';
 import colors from '../theme/colors';
 import typography from '../theme/typography';
+import { incidentReportService } from '@services/api';
 
 // Initialize geocoding
 RNGeocoding.init(Config.GOOGLE_MAPS_API_KEY as string);
@@ -48,9 +49,14 @@ export const ReportIncidentScreen: React.FC = () => {
   // States
   const [selectedIncidentType, setSelectedIncidentType] = useState<string>('1');
   const [locationName, setLocationName] = useState<string>('Getting location...');
+  const [locationCoords, setLocationCoords] = useState<{
+    latitude: number;
+    longitude: number;
+  } | null>(null);
   const [incidentTime, setIncidentTime] = useState<Date>(new Date());
   const [description, setDescription] = useState<string>('');
   const [loading, setLoading] = useState(true);
+  const [submitting, setSubmitting] = useState(false);
   const [showTimeModal, setShowTimeModal] = useState(false);
   const [showLocationModal, setShowLocationModal] = useState(false);
   const [editingLocation, setEditingLocation] = useState<string>('');
@@ -61,6 +67,7 @@ export const ReportIncidentScreen: React.FC = () => {
   const [photoUri, setPhotoUri] = useState<string | null>(null);
   const [submitted, setSubmitted] = useState(false);
   const [showErrorModal, setShowErrorModal] = useState(false);
+  const [errorMessage, setErrorMessage] = useState<string>('');
 
   // Get current location and time on mount
   useEffect(() => {
@@ -103,6 +110,9 @@ export const ReportIncidentScreen: React.FC = () => {
       Geolocation.getCurrentPosition(
         async position => {
           const { latitude, longitude } = position.coords;
+
+          // Save coordinates
+          setLocationCoords({ latitude, longitude });
 
           // Reverse geocode to get location name
           try {
@@ -193,20 +203,72 @@ export const ReportIncidentScreen: React.FC = () => {
     );
   };
 
-  const handleSubmit = () => {
+  const handleSubmit = async () => {
     if (!selectedIncidentType || !description.trim()) {
+      setErrorMessage(
+        'Please select an incident type and describe what happened before submitting.',
+      );
       setShowErrorModal(true);
       return;
     }
-    // Submit logic here
-    console.log({
-      incidentType: INCIDENT_TYPES.find(t => t.id === selectedIncidentType)?.label,
-      location: locationName,
-      time: incidentTime,
-      description,
-      photo: photoUri,
-    });
-    setSubmitted(true);
+
+    if (description.trim().length < 10) {
+      setErrorMessage('Description must be at least 10 characters long.');
+      setShowErrorModal(true);
+      return;
+    }
+
+    setSubmitting(true);
+
+    try {
+      const incidentTypeLabel = INCIDENT_TYPES.find(t => t.id === selectedIncidentType)?.label;
+
+      if (!incidentTypeLabel) {
+        throw new Error('Invalid incident type selected');
+      }
+
+      // Prepare the report data
+      const reportData = {
+        incidentType: incidentTypeLabel as
+          | 'Pickpocketing'
+          | 'Bag Snatching'
+          | 'Scam'
+          | 'Money Theft'
+          | 'Harassment'
+          | 'Extortion'
+          | 'Theft'
+          | 'Other',
+        location: {
+          latitude: locationCoords?.latitude,
+          longitude: locationCoords?.longitude,
+          address: locationName,
+        },
+        incidentTime: incidentTime.toISOString(),
+        description: description.trim(),
+        photoUrl: photoUri || undefined,
+        isAnonymous: true, // Reports are anonymous by default
+      };
+
+      console.log('[ReportIncident] Submitting report:', reportData);
+
+      // Submit to backend
+      const result = await incidentReportService.createReport(reportData);
+
+      if (result.success) {
+        console.log('[ReportIncident] Report submitted successfully:', result.data);
+        setSubmitted(true);
+      } else {
+        throw new Error(result.error || 'Failed to submit report');
+      }
+    } catch (error) {
+      console.error('[ReportIncident] Error submitting report:', error);
+      setErrorMessage(
+        (error as Error).message || 'Failed to submit incident report. Please try again.',
+      );
+      setShowErrorModal(true);
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   // console.log('API Key:', Config.GOOGLE_MAPS_API_KEY);
@@ -535,12 +597,22 @@ export const ReportIncidentScreen: React.FC = () => {
           {/* Submit Button */}
           <TouchableOpacity
             onPress={handleSubmit}
+            disabled={submitting}
             className="w-full py-4 rounded-lg items-center justify-center mb-8"
-            style={{ backgroundColor: colors.primary }}
+            style={{ backgroundColor: submitting ? colors.gray[400] : colors.primary }}
           >
-            <Text className="text-base font-gilroy-bold" style={{ color: colors.white }}>
-              Submit Report
-            </Text>
+            {submitting ? (
+              <View className="flex-row items-center">
+                <ActivityIndicator size="small" color={colors.white} />
+                <Text className="text-base font-gilroy-bold ml-2" style={{ color: colors.white }}>
+                  Submitting...
+                </Text>
+              </View>
+            ) : (
+              <Text className="text-base font-gilroy-bold" style={{ color: colors.white }}>
+                Submit Report
+              </Text>
+            )}
           </TouchableOpacity>
         </Animated.View>
       </ScrollView>
@@ -705,13 +777,14 @@ export const ReportIncidentScreen: React.FC = () => {
               className="text-xl font-gilroy-bold text-center mb-2"
               style={{ color: colors.gray[900] }}
             >
-              Required Fields Missing
+              {errorMessage.includes('Failed') ? 'Submission Error' : 'Required Fields Missing'}
             </Text>
             <Text
               className="text-sm font-gilroy-regular text-center mb-6"
               style={{ color: colors.gray[600], lineHeight: 20 }}
             >
-              Please select an incident type and describe what happened before submitting.
+              {errorMessage ||
+                'Please select an incident type and describe what happened before submitting.'}
             </Text>
 
             {/* OK Button */}
