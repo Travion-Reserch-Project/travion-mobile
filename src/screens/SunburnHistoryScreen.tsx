@@ -19,6 +19,7 @@ const SunburnHistoryScreen: React.FC = () => {
 
   const imageUri = route.params?.imageUri ?? '';
   const skinType = route.params?.skinType ?? 3;
+  const ageNum = route.params?.ageNum;
 
   const timesOptions = ['One', 'Two', 'Three', 'Four', 'Five+'];
 
@@ -31,8 +32,9 @@ const SunburnHistoryScreen: React.FC = () => {
       burnFrequency,
       tanResponse,
       sunburnTanTimes,
+      ageNum: ageNum ?? 0,
     });
-  }, [navigation, imageUri, skinType, burnFrequency, tanResponse, sunburnTanTimes]);
+  }, [navigation, imageUri, skinType, burnFrequency, tanResponse, sunburnTanTimes, ageNum]);
 
   return (
     <View className="flex-1 bg-white px-6">

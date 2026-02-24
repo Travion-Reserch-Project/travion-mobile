@@ -1,9 +1,19 @@
 import React, { useState } from 'react';
-import { View, Text, TouchableOpacity, StatusBar, TextInput, Alert, Image } from 'react-native';
+import {
+  View,
+  Text,
+  TouchableOpacity,
+  StatusBar,
+  TextInput,
+  Alert,
+  Image,
+  ActivityIndicator,
+} from 'react-native';
 import FontAwesome from 'react-native-vector-icons/FontAwesome';
 import { MainStackParamList } from '@navigation/MainNavigator';
 import { RouteProp, useNavigation, useRoute } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
+import { useAuthStore } from '@stores';
 
 type NavigationProp = NativeStackNavigationProp<MainStackParamList>;
 type RouteProps = RouteProp<MainStackParamList, 'HealthProfileSetup'>;
@@ -11,10 +21,12 @@ type RouteProps = RouteProp<MainStackParamList, 'HealthProfileSetup'>;
 const HealthProfileSetupScreen: React.FC = () => {
   const navigation = useNavigation<NavigationProp>();
   const [age, setAge] = useState('');
+  const [isLoading, setIsLoading] = useState(false);
   const route = useRoute<RouteProps>();
   const { imageUri } = route.params;
+  const { user } = useAuthStore();
 
-  const handleContinue = () => {
+  const handleContinue = async () => {
     if (!age.trim()) {
       Alert.alert('Age Required', 'Please enter your age to continue.');
       return;
@@ -24,7 +36,21 @@ const HealthProfileSetupScreen: React.FC = () => {
       Alert.alert('Invalid Age', 'You must be at least 16 years old to use this app.');
       return;
     }
-    navigation.navigate('SkinAnalysis', { imageUri: imageUri ?? '' });
+
+    if (!user?.userId) {
+      Alert.alert('Error', 'User not authenticated. Please log in again.');
+      return;
+    }
+
+    setIsLoading(true);
+    try {
+      navigation.navigate('SkinAnalysis', { imageUri: imageUri ?? '', ageNum });
+    } catch (error: any) {
+      console.error('Failed to create health profile:', error);
+      Alert.alert('Error', error.message || 'Failed to create health profile. Please try again.');
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   return (
@@ -71,9 +97,7 @@ const HealthProfileSetupScreen: React.FC = () => {
           )}
 
           {/* Edit Button */}
-          <TouchableOpacity
-            className="absolute bottom-0 right-0 w-12 h-12 rounded-full items-center justify-center border-4 border-white shadow-lg bg-orange-500"
-          >
+          <TouchableOpacity className="absolute bottom-0 right-0 w-12 h-12 rounded-full items-center justify-center border-4 border-white shadow-lg bg-orange-500">
             <FontAwesome name="pencil" size={18} color="#fff" />
           </TouchableOpacity>
         </View>
@@ -111,9 +135,16 @@ const HealthProfileSetupScreen: React.FC = () => {
       <TouchableOpacity
         className="bg-primary rounded-full px-10 py-4 flex-row items-center justify-center shadow-lg"
         onPress={handleContinue}
+        disabled={isLoading}
       >
-        <Text className="text-white font-extrabold text-lg mr-3">Upload Image & Continue</Text>
-        <FontAwesome name="arrow-right" size={18} color="#fff" />
+        {isLoading ? (
+          <ActivityIndicator color="#fff" size="small" />
+        ) : (
+          <>
+            <Text className="text-white font-extrabold text-lg mr-3">Upload Image & Continue</Text>
+            <FontAwesome name="arrow-right" size={18} color="#fff" />
+          </>
+        )}
       </TouchableOpacity>
 
       {/* Privacy */}

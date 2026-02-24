@@ -1,9 +1,11 @@
-import React from 'react';
-import { View, Text, TouchableOpacity, StatusBar, Image, ScrollView } from 'react-native';
+import React, { useCallback } from 'react';
+import { View, Text, TouchableOpacity, StatusBar, Image, ScrollView, Alert } from 'react-native';
 import FontAwesome from 'react-native-vector-icons/FontAwesome';
 import { useNavigation, useRoute, RouteProp } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { MainStackParamList } from '@navigation/MainNavigator';
+import { healthProfileService } from '@services/api';
+import { useAuthStore } from '@stores';
 
 type NavigationProp = NativeStackNavigationProp<MainStackParamList, 'SkinHelthProfile'>;
 type RouteProps = RouteProp<MainStackParamList, 'SkinHelthProfile'>;
@@ -60,10 +62,41 @@ const BURN_FREQUENCY_ICON: Record<string, string> = {
 const contentContainerStyle = { paddingBottom: 200 };
 
 const SkinHelthProfileScreen: React.FC = () => {
+  const { user } = useAuthStore();
   const navigation = useNavigation<NavigationProp>();
   const route = useRoute<RouteProps>();
-  const { imageUri, skinType, burnFrequency, tanResponse, sunburnTanTimes } = route.params;
+  const { imageUri, skinType, burnFrequency, tanResponse, sunburnTanTimes, ageNum } = route.params;
   const skinInfo = SKIN_TYPE_INFO[skinType] || SKIN_TYPE_INFO[3];
+
+  const handleSaveAndContinue = useCallback(async () => {
+    try {
+      if (!user?.userId) {
+        Alert.alert('Error', 'User not authenticated. Please log in again.');
+        return;
+      }
+      await healthProfileService.createHealthProfile({
+        userId: user?.userId,
+        age: ageNum,
+        imageUrl: imageUri,
+        historicalSunburnTimes: parseInt(sunburnTanTimes, 10),
+        skinType: skinType.toString(),
+        skinProductInteraction: burnFrequency,
+        useOfSunglasses: tanResponse,
+      });
+      navigation.navigate('MainApp');
+    } catch (error) {
+      console.error('Failed to save health profile:', error);
+    }
+  }, [
+    ageNum,
+    imageUri,
+    skinType,
+    burnFrequency,
+    tanResponse,
+    sunburnTanTimes,
+    navigation,
+    user?.userId,
+  ]);
 
   return (
     <View className="flex-1 bg-white">
@@ -210,7 +243,7 @@ const SkinHelthProfileScreen: React.FC = () => {
       <View className="absolute bottom-0 left-0 right-0 px-6 pb-6 bg-white">
         <TouchableOpacity
           className="bg-primary rounded-full px-8 py-4 flex-row items-center justify-center shadow-lg"
-          onPress={() => navigation.navigate('MainApp')}
+          onPress={handleSaveAndContinue}
         >
           <Text className="text-white font-extrabold text-lg mr-2">Continue to Weather</Text>
           <FontAwesome name="arrow-right" size={18} color="#fff" />

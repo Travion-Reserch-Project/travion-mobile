@@ -40,15 +40,16 @@ export type MainStackParamList = {
   SafetyAdvisor: undefined;
   HealthProfileSetup: { imageUri?: string };
   HealthProfileLanding: undefined;
-  SkinAnalysis: { imageUri?: string };
-  SkinAnalysisResult: { imageUri: string; skinType: number };
-  SunburnHistory: { imageUri: string; skinType: number };
+  SkinAnalysis: { imageUri?: string; ageNum?: number };
+  SkinAnalysisResult: { imageUri: string; skinType: number; ageNum?: number };
+  SunburnHistory: { imageUri: string; skinType: number; ageNum?: number };
   SkinHelthProfile: {
     imageUri: string;
     skinType: number;
     burnFrequency: string;
     tanResponse: string;
     sunburnTanTimes: string;
+    ageNum: number;
   };
   FaceCapture: undefined;
 };

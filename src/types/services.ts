@@ -34,3 +34,37 @@ export interface AvatarUploadResponse {
   avatarUrl: string;
   message?: string;
 }
+
+// Health Profile types
+export interface HealthProfileHistory {
+  skinType: string;
+  imageUrl?: string;
+  timeStamp: Date;
+}
+
+export interface HealthProfile {
+  _id?: string;
+  userId: string;
+  age: number;
+  skinType?: string;
+  imageUrl?: string;
+  history?: HealthProfileHistory[];
+  createdAt?: Date;
+  updatedAt?: Date;
+}
+
+export interface CreateHealthProfileRequest {
+  userId: string;
+  age: number;
+  skinType?: string;
+  imageUrl?: string;
+  skinProductInteraction?: string;
+  useOfSunglasses?: string;
+  historicalSunburnTimes?: number;
+  historicalTanningTimes?: number;
+}
+
+export interface UpdateSkinTypeRequest {
+  skinType: string;
+  imageUrl?: string;
+}

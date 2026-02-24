@@ -22,7 +22,7 @@ type RouteProps = RouteProp<MainStackParamList, 'SkinAnalysis'>;
 const SkinAnalysisScreen: React.FC = () => {
   const navigation = useNavigation<NavigationProp>();
   const route = useRoute<RouteProps>();
-  const { imageUri } = route.params;
+  const { imageUri, ageNum } = route.params;
 
   const [selectedImage, setSelectedImage] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
@@ -97,6 +97,7 @@ const SkinAnalysisScreen: React.FC = () => {
       navigation.navigate('SkinAnalysisResult', {
         imageUri: selectedImage,
         skinType: data.predicted_skin_type,
+        ageNum,
       });
     } catch (error) {
       Alert.alert('Error', 'Failed to analyze skin. Please try again.');

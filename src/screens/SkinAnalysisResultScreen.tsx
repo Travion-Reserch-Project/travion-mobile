@@ -55,7 +55,7 @@ const contentContainerStyle = { paddingBottom: 208 };
 const SkinAnalysisResultScreen: React.FC = () => {
   const navigation = useNavigation<NavigationProp>();
   const route = useRoute<RouteProps>();
-  const { imageUri, skinType } = route.params;
+  const { imageUri, skinType, ageNum } = route.params;
   const skinInfo = SKIN_TYPE_INFO[skinType] || SKIN_TYPE_INFO[3];
 
   return (
@@ -167,6 +167,7 @@ const SkinAnalysisResultScreen: React.FC = () => {
             navigation.navigate('SunburnHistory', {
               imageUri,
               skinType,
+              ageNum,
             })
           }
         >

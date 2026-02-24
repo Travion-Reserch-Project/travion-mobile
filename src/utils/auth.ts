@@ -67,6 +67,7 @@ class AuthUtils {
   static async getStoredTokens(): Promise<AuthTokens | null> {
     try {
       const tokens = await AsyncStorage.getItem(this.TOKEN_KEY);
+      console.log('tokens', tokens);
       return tokens ? JSON.parse(tokens) : null;
     } catch (error) {
       console.error('Error getting tokens:', error);
