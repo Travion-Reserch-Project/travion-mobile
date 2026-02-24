@@ -25,7 +25,8 @@ export interface SafetyAlert {
     | 'Money Theft'
     | 'Harassment'
     | 'Bag Snatching'
-    | 'Extortion';
+    | 'Extortion'
+    | 'Other';
 }
 
 export interface RiskPrediction {
@@ -113,6 +114,42 @@ export class SafetyService extends BaseApiService {
         incidentType: 'Scam',
       },
     ];
+  }
+
+  /**
+   * Get nearby user-reported incidents
+   * Returns real incidents reported by other users in the area
+   * Requires authentication
+   */
+  async getNearbyIncidents(
+    latitude: number,
+    longitude: number,
+    radius: number = 5,
+    limit: number = 20,
+  ): Promise<SafetyAlert[]> {
+    try {
+      // Build query string
+      const queryParams = new URLSearchParams({
+        latitude: latitude.toString(),
+        longitude: longitude.toString(),
+        radius: radius.toString(),
+        limit: limit.toString(),
+      });
+
+      const response = await this.authenticatedGet<{ data: SafetyAlert[]; count: number }>(
+        `/nearby-incidents?${queryParams.toString()}`,
+      );
+
+      if (response.success && response.data?.data) {
+        console.log(`[SafetyService] Received ${response.data.count} nearby incidents`);
+        return response.data.data;
+      }
+
+      return [];
+    } catch (error) {
+      console.error('[SafetyService] Error fetching nearby incidents:', error);
+      return [];
+    }
   }
 
   /**
