@@ -18,6 +18,8 @@ export interface SafetyAlert {
   description: string;
   level: 'low' | 'medium' | 'high';
   location: string;
+  latitude?: number;
+  longitude?: number;
   incidentType:
     | 'Scam'
     | 'Pickpocket'

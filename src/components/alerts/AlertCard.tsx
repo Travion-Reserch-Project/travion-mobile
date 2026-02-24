@@ -102,7 +102,7 @@ export const AlertCard: React.FC<AlertCardProps> = ({ alert, onToggleRead }) => 
                   {alert.incidentType
                     ? `${alert.severity.charAt(0).toUpperCase() + alert.severity.slice(1)} ${
                         alert.incidentType
-                      } Risk – ${alert.title}`
+                      } Risk${alert.title ? ` – ${alert.title}` : ''}`
                     : alert.title}
                 </Text>
                 {!alert.isRead && <View className="w-2 h-2 bg-primary rounded-full ml-2" />}

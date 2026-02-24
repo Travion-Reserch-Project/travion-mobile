@@ -15,15 +15,68 @@ import { AlertCard, FilterTabs, EmptyState, Alert } from '../components/alerts';
 import SafetyService, { SafetyAlert } from '@services/api/SafetyService';
 
 /**
+ * Calculate distance between two coordinates using Haversine formula
+ * Returns distance in meters
+ */
+const calculateDistance = (lat1: number, lon1: number, lat2: number, lon2: number): number => {
+  const R = 6371e3; // Earth's radius in meters
+  const φ1 = (lat1 * Math.PI) / 180;
+  const φ2 = (lat2 * Math.PI) / 180;
+  const Δφ = ((lat2 - lat1) * Math.PI) / 180;
+  const Δλ = ((lon2 - lon1) * Math.PI) / 180;
+
+  const a =
+    Math.sin(Δφ / 2) * Math.sin(Δφ / 2) +
+    Math.cos(φ1) * Math.cos(φ2) * Math.sin(Δλ / 2) * Math.sin(Δλ / 2);
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+
+  return R * c; // Distance in meters
+};
+
+/**
+ * Format distance for display
+ */
+const formatDistance = (meters: number): string => {
+  if (meters < 10) {
+    return 'Nearby';
+  }
+  if (meters < 1000) {
+    return `${Math.round(meters)}m away`;
+  }
+  return `${(meters / 1000).toFixed(1)}km away`;
+};
+
+/**
  * Transform SafetyAlert from backend to Alert format for UI
  */
-const transformSafetyAlertToAlert = (safetyAlert: SafetyAlert): Alert => {
+const transformSafetyAlertToAlert = (
+  safetyAlert: SafetyAlert,
+  userLat?: number,
+  userLon?: number,
+): Alert => {
   // Extract timestamp from title (e.g., "Reported 2 hours ago" -> "2 hours ago")
   const timestamp = safetyAlert.title.replace('Reported ', '');
 
+  // Calculate distance if coordinates are available
+  let distanceText = '';
+  if (
+    userLat !== undefined &&
+    userLon !== undefined &&
+    safetyAlert.latitude !== undefined &&
+    safetyAlert.longitude !== undefined
+  ) {
+    const distanceMeters = calculateDistance(
+      userLat,
+      userLon,
+      safetyAlert.latitude,
+      safetyAlert.longitude,
+    );
+    distanceText = formatDistance(distanceMeters);
+  }
+
   return {
     id: safetyAlert.id,
-    title: safetyAlert.title,
+    title: distanceText, // Show distance instead of empty title
     description: safetyAlert.description,
     type: 'safety',
     severity: safetyAlert.level,
@@ -89,7 +142,9 @@ export const AlertsScreen: React.FC = () => {
           console.log('[AlertsScreen] Received incidents:', incidents.length);
 
           // Transform to Alert format
-          const transformedAlerts = incidents.map(transformSafetyAlertToAlert);
+          const transformedAlerts = incidents.map(incident =>
+            transformSafetyAlertToAlert(incident, latitude, longitude),
+          );
 
           setAlerts(transformedAlerts);
           setLoading(false);
