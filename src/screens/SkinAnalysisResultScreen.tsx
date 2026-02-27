@@ -55,7 +55,7 @@ const contentContainerStyle = { paddingBottom: 208 };
 const SkinAnalysisResultScreen: React.FC = () => {
   const navigation = useNavigation<NavigationProp>();
   const route = useRoute<RouteProps>();
-  const { imageUri, skinType, ageNum } = route.params;
+  const { imageUrl, skinType, age } = route.params;
   const skinInfo = SKIN_TYPE_INFO[skinType] || SKIN_TYPE_INFO[3];
 
   return (
@@ -66,7 +66,7 @@ const SkinAnalysisResultScreen: React.FC = () => {
       <View className="flex-row items-center px-6 pt-10 pb-4">
         <TouchableOpacity
           className="mr-4"
-          onPress={() => navigation.navigate('SkinAnalysis', { imageUri: '' })}
+          onPress={() => navigation.navigate('SkinAnalysis', { imageUrl: '' })}
         >
           <FontAwesome name="arrow-left" size={18} color="#0f172a" />
         </TouchableOpacity>
@@ -80,7 +80,7 @@ const SkinAnalysisResultScreen: React.FC = () => {
         {/* Image Result */}
         <View className="items-center mt-8">
           <View className="w-64 h-64 rounded-3xl overflow-hidden bg-orange-100 items-center justify-center">
-            <Image source={{ uri: imageUri }} className="w-full h-full" resizeMode="cover" />
+            <Image source={{ uri: imageUrl }} className="w-full h-full" resizeMode="cover" />
 
             {/* Confidence Badge */}
             <View className="absolute bottom-4 bg-white px-4 py-2 rounded-full flex-row items-center shadow">
@@ -165,9 +165,9 @@ const SkinAnalysisResultScreen: React.FC = () => {
           className="bg-primary rounded-full px-8 py-3 flex-row items-center justify-center shadow-lg mb-5"
           onPress={() =>
             navigation.navigate('SunburnHistory', {
-              imageUri,
+              imageUrl,
               skinType,
-              ageNum,
+              age,
             })
           }
         >
