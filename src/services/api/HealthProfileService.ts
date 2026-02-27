@@ -3,7 +3,7 @@ import type { HealthProfile, CreateHealthProfileRequest, UpdateSkinTypeRequest }
 
 class HealthProfileService extends BaseApiService {
   constructor() {
-    super('/health');
+    super('/healthProfile');
   }
 
   /**
