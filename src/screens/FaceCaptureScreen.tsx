@@ -38,7 +38,7 @@ const FaceCaptureScreen: React.FC = () => {
 
   const handleContinue = () => {
     if (capturedImage) {
-      navigation.navigate('HealthProfileSetup', { imageUri: capturedImage });
+      navigation.navigate('HealthProfileSetup', { imageUrl: capturedImage });
     }
   };
 
