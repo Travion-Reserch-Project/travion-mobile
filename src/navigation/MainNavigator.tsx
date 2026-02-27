@@ -38,18 +38,19 @@ export type MainStackParamList = {
   ProfileScreen: { userName?: string; userEmail?: string };
   SunProtection: undefined;
   SafetyAdvisor: undefined;
-  HealthProfileSetup: { imageUri?: string };
+  HealthProfileSetup: { imageUrl?: string };
   HealthProfileLanding: undefined;
-  SkinAnalysis: { imageUri?: string; ageNum?: number };
-  SkinAnalysisResult: { imageUri: string; skinType: number; ageNum?: number };
-  SunburnHistory: { imageUri: string; skinType: number; ageNum?: number };
+  SkinAnalysis: { imageUrl?: string; age?: number };
+  SkinAnalysisResult: { imageUrl: string; skinType: number; age?: number };
+  SunburnHistory: { imageUrl: string; skinType: number; age?: number };
   SkinHelthProfile: {
-    imageUri: string;
+    imageUrl: string;
     skinType: number;
-    burnFrequency: string;
-    tanResponse: string;
-    sunburnTanTimes: string;
-    ageNum: number;
+    skinProductInteraction: string;
+    useOfSunglasses: string;
+    historicalSunburnTimes: string;
+    age: number;
+    isExistingProfile?: boolean;
   };
   FaceCapture: undefined;
 };
