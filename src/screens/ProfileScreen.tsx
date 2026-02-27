@@ -1,11 +1,13 @@
-import React from 'react';
+import React, { useCallback } from 'react';
 import { View, Text, StatusBar, ScrollView, Alert, TouchableOpacity } from 'react-native';
 import FontAwesome5 from 'react-native-vector-icons/FontAwesome5';
 import { Button } from '@components/common';
 import { useAuthStore } from '@stores';
-import { useNavigation } from '@react-navigation/native';
+import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import { MainStackParamList } from '@navigation/MainNavigator';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
+import { healthProfileService } from '@services/api';
+import { HealthProfile } from '@types';
 
 interface ProfileScreenProps {
   userName?: string;
@@ -13,11 +15,38 @@ interface ProfileScreenProps {
 }
 type NavigationProp = NativeStackNavigationProp<MainStackParamList>;
 
+const REVERSE_TIMES_MAP: Record<number, string> = {
+  1: 'One',
+  2: 'Two',
+  3: 'Three',
+  4: 'Four',
+  5: 'Five+',
+};
+
 export const ProfileScreen: React.FC<ProfileScreenProps> = ({
   userEmail = 'travel@example.com',
 }) => {
   const { logout, user } = useAuthStore();
   const navigation = useNavigation<NavigationProp>();
+  const [healthProfile, setHealthProfile] = React.useState<HealthProfile | null>(null);
+
+  const fetchHealthProfile = useCallback(async () => {
+    if (user?.userId) {
+      try {
+        const profile = await healthProfileService.getHealthProfile(user.userId);
+        setHealthProfile(profile);
+      } catch (error) {
+        console.error('Error fetching health profile:', error);
+        setHealthProfile(null);
+      }
+    }
+  }, [user?.userId]);
+
+  useFocusEffect(
+    React.useCallback(() => {
+      fetchHealthProfile();
+    }, [fetchHealthProfile]),
+  );
 
   const handleSignOut = () => {
     Alert.alert('Sign Out', 'Are you sure you want to sign out?', [
@@ -41,7 +70,21 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
 
   const navigate = (href?: string) => {
     if (!href) return;
-    navigation.navigate(href as any);
+
+    if (href === 'HealthProfileLanding' && healthProfile) {
+      navigation.navigate('SkinHelthProfile', {
+        imageUrl: healthProfile.imageUrl,
+        skinType: healthProfile.skinType,
+        skinProductInteraction: healthProfile.skinProductInteraction,
+        useOfSunglasses: healthProfile.useOfSunglasses,
+        historicalSunburnTimes:
+          REVERSE_TIMES_MAP[healthProfile.historicalSunburnTimes || 0] || 'One',
+        age: healthProfile.age,
+        isExistingProfile: true,
+      });
+    } else {
+      navigation.navigate(href as any);
+    }
   };
   return (
     <View className="flex-1 bg-gray-50">
@@ -71,8 +114,10 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
               { icon: 'edit', title: 'Edit Profile', subtitle: 'Update your personal information' },
               {
                 icon: 'heartbeat',
-                title: 'Set Up Health Profile',
-                subtitle: 'Add skin image for UV & health analysis',
+                title: healthProfile ? 'Health Profile' : 'Set Up Health Profile',
+                subtitle: healthProfile
+                  ? 'View and manage your health information'
+                  : 'Add skin image for UV & health analysis',
                 href: 'HealthProfileLanding',
               },
               { icon: 'cog', title: 'Settings', subtitle: 'App preferences and notifications' },
