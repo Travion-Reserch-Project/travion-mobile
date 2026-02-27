@@ -79,7 +79,7 @@ const HealthProfileLandingScreen: React.FC = () => {
 
             <TouchableOpacity
               className="bg-primary rounded-full px-10 py-5 flex-row items-center shadow-lg"
-              onPress={() => navigation.navigate('HealthProfileSetup', { imageUri: '' })}
+              onPress={() => navigation.navigate('HealthProfileSetup', { imageUrl: '' })}
             >
               <Text className="text-white font-extrabold text-lg mr-3">Get Started</Text>
               <FontAwesome name="arrow-right" size={18} color="#fff" />
