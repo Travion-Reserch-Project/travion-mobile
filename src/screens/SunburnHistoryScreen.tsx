@@ -12,14 +12,14 @@ const SunburnHistoryScreen: React.FC = () => {
   const navigation = useNavigation<NavigationProp>();
   const route = useRoute<RouteProps>();
 
-  const [burnFrequency, setBurnFrequency] = useState('Sometimes');
-  const [tanResponse, setTanResponse] = useState('Sometimes');
-  const [sunburnTanTimes, setSunburnTanTimes] = useState('One');
+  const [skinProductInteraction, setSkinProductInteraction] = useState('Sometimes');
+  const [useOfSunglasses, setUseOfSunglasses] = useState('Sometimes');
+  const [historicalSunburnTimes, setHistoricalSunburnTimes] = useState('One');
   const [showTimesDropdown, setShowTimesDropdown] = useState(false);
 
-  const imageUri = route.params?.imageUri ?? '';
+  const imageUrl = route.params?.imageUrl ?? '';
   const skinType = route.params?.skinType ?? 3;
-  const ageNum = route.params?.ageNum;
+  const age = route.params?.age;
 
   const timesOptions = ['One', 'Two', 'Three', 'Four', 'Five+'];
 
@@ -27,14 +27,22 @@ const SunburnHistoryScreen: React.FC = () => {
 
   const handleSave = useCallback(() => {
     navigation.navigate('SkinHelthProfile', {
-      imageUri,
+      imageUrl,
       skinType,
-      burnFrequency,
-      tanResponse,
-      sunburnTanTimes,
-      ageNum: ageNum ?? 0,
+      skinProductInteraction,
+      useOfSunglasses,
+      historicalSunburnTimes,
+      age: age ?? 0,
     });
-  }, [navigation, imageUri, skinType, burnFrequency, tanResponse, sunburnTanTimes, ageNum]);
+  }, [
+    navigation,
+    imageUrl,
+    skinType,
+    skinProductInteraction,
+    useOfSunglasses,
+    historicalSunburnTimes,
+    age,
+  ]);
 
   return (
     <View className="flex-1 bg-white px-6">
@@ -77,11 +85,11 @@ const SunburnHistoryScreen: React.FC = () => {
             { label: 'Sometimes', icon: 'cloud' },
             { label: 'Often', icon: 'fire' },
           ].map(item => {
-            const active = burnFrequency === item.label;
+            const active = skinProductInteraction === item.label;
             return (
               <TouchableOpacity
                 key={item.label}
-                onPress={() => setBurnFrequency(item.label)}
+                onPress={() => setSkinProductInteraction(item.label)}
                 className={`w-[48%] h-28 rounded-2xl mb-4 items-center justify-center ${
                   active ? 'bg-primary' : 'bg-gray-100'
                 }`}
@@ -107,11 +115,11 @@ const SunburnHistoryScreen: React.FC = () => {
         </Text>
 
         {['Never', 'Rarely', 'Sometimes', 'Often'].map(item => {
-          const active = tanResponse === item;
+          const active = useOfSunglasses === item;
           return (
             <TouchableOpacity
               key={item}
-              onPress={() => setTanResponse(item)}
+              onPress={() => setUseOfSunglasses(item)}
               className={`flex-row items-center px-5 py-4 rounded-full mb-3 ${
                 active ? 'border-2 border-orange-500 bg-gray-50' : 'bg-gray-100'
               }`}
@@ -141,7 +149,7 @@ const SunburnHistoryScreen: React.FC = () => {
           onPress={() => setShowTimesDropdown(true)}
         >
           <FontAwesome name="sun-o" size={16} color="#64748b" />
-          <Text className="text-slate-900 ml-3 flex-1 font-semibold">{sunburnTanTimes}</Text>
+          <Text className="text-slate-900 ml-3 flex-1 font-semibold">{historicalSunburnTimes}</Text>
           <FontAwesome name="chevron-down" size={14} color="#64748b" />
         </TouchableOpacity>
 
@@ -170,12 +178,12 @@ const SunburnHistoryScreen: React.FC = () => {
               </View>
 
               {timesOptions.map(item => {
-                const active = sunburnTanTimes === item;
+                const active = historicalSunburnTimes === item;
                 return (
                   <TouchableOpacity
                     key={item}
                     onPress={() => {
-                      setSunburnTanTimes(item);
+                      setHistoricalSunburnTimes(item);
                       setShowTimesDropdown(false);
                     }}
                     className={`flex-row items-center px-5 py-4 rounded-full mb-3 ${
