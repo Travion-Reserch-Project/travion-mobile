@@ -22,7 +22,7 @@ type RouteProps = RouteProp<MainStackParamList, 'SkinAnalysis'>;
 const SkinAnalysisScreen: React.FC = () => {
   const navigation = useNavigation<NavigationProp>();
   const route = useRoute<RouteProps>();
-  const { imageUri, ageNum } = route.params;
+  const { imageUrl, age } = route.params;
 
   const [selectedImage, setSelectedImage] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
@@ -95,9 +95,9 @@ const SkinAnalysisScreen: React.FC = () => {
 
       const data = await response.json();
       navigation.navigate('SkinAnalysisResult', {
-        imageUri: selectedImage,
+        imageUrl: selectedImage,
         skinType: data.predicted_skin_type,
-        ageNum,
+        age,
       });
     } catch (error) {
       Alert.alert('Error', 'Failed to analyze skin. Please try again.');
@@ -108,10 +108,10 @@ const SkinAnalysisScreen: React.FC = () => {
   };
 
   useEffect(() => {
-    if (imageUri) {
-      setSelectedImage(imageUri);
+    if (imageUrl) {
+      setSelectedImage(imageUrl);
     }
-  }, [imageUri]);
+  }, [imageUrl]);
 
   return (
     <View className="flex-1 bg-white px-6">
@@ -122,7 +122,7 @@ const SkinAnalysisScreen: React.FC = () => {
         <TouchableOpacity
           className="mr-4"
           onPress={() =>
-            navigation.navigate('HealthProfileSetup', { imageUri: selectedImage ?? '' })
+            navigation.navigate('HealthProfileSetup', { imageUrl: selectedImage ?? '' })
           }
         >
           <FontAwesome name="arrow-left" size={18} color="#0f172a" />
