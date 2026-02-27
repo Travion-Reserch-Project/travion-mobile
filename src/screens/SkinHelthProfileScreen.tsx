@@ -59,14 +59,32 @@ const BURN_FREQUENCY_ICON: Record<string, string> = {
   Often: 'fire',
 };
 
+// Convert text to number for historicalSunburnTimes
+const TIMES_MAP: Record<string, number> = {
+  One: 1,
+  Two: 2,
+  Three: 3,
+  Four: 4,
+  'Five+': 5,
+};
+
 const contentContainerStyle = { paddingBottom: 200 };
 
 const SkinHelthProfileScreen: React.FC = () => {
   const { user } = useAuthStore();
   const navigation = useNavigation<NavigationProp>();
   const route = useRoute<RouteProps>();
-  const { imageUri, skinType, burnFrequency, tanResponse, sunburnTanTimes, ageNum } = route.params;
+  const {
+    imageUrl,
+    skinType,
+    skinProductInteraction,
+    useOfSunglasses,
+    historicalSunburnTimes,
+    age,
+    isExistingProfile,
+  } = route.params;
   const skinInfo = SKIN_TYPE_INFO[skinType] || SKIN_TYPE_INFO[3];
+console.log('imageUrl', imageUrl);
 
   const handleSaveAndContinue = useCallback(async () => {
     try {
@@ -74,26 +92,28 @@ const SkinHelthProfileScreen: React.FC = () => {
         Alert.alert('Error', 'User not authenticated. Please log in again.');
         return;
       }
+      console.log('Saving health profile...');
       await healthProfileService.createHealthProfile({
         userId: user?.userId,
-        age: ageNum,
-        imageUrl: imageUri,
-        historicalSunburnTimes: parseInt(sunburnTanTimes, 10),
-        skinType: skinType.toString(),
-        skinProductInteraction: burnFrequency,
-        useOfSunglasses: tanResponse,
+        age,
+        imageUrl,
+        historicalSunburnTimes: TIMES_MAP[historicalSunburnTimes] || 0,
+        skinType,
+        skinProductInteraction,
+        useOfSunglasses,
       });
       navigation.navigate('MainApp');
     } catch (error) {
       console.error('Failed to save health profile:', error);
+      Alert.alert('Error', 'Failed to save health profile. Please try again.');
     }
   }, [
-    ageNum,
-    imageUri,
+    age,
+    imageUrl,
     skinType,
-    burnFrequency,
-    tanResponse,
-    sunburnTanTimes,
+    skinProductInteraction,
+    useOfSunglasses,
+    historicalSunburnTimes,
     navigation,
     user?.userId,
   ]);
@@ -106,7 +126,13 @@ const SkinHelthProfileScreen: React.FC = () => {
       <View className="flex-row items-center px-6 pt-10 pb-4">
         <TouchableOpacity
           className="mr-4"
-          onPress={() => navigation.navigate('SkinAnalysis', { imageUri: '' })}
+          onPress={() => {
+            if (isExistingProfile) {
+              navigation.goBack();
+            } else {
+              navigation.navigate('SkinAnalysis', { imageUrl: '' });
+            }
+          }}
         >
           <FontAwesome name="arrow-left" size={18} color="#0f172a" />
         </TouchableOpacity>
@@ -120,7 +146,7 @@ const SkinHelthProfileScreen: React.FC = () => {
         {/* Image Result */}
         <View className="items-center mt-8">
           <View className="w-64 h-64 rounded-3xl overflow-hidden bg-orange-100 items-center justify-center">
-            <Image source={{ uri: imageUri }} className="w-full h-full" resizeMode="cover" />
+            <Image source={{ uri: imageUrl }} className="w-full h-full" resizeMode="cover" />
 
             {/* Confidence Badge */}
             <View className="absolute bottom-4 bg-white px-4 py-2 rounded-full flex-row items-center shadow">
@@ -207,13 +233,15 @@ const SkinHelthProfileScreen: React.FC = () => {
               <View className="flex-1 bg-white rounded-2xl p-4 mr-2">
                 <View className="flex-row items-center mb-2">
                   <FontAwesome
-                    name={BURN_FREQUENCY_ICON[burnFrequency] || 'sun-o'}
+                    name={BURN_FREQUENCY_ICON[skinProductInteraction] || 'sun-o'}
                     size={14}
                     color="#f97316"
                   />
                   <Text className="text-xs text-slate-400 font-semibold ml-2">SKIN PRODUCTS</Text>
                 </View>
-                <Text className="text-base font-extrabold text-slate-900">{burnFrequency}</Text>
+                <Text className="text-base font-extrabold text-slate-900">
+                  {skinProductInteraction}
+                </Text>
               </View>
 
               <View className="flex-1 bg-white rounded-2xl p-4 ml-2">
@@ -221,7 +249,7 @@ const SkinHelthProfileScreen: React.FC = () => {
                   <FontAwesome name="eye" size={14} color="#f97316" />
                   <Text className="text-xs text-slate-400 font-semibold ml-2">SUN PROTECTION</Text>
                 </View>
-                <Text className="text-base font-extrabold text-slate-900">{tanResponse}</Text>
+                <Text className="text-base font-extrabold text-slate-900">{useOfSunglasses}</Text>
               </View>
             </View>
 
@@ -233,22 +261,26 @@ const SkinHelthProfileScreen: React.FC = () => {
                   {skinType === 1 || skinType === 2 ? 'SUNBURN TIMES' : 'TANNING TIMES'}
                 </Text>
               </View>
-              <Text className="text-base font-extrabold text-slate-900">{sunburnTanTimes}</Text>
+              <Text className="text-base font-extrabold text-slate-900">
+                {historicalSunburnTimes}
+              </Text>
             </View>
           </View>
         </View>
       </ScrollView>
 
       {/* Bottom Action */}
-      <View className="absolute bottom-0 left-0 right-0 px-6 pb-6 bg-white">
-        <TouchableOpacity
-          className="bg-primary rounded-full px-8 py-4 flex-row items-center justify-center shadow-lg"
-          onPress={handleSaveAndContinue}
-        >
-          <Text className="text-white font-extrabold text-lg mr-2">Continue to Weather</Text>
-          <FontAwesome name="arrow-right" size={18} color="#fff" />
-        </TouchableOpacity>
-      </View>
+      {!isExistingProfile && (
+        <View className="absolute bottom-0 left-0 right-0 px-6 pb-6 bg-white">
+          <TouchableOpacity
+            className="bg-primary rounded-full px-8 py-4 flex-row items-center justify-center shadow-lg"
+            onPress={handleSaveAndContinue}
+          >
+            <Text className="text-white font-extrabold text-lg mr-2">Continue to Weather</Text>
+            <FontAwesome name="arrow-right" size={18} color="#fff" />
+          </TouchableOpacity>
+        </View>
+      )}
     </View>
   );
 };
