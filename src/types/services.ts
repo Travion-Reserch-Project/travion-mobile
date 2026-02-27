@@ -37,7 +37,7 @@ export interface AvatarUploadResponse {
 
 // Health Profile types
 export interface HealthProfileHistory {
-  skinType: string;
+  skinType: number;
   imageUrl?: string;
   timeStamp: Date;
 }
@@ -46,8 +46,12 @@ export interface HealthProfile {
   _id?: string;
   userId: string;
   age: number;
-  skinType?: string;
-  imageUrl?: string;
+  skinType: number;
+  imageUrl: string;
+  skinProductInteraction: string;
+  useOfSunglasses: string;
+  historicalSunburnTimes?: number;
+  historicalTanningTimes?: number;
   history?: HealthProfileHistory[];
   createdAt?: Date;
   updatedAt?: Date;
@@ -56,10 +60,10 @@ export interface HealthProfile {
 export interface CreateHealthProfileRequest {
   userId: string;
   age: number;
-  skinType?: string;
-  imageUrl?: string;
-  skinProductInteraction?: string;
-  useOfSunglasses?: string;
+  skinType: number;
+  imageUrl: string;
+  skinProductInteraction: string;
+  useOfSunglasses: string;
   historicalSunburnTimes?: number;
   historicalTanningTimes?: number;
 }
