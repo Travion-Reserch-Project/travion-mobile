@@ -23,7 +23,7 @@ const HealthProfileSetupScreen: React.FC = () => {
   const [age, setAge] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const route = useRoute<RouteProps>();
-  const { imageUri } = route.params;
+  const { imageUrl } = route.params;
   const { user } = useAuthStore();
 
   const handleContinue = async () => {
@@ -44,7 +44,7 @@ const HealthProfileSetupScreen: React.FC = () => {
 
     setIsLoading(true);
     try {
-      navigation.navigate('SkinAnalysis', { imageUri: imageUri ?? '', ageNum });
+      navigation.navigate('SkinAnalysis', { imageUrl: imageUrl ?? '', age: ageNum });
     } catch (error: any) {
       console.error('Failed to create health profile:', error);
       Alert.alert('Error', error.message || 'Failed to create health profile. Please try again.');
@@ -81,9 +81,9 @@ const HealthProfileSetupScreen: React.FC = () => {
       {/* Image Upload */}
       <View className="items-center mb-10">
         <View className="relative overflow-visible">
-          {imageUri ? (
+          {imageUrl ? (
             <Image
-              source={{ uri: imageUri }}
+              source={{ uri: imageUrl }}
               className="w-72 h-72 rounded-full"
               resizeMode="cover"
             />
