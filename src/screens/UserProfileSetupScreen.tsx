@@ -139,8 +139,8 @@ export const UserProfileSetupScreen: React.FC<UserProfileSetupProps> = () => {
     <SafeAreaView className="flex-1 bg-white">
       <StatusBar barStyle="dark-content" backgroundColor="#FFFFFF" />
 
-      <ScrollView className="flex-1 px-6">
-        <View className="pt-8 mt-5">
+      <ScrollView className="flex-1 px-6" showsVerticalScrollIndicator={true} bounces={false}>
+        <View className="pt-8 mt-5 pb-32">
           <View className="mb-8">
             <Text className="text-3xl font-gilroy-bold text-gray-900 mb-2">
               Complete Your Profile

@@ -3,6 +3,7 @@ apply plugin: "org.jetbrains.kotlin.android"
 apply plugin: "com.facebook.react"
 apply plugin: "com.google.gms.google-services"
 apply from: file("../../node_modules/react-native-vector-icons/fonts.gradle")
+apply from: file("../../node_modules/react-native-config/android/dotenv.gradle")
 
 /**
  * This is the configuration block to customize your React Native Android app.
@@ -86,6 +87,11 @@ android {
         targetSdkVersion rootProject.ext.targetSdkVersion
         versionCode 1
         versionName "1.0"
+        
+        // Inject env variables into AndroidManifest.xml
+        manifestPlaceholders = [
+            GOOGLE_MAPS_API_KEY: project.env.get("GOOGLE_MAPS_API_KEY") ?: "YOUR_API_KEY"
+        ]
     }
     signingConfigs {
         debug {
@@ -115,6 +121,9 @@ dependencies {
     
     // Google Play Services for Google Sign-In
     implementation("com.google.android.gms:play-services-auth:21.0.0")
+    
+    // Google Play Services for Maps
+    implementation("com.google.android.gms:play-services-maps:18.2.0")
 
     if (hermesEnabled.toBoolean()) {
         implementation("com.facebook.react:hermes-android")
