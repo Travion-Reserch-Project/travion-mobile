@@ -6,7 +6,7 @@ import { ReportIncidentScreen } from '@screens/ReportIncidentScreen';
 import { PoliceHelpScreen } from '@screens/PoliceHelpScreen';
 import { AlertsScreen } from '@screens/AlertsScreen';
 import { ProfileScreen } from '@screens/ProfileScreen';
-import { ChatbotScreen } from '@screens/ChatbotScreen';
+import { ChatbotScreen } from '@screens/transport/ChatbotScreen';
 import { useAuthStore } from '@stores';
 import { View, Text, StyleSheet } from 'react-native';
 import LottieView from 'lottie-react-native';

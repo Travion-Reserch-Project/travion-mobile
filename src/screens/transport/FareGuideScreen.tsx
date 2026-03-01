@@ -3,7 +3,7 @@ import { View, Text, ScrollView, TouchableOpacity, Modal } from 'react-native';
 import FontAwesome5 from 'react-native-vector-icons/FontAwesome5';
 import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
-import type { MainStackParamList } from '../navigation/MainNavigator';
+import type { MainStackParamList } from '../../navigation/MainNavigator';
 
 const fares = [
   { label: 'Tuk-tuk meter (city)', value: 'Rs.100–120 base, Rs.90–120/km' },
