@@ -12,9 +12,15 @@ import {
   Modal,
 } from 'react-native';
 import FontAwesome5 from 'react-native-vector-icons/FontAwesome5';
-import { chatService } from '@services';
+import Geolocation from '@react-native-community/geolocation';
+import RNGeocoding from 'react-native-geocoding';
+import Config from 'react-native-config';
+import { useNavigation } from '@react-navigation/native';
+import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
+import type { MainStackParamList } from '../../navigation/MainNavigator';
 import { API_CONFIG } from '@constants';
 import { useAuthStore } from '@stores';
+import { chatService } from '@services';
 
 interface Timetable {
   departure_time: string;
@@ -51,10 +57,11 @@ interface Message {
 }
 
 export const ChatbotScreen: React.FC = () => {
+  const navigation = useNavigation<NativeStackNavigationProp<MainStackParamList>>();
   const [messages, setMessages] = useState<Message[]>([
     {
       id: '1',
-      text: "Hello! I'm your AI travel assistant. How can I help you plan your next adventure?",
+      text: "👋 Hi! I'm your travel assistant. Where do you want to go?",
       isUser: false,
       timestamp: new Date(),
     },
@@ -67,6 +74,12 @@ export const ChatbotScreen: React.FC = () => {
   const [selectedService, setSelectedService] = useState<TransportRecommendation | null>(null);
   const scrollViewRef = useRef<ScrollView>(null);
   const { tokens } = useAuthStore();
+  const [_conversationId, _setConversationId] = useState<string | null>(null);
+  const [_currentLocation, _setCurrentLocation] = useState<{
+    latitude: number;
+    longitude: number;
+    address: string;
+  } | null>(null);
 
   const quickSuggestions = [
     'Best destinations for winter',
@@ -75,6 +88,14 @@ export const ChatbotScreen: React.FC = () => {
     'Hotel recommendations',
   ];
 
+  // Initialize geocoding
+  useEffect(() => {
+    if (Config.GOOGLE_MAPS_API_KEY) {
+      RNGeocoding.init(Config.GOOGLE_MAPS_API_KEY as string);
+    }
+  }, []);
+
+  // Auto-scroll to bottom when new messages are added
   useEffect(() => {
     // Auto-scroll to bottom when new messages are added
     setTimeout(() => {
@@ -82,102 +103,129 @@ export const ChatbotScreen: React.FC = () => {
     }, 100);
   }, [messages]);
 
-  const handleSendMessage = async () => {
-    if (inputText.trim() === '') return;
+  // Fetch current location and send it to chatbot
+  const fetchCurrentLocation = async () => {
+    try {
+      setIsTyping(true);
+      Geolocation.getCurrentPosition(
+        async position => {
+          const { latitude, longitude } = position.coords;
+          try {
+            const results = await RNGeocoding.from(latitude, longitude);
+            const address =
+              results?.results?.[0]?.formatted_address ||
+              `${latitude.toFixed(3)}, ${longitude.toFixed(3)}`;
+
+            _setCurrentLocation({ latitude, longitude, address });
+
+            // Send location to chatbot
+            const message = `I'm currently at ${address}`;
+            await handleSendMessage(message);
+          } catch (err) {
+            console.error('Geocoding error:', err);
+            _setCurrentLocation({
+              latitude,
+              longitude,
+              address: `${latitude.toFixed(3)}, ${longitude.toFixed(3)}`,
+            });
+            const message = `I'm at ${latitude.toFixed(3)}, ${longitude.toFixed(3)}`;
+            await handleSendMessage(message);
+          }
+        },
+        _error => {
+          setIsTyping(false);
+          const errorMsg: Message = {
+            id: Date.now().toString(),
+            text: 'Unable to get your location. Please check your location settings.',
+            isUser: false,
+            timestamp: new Date(),
+          };
+          setMessages(prev => [...prev, errorMsg]);
+        },
+        { enableHighAccuracy: true, timeout: 15000, maximumAge: 10000 },
+      );
+    } catch (error) {
+      setIsTyping(false);
+      console.error('Error fetching location:', error);
+    }
+  };
+
+  const handleSelectLocationOnMap = () => {
+    // Navigate to map screen to select location
+    navigation.navigate('MapScreen', {});
+  };
+
+  const handleSendMessage = async (messageText?: string) => {
+    const textToSend = messageText || inputText.trim();
+    if (!textToSend) return;
 
     const userMessage: Message = {
       id: Date.now().toString(),
-      text: inputText,
+      text: textToSend,
       isUser: true,
       timestamp: new Date(),
     };
 
-    const messageToSend = inputText;
     setMessages(prev => [...prev, userMessage]);
     setInputText('');
     setIsTyping(true);
 
     try {
-      const response = await chatService.sendMessage(messageToSend);
+      // Call chatbot service
+      console.log('Sending message to chatbot...');
 
-      let displayText = '';
-      let recommendations: TransportRecommendation[] | undefined;
-      let recommendationData: any;
+      const response = await chatService.sendChatbotMessage(textToSend);
 
-      if (response.success && response.data) {
-        // Check if we have recommendations in response.data.recommendations (flat structure)
-        if (
-          response.data.recommendations &&
-          Array.isArray(response.data.recommendations) &&
-          response.data.recommendations.length > 0
-        ) {
-          displayText = `Great! I found ${response.data.recommendations.length} transport options for you.`;
-          recommendations = response.data.recommendations.map((rec: any) => ({
-            ...rec,
-            reliability_stars:
-              typeof rec.reliability_stars === 'string'
-                ? parseFloat(rec.reliability_stars)
-                : rec.reliability_stars,
-          }));
-          recommendationData = {
-            origin: (response.data as any).origin || 'Colombo',
-            destination: (response.data as any).destination || 'Destination',
-            departureDate: (response.data as any).departure_date || '2026-03-04',
-            departureTime: (response.data as any).departure_time || '15:00',
-          };
-        }
-        // Also check nested structure response.data.recommendation.recommendations
-        else if (
-          response.data.recommendation?.recommendations &&
-          response.data.recommendation.recommendations.length > 0
-        ) {
-          displayText = `Great! I found ${response.data.recommendation.recommendations.length} transport options for you.`;
-          recommendations = response.data.recommendation.recommendations.map((rec: any) => ({
-            ...rec,
-            reliability_stars:
-              typeof rec.reliability_stars === 'string'
-                ? parseFloat(rec.reliability_stars)
-                : rec.reliability_stars,
-          }));
-          recommendationData = {
-            origin: response.data.recommendation.origin || 'Colombo',
-            destination: response.data.recommendation.destination || 'Destination',
-            departureDate: response.data.recommendation.departure_date || '2026-03-04',
-            departureTime: response.data.recommendation.departure_time || '15:00',
-          };
-        } else if (response.data.nextQuestion) {
-          // Prefer the direct next question when provided
-          displayText = response.data.nextQuestion;
-        } else if (response.data.clarificationPrompt) {
-          displayText = response.data.clarificationPrompt;
-        } else if (response.data.status === 'needs_clarification') {
-          displayText =
-            'I need more information to help you better. ' +
-            (response.data.nextQuestion || 'Please provide more details.');
-        } else if (response.data.message) {
-          displayText = response.data.message;
-        } else {
-          displayText = 'Unable to process your request. Please try again.';
-        }
+      if (response.success && 'data' in response && response.data) {
+        const botData = response.data;
+        _setConversationId(botData.conversation_id);
+
+        const botMessage: Message = {
+          id: (Date.now() + 1).toString(),
+          text: botData.message,
+          isUser: false,
+          timestamp: new Date(),
+          recommendations: botData.metadata?.transport_recommendations?.ranked_routes?.map(
+            (route: any) => ({
+              service_id: route.route_id,
+              mode: route.transport_type,
+              operator: route.operator_name,
+              duration_min: route.dynamic?.duration_min || 0,
+              distance_km: route.dynamic?.distance_km || 0,
+              fare_lkr: route.static?.base_fare_lkr || 0,
+              reliability_stars: 4.5,
+              is_recommended: route.ml_confidence > 0.7,
+            }),
+          ),
+          recommendationData: {
+            origin: botData.metadata?.locations_identified?.[0]?.name || 'Origin',
+            destination: botData.metadata?.locations_identified?.[1]?.name || 'Destination',
+          },
+        };
+        setMessages(prev => [...prev, botMessage]);
       } else {
-        displayText =
-          response.error || "I'm having trouble processing your request. Please try again.";
+        const errorMsg: Message = {
+          id: (Date.now() + 1).toString(),
+          text:
+            'error' in response
+              ? response.error
+              : 'Sorry, I encountered an error. Please try again.',
+          isUser: false,
+          timestamp: new Date(),
+        };
+        setMessages(prev => [...prev, errorMsg]);
       }
-
-      const botResponse: Message = {
-        id: (Date.now() + 1).toString(),
-        text: displayText,
-        isUser: false,
-        timestamp: new Date(),
-        recommendations,
-        recommendationData,
-      };
-      setMessages(prev => [...prev, botResponse]);
-    } catch (error) {
+    } catch (error: any) {
       console.error('Chat error:', error);
+
+      const errorText =
+        error.response?.status === 401
+          ? '🔐 Authentication failed. Please log in again.'
+          : '⚠️ Network connection error. Please check your connection and try again.';
+
       const errorMessage: Message = {
         id: (Date.now() + 1).toString(),
-        text: 'Sorry, I encountered an error. Please try again.',
+        text: errorText,
         isUser: false,
         timestamp: new Date(),
       };
@@ -437,23 +485,44 @@ export const ChatbotScreen: React.FC = () => {
 
         {/* Input Area */}
         <View className="bg-white px-4 py-4 border-t border-gray-200">
+          {/* Location Buttons */}
+          <View className="flex-row gap-2 mb-3">
+            <TouchableOpacity
+              className="flex-1 flex-row items-center justify-center bg-blue-50 rounded-full py-3 gap-2"
+              onPress={handleSelectLocationOnMap}
+            >
+              <FontAwesome5 name="map" size={14} color="#2563EB" />
+              <Text className="text-sm font-gilroy-medium text-blue-600">Select on Map</Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              className="flex-1 flex-row items-center justify-center bg-orange-50 rounded-full py-3 gap-2"
+              onPress={fetchCurrentLocation}
+              disabled={isTyping}
+            >
+              <FontAwesome5 name="location-arrow" size={14} color="#F5840E" />
+              <Text className="text-sm font-gilroy-medium text-orange-600">My Location</Text>
+            </TouchableOpacity>
+          </View>
+
+          {/* Text Input */}
           <View className="flex-row items-center bg-gray-100 rounded-full px-4 py-2">
             <TextInput
               className="flex-1 text-base font-gilroy-regular text-gray-900 py-2"
-              placeholder="Type your message..."
+              placeholder="Where do you want to go?"
               placeholderTextColor="#9CA3AF"
               value={inputText}
               onChangeText={setInputText}
               multiline
               maxLength={500}
-              onSubmitEditing={handleSendMessage}
+              onSubmitEditing={() => handleSendMessage()}
               blurOnSubmit={false}
             />
             <TouchableOpacity
               className={`ml-3 w-10 h-10 rounded-full items-center justify-center ${
                 inputText.trim() ? 'bg-primary' : 'bg-gray-300'
               }`}
-              onPress={handleSendMessage}
+              onPress={() => handleSendMessage()}
               disabled={!inputText.trim()}
             >
               <FontAwesome5 name="paper-plane" size={16} color="white" />
