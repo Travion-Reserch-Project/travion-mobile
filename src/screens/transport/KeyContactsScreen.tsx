@@ -3,7 +3,7 @@ import { View, Text, ScrollView, TouchableOpacity } from 'react-native';
 import FontAwesome5 from 'react-native-vector-icons/FontAwesome5';
 import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
-import type { MainStackParamList } from '../navigation/MainNavigator';
+import type { MainStackParamList } from '../../navigation/MainNavigator';
 
 const contacts = [
   { label: 'Tourist Police', value: '1912', icon: 'shield-alt' },

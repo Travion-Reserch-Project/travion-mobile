@@ -4,8 +4,8 @@ import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { HomeScreen, SafetyScreen, TransportScreen, GuideScreen } from '@screens';
 import { BottomTabBar, TabKey } from '@components/navigation/BottomTabBar';
 import { TravionBotButton } from '@components/common';
-import type { MainStackParamList } from '../navigation/MainNavigator';
-import RiskAnalyticsScreen from './RiskAnalyticsScreen';
+import type { MainStackParamList } from '../../navigation/MainNavigator';
+import RiskAnalyticsScreen from '../RiskAnalyticsScreen';
 
 type Props = NativeStackScreenProps<MainStackParamList, 'MainApp'>;
 
@@ -25,7 +25,7 @@ export const MainAppScreen: React.FC<Props> = ({ route, navigation }) => {
           />
         );
       case 'transport':
-        return <TransportScreen />;
+        return <TransportScreen navigation={navigation} />;
       case 'guide':
         return <GuideScreen />;
       case 'safety':

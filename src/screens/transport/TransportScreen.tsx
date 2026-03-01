@@ -13,12 +13,14 @@ import FontAwesome5 from 'react-native-vector-icons/FontAwesome5';
 import Geolocation from '@react-native-community/geolocation';
 import RNGeocoding from 'react-native-geocoding';
 import Config from 'react-native-config';
-import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
-import type { MainStackParamList } from '../navigation/MainNavigator';
+import type { MainStackParamList } from '../../navigation/MainNavigator';
 
-export const TransportScreen: React.FC = () => {
-  const navigation = useNavigation<NativeStackNavigationProp<MainStackParamList>>();
+interface TransportScreenProps {
+  navigation?: NativeStackNavigationProp<MainStackParamList>;
+}
+
+export const TransportScreen: React.FC<TransportScreenProps> = ({ navigation }) => {
   const [locationName, setLocationName] = useState<string>('Detecting location...');
   const [locationLoading, setLocationLoading] = useState<boolean>(true);
 
@@ -93,14 +95,13 @@ export const TransportScreen: React.FC = () => {
         </Text>
       </View>
 
-      <ScrollView className="flex-1" contentContainerStyle={{ padding: 16, paddingBottom: 32 }}>
+      <ScrollView className="flex-1" contentContainerStyle={styles.scrollContent}>
         {/* Location & peak traffic */}
         <View className="rounded-2xl p-5 mb-5" style={[styles.card, styles.gradientCard]}>
           <View className="flex-row items-center justify-between mb-3">
             <Text className="text-lg font-gilroy-bold text-gray-900">Live local travel</Text>
             <View
-              className="w-2 h-2 rounded-full"
-              style={{ backgroundColor: isPeakNow() ? '#DC2626' : '#16A34A' }}
+              className={`w-2 h-2 rounded-full ${isPeakNow() ? 'bg-red-600' : 'bg-green-600'}`}
             />
           </View>
           {locationLoading ? (
@@ -113,10 +114,7 @@ export const TransportScreen: React.FC = () => {
           ) : (
             <View>
               <View className="flex-row items-center mb-3 bg-white/60 rounded-xl p-3">
-                <View
-                  className="w-9 h-9 rounded-full items-center justify-center"
-                  style={{ backgroundColor: '#FFF4E6' }}
-                >
+                <View className="w-9 h-9 rounded-full items-center justify-center bg-orange-100">
                   <FontAwesome5 name="map-marker-alt" size={14} color="#F5840E" />
                 </View>
                 <Text className="text-sm font-gilroy-semibold text-gray-900 ml-3 flex-1">
@@ -128,7 +126,7 @@ export const TransportScreen: React.FC = () => {
                   name={isPeakNow() ? 'exclamation-circle' : 'check-circle'}
                   size={15}
                   color={isPeakNow() ? '#DC2626' : '#16A34A'}
-                  style={{ marginTop: 2 }}
+                  style={styles.iconMargin}
                 />
                 <Text className="text-sm font-gilroy-medium text-gray-800 ml-2.5 flex-1 leading-5">
                   {isPeakNow()
@@ -146,10 +144,7 @@ export const TransportScreen: React.FC = () => {
         {/* Tools */}
         <View className="rounded-2xl p-5 mb-5" style={styles.card}>
           <View className="flex-row items-center mb-4">
-            <View
-              className="w-8 h-8 rounded-lg items-center justify-center"
-              style={{ backgroundColor: '#FFF4E6' }}
-            >
+            <View className="w-8 h-8 rounded-lg items-center justify-center bg-orange-100">
               <FontAwesome5 name="tools" size={14} color="#F5840E" />
             </View>
             <Text className="text-lg font-gilroy-bold text-gray-900 ml-3">Travel Tools</Text>
@@ -158,14 +153,11 @@ export const TransportScreen: React.FC = () => {
             <TouchableOpacity
               className="rounded-xl p-4 flex-row items-center justify-between"
               activeOpacity={0.8}
-              onPress={() => navigation.navigate('FareGuideScreen')}
+              onPress={() => console.log('Fare guide coming soon')}
               style={styles.toolCard}
             >
               <View className="flex-row items-center flex-1">
-                <View
-                  className="w-11 h-11 rounded-xl items-center justify-center"
-                  style={{ backgroundColor: '#FFF4E6' }}
-                >
+                <View className="w-11 h-11 rounded-xl items-center justify-center bg-orange-100">
                   <FontAwesome5 name="tags" size={16} color="#F5840E" />
                 </View>
                 <View className="ml-3.5 flex-1">
@@ -181,14 +173,11 @@ export const TransportScreen: React.FC = () => {
             <TouchableOpacity
               className="rounded-xl p-4 flex-row items-center justify-between"
               activeOpacity={0.8}
-              onPress={() => navigation.navigate('KeyContactsScreen')}
+              onPress={() => console.log('Key contacts coming soon')}
               style={styles.toolCard}
             >
               <View className="flex-row items-center flex-1">
-                <View
-                  className="w-11 h-11 rounded-xl items-center justify-center"
-                  style={{ backgroundColor: '#FFF4E6' }}
-                >
+                <View className="w-11 h-11 rounded-xl items-center justify-center bg-orange-100">
                   <FontAwesome5 name="phone-alt" size={16} color="#F5840E" />
                 </View>
                 <View className="ml-3.5 flex-1">
@@ -208,10 +197,7 @@ export const TransportScreen: React.FC = () => {
         {/* Reports & map */}
         <View className="rounded-2xl p-5" style={styles.card}>
           <View className="flex-row items-center mb-4">
-            <View
-              className="w-8 h-8 rounded-lg items-center justify-center"
-              style={{ backgroundColor: '#FEE2E2' }}
-            >
+            <View className="w-8 h-8 rounded-lg items-center justify-center bg-red-100">
               <FontAwesome5 name="map-marked-alt" size={14} color="#DC2626" />
             </View>
             <Text className="text-lg font-gilroy-bold text-gray-900 ml-3">Reports & Map</Text>
@@ -220,14 +206,11 @@ export const TransportScreen: React.FC = () => {
             <TouchableOpacity
               className="rounded-xl p-4 flex-row items-center justify-between"
               activeOpacity={0.8}
-              onPress={() => navigation.navigate('RoadIssueReportScreen')}
+              onPress={() => console.log('Road issue report coming soon')}
               style={styles.reportCard}
             >
               <View className="flex-row items-center flex-1">
-                <View
-                  className="w-11 h-11 rounded-xl items-center justify-center"
-                  style={{ backgroundColor: '#FFFFFF' }}
-                >
+                <View className="w-11 h-11 rounded-xl items-center justify-center bg-white">
                   <FontAwesome5 name="exclamation-triangle" size={17} color="#DC2626" />
                 </View>
                 <View className="ml-3.5 flex-1">
@@ -245,14 +228,11 @@ export const TransportScreen: React.FC = () => {
             <TouchableOpacity
               className="rounded-xl p-4 flex-row items-center justify-between"
               activeOpacity={0.8}
-              onPress={() => navigation.navigate('IncidentMapScreen')}
+              onPress={() => navigation && navigation.navigate('MapScreen', {})}
               style={styles.toolCard}
             >
               <View className="flex-row items-center flex-1">
-                <View
-                  className="w-11 h-11 rounded-xl items-center justify-center"
-                  style={{ backgroundColor: '#EFF6FF' }}
-                >
+                <View className="w-11 h-11 rounded-xl items-center justify-center bg-blue-100">
                   <FontAwesome5 name="map-marked-alt" size={16} color="#2563EB" />
                 </View>
                 <View className="ml-3.5 flex-1">
@@ -274,6 +254,13 @@ export const TransportScreen: React.FC = () => {
 };
 
 const styles = StyleSheet.create({
+  scrollContent: {
+    padding: 16,
+    paddingBottom: 32,
+  },
+  iconMargin: {
+    marginTop: 2,
+  },
   header: {
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 1 },
