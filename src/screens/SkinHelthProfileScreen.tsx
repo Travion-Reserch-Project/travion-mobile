@@ -84,7 +84,6 @@ const SkinHelthProfileScreen: React.FC = () => {
     isExistingProfile,
   } = route.params;
   const skinInfo = SKIN_TYPE_INFO[skinType] || SKIN_TYPE_INFO[3];
-console.log('imageUrl', imageUrl);
 
   const handleSaveAndContinue = useCallback(async () => {
     try {
@@ -93,7 +92,7 @@ console.log('imageUrl', imageUrl);
         return;
       }
       console.log('Saving health profile...');
-      await healthProfileService.createHealthProfile({
+      const payload = {
         userId: user?.userId,
         age,
         imageUrl,
@@ -101,7 +100,9 @@ console.log('imageUrl', imageUrl);
         skinType,
         skinProductInteraction,
         useOfSunglasses,
-      });
+      };
+      console.log('Sending health profile payload:', JSON.stringify(payload, null, 2));
+      await healthProfileService.createHealthProfile(payload);
       navigation.navigate('MainApp');
     } catch (error) {
       console.error('Failed to save health profile:', error);
