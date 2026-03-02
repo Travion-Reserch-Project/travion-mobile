@@ -9,11 +9,11 @@ import {
 } from 'react-native';
 import MapView, { Marker, Circle, PROVIDER_GOOGLE } from 'react-native-maps';
 import FontAwesome5 from 'react-native-vector-icons/FontAwesome5';
-import Geolocation from '@react-native-community/geolocation';
 import RNGeocoding from 'react-native-geocoding';
 import Config from 'react-native-config';
 import { useNavigation } from '@react-navigation/native';
 import type { SafetyAlert } from '../components/explore/SafetyAlerts';
+import { getCurrentPosition } from '@utils/geolocation';
 
 // Initialize geocoding with API key
 RNGeocoding.init(Config.GOOGLE_MAPS_API_KEY as string);
@@ -62,13 +62,13 @@ const getRiskLevelColor = (level: string) => {
 const getRiskRadius = (level: string) => {
   switch (level) {
     case 'high':
-      return 600; // 600m radius for high risk
+      return 300; // 300m radius for high risk
     case 'medium':
-      return 400; // 400m radius for medium risk
+      return 200; // 200m radius for medium risk
     case 'low':
-      return 200; // 200m radius for low risk
+      return 200; // 100m radius for low risk
     default:
-      return 300;
+      return 150;
   }
 };
 
@@ -78,35 +78,63 @@ const getHighestRiskLevel = (alertsList: SafetyAlert[]): 'high' | 'medium' | 'lo
   return 'low';
 };
 
-// Sample alerts for demo
+// Sample alerts for demo - showing all 7 risk types for safe area display
 const sampleAlerts: SafetyAlert[] = [
   {
     id: '1',
     title: 'Pickpocketing',
     description: 'Pickpocketing risk increases at this hour.',
-    level: 'high',
+    level: 'low',
     location: 'Colombo City Center',
+    incidentType: 'Pickpocket',
   },
   {
     id: '2',
     title: 'Scam',
     description: 'Scam activities reported in this area.',
-    level: 'high',
+    level: 'low',
     location: 'Colombo City Center',
+    incidentType: 'Scam',
   },
   {
     id: '3',
     title: 'Harassment',
     description: 'Harassment incidents reported nearby.',
-    level: 'medium',
+    level: 'low',
     location: 'Colombo City Center',
+    incidentType: 'Harassment',
   },
   {
     id: '4',
     title: 'Money Theft',
     description: 'Money theft incidents in this location.',
-    level: 'high',
+    level: 'low',
     location: 'Colombo City Center',
+    incidentType: 'Money Theft',
+  },
+  {
+    id: '5',
+    title: 'Theft',
+    description: 'Theft incidents in this location.',
+    level: 'low',
+    location: 'Colombo City Center',
+    incidentType: 'Theft',
+  },
+  {
+    id: '6',
+    title: 'Bag Snatching',
+    description: 'Bag snatching incidents reported.',
+    level: 'low',
+    location: 'Colombo City Center',
+    incidentType: 'Bag Snatching',
+  },
+  {
+    id: '7',
+    title: 'Extortion',
+    description: 'Extortion incidents in this location.',
+    level: 'low',
+    location: 'Colombo City Center',
+    incidentType: 'Extortion',
   },
 ];
 
@@ -146,6 +174,20 @@ export const MapScreen: React.FC<MapScreenProps> = ({ route }) => {
     return riskOrder[a.level] - riskOrder[b.level];
   });
 
+  // For safe areas, show all 7 incident types
+  const displayAlerts =
+    displayRiskLevel === 'low'
+      ? [
+          { id: '1', incidentType: 'Scam' as const, level: 'low' as const },
+          { id: '2', incidentType: 'Pickpocket' as const, level: 'low' as const },
+          { id: '3', incidentType: 'Theft' as const, level: 'low' as const },
+          { id: '4', incidentType: 'Money Theft' as const, level: 'low' as const },
+          { id: '5', incidentType: 'Harassment' as const, level: 'low' as const },
+          { id: '6', incidentType: 'Bag Snatching' as const, level: 'low' as const },
+          { id: '7', incidentType: 'Extortion' as const, level: 'low' as const },
+        ]
+      : sortedAlerts;
+
   // Get current location
   useEffect(() => {
     const requestLocationPermission = async () => {
@@ -167,66 +209,67 @@ export const MapScreen: React.FC<MapScreenProps> = ({ route }) => {
           }
         }
 
-        Geolocation.getCurrentPosition(
-          async position => {
-            const { latitude, longitude } = position.coords;
-            const newLocation = { latitude, longitude };
-            setUserLocation(newLocation);
+        const position = await getCurrentPosition({
+          timeout: 15000,
+          enableHighAccuracy: true,
+          retryAttempts: 2,
+        });
+        const { latitude, longitude } = position;
+        const newLocation = { latitude, longitude };
+        setUserLocation(newLocation);
 
-            // Set map region to user location
-            setMapRegion({
-              latitude,
-              longitude,
-              latitudeDelta: 0.05,
-              longitudeDelta: 0.05,
-            });
+        // Set map region to user location with appropriate zoom based on risk circle
+        const radius = getRiskRadius(displayRiskLevel);
+        const paddingFactor = 6.0;
+        const degreesPerMeter = 0.00001;
+        const delta = radius * degreesPerMeter * paddingFactor;
 
-            // Reverse geocode to get location name
-            try {
-              const results = await RNGeocoding.from(latitude, longitude);
-              if (results && results.results && results.results.length > 0) {
-                const address = results.results[0];
-                const locationString = address.formatted_address || 'Current Location';
-                // Extract location names, removing postal codes
-                const parts = locationString.split(',').map(p => p.trim());
-                // Filter and clean location parts
-                const locationParts = parts
-                  .map(p => {
-                    // Remove trailing digits and spaces (postal codes like "Galle 80000" -> "Galle")
-                    return p.replace(/\s*\d+\s*$/, '').trim();
-                  })
-                  .filter(p => {
-                    // Skip if part is only digits (pure postal code like "94102")
-                    if (/^\d+$/.test(p)) return false;
-                    // Skip if part is only 2 chars (state codes like "CA", "NY")
-                    if (/^[A-Z]{2}$/.test(p)) return false;
-                    // Skip empty strings
-                    if (p === '') return false;
-                    return true;
-                  });
+        setMapRegion({
+          latitude,
+          longitude,
+          latitudeDelta: delta,
+          longitudeDelta: delta,
+        });
 
-                // Get at least 2 location names
-                let displayName = 'Current Location';
-                if (locationParts.length >= 2) {
-                  displayName = `${locationParts[0]}, ${locationParts[1]}`;
-                } else if (locationParts.length === 1) {
-                  displayName = locationParts[0];
-                }
+        // Reverse geocode to get location name
+        try {
+          const results = await RNGeocoding.from(latitude, longitude);
+          if (results && results.results && results.results.length > 0) {
+            const address = results.results[0];
+            const locationString = address.formatted_address || 'Current Location';
+            // Extract location names, removing postal codes
+            const parts = locationString.split(',').map(p => p.trim());
+            // Filter and clean location parts
+            const locationParts = parts
+              .map(p => {
+                // Remove trailing digits and spaces (postal codes like "Galle 80000" -> "Galle")
+                return p.replace(/\s*\d+\s*$/, '').trim();
+              })
+              .filter(p => {
+                // Skip if part is only digits (pure postal code like "94102")
+                if (/^\d+$/.test(p)) return false;
+                // Skip if part is only 2 chars (state codes like "CA", "NY")
+                if (/^[A-Z]{2}$/.test(p)) return false;
+                // Skip empty strings
+                if (p === '') return false;
+                return true;
+              });
 
-                setLocationName(displayName);
-              }
-            } catch (err) {
-              console.error('Reverse geocoding error:', err);
+            // Get at least 2 location names
+            let displayName = 'Current Location';
+            if (locationParts.length >= 2) {
+              displayName = `${locationParts[0]}, ${locationParts[1]}`;
+            } else if (locationParts.length === 1) {
+              displayName = locationParts[0];
             }
 
-            setLocationLoading(false);
-          },
-          error => {
-            console.log('Geolocation error:', error);
-            setLocationLoading(false);
-          },
-          { enableHighAccuracy: true, timeout: 15000, maximumAge: 10000 },
-        );
+            setLocationName(displayName);
+          }
+        } catch (err) {
+          console.error('Reverse geocoding error:', err);
+        }
+
+        setLocationLoading(false);
       } catch (error) {
         console.error('Permission error:', error);
         setLocationLoading(false);
@@ -234,6 +277,7 @@ export const MapScreen: React.FC<MapScreenProps> = ({ route }) => {
     };
 
     requestLocationPermission();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const handleCirclePress = () => {
@@ -463,7 +507,13 @@ export const MapScreen: React.FC<MapScreenProps> = ({ route }) => {
               >
                 {/* Header */}
                 <View className="flex-row justify-between items-center mb-3">
-                  <Text className="text-base font-gilroy-bold text-gray-900">High Risk Area</Text>
+                  <Text className="text-base font-gilroy-bold text-gray-900">
+                    {displayRiskLevel === 'low'
+                      ? 'Safe Area'
+                      : displayRiskLevel === 'medium'
+                      ? 'Medium Risk Area'
+                      : 'High Risk Area'}
+                  </Text>
                   <TouchableOpacity onPress={() => setShowRiskCircle(false)}>
                     <FontAwesome5 name="times" size={14} color="#9CA3AF" />
                   </TouchableOpacity>
@@ -471,16 +521,16 @@ export const MapScreen: React.FC<MapScreenProps> = ({ route }) => {
 
                 {/* Incident list */}
                 <View>
-                  {sortedAlerts.map((alert, index) => (
+                  {displayAlerts.map((alert, index) => (
                     <View
                       key={alert.id}
                       className={`flex-row items-center justify-between py-2 ${
-                        index < sortedAlerts.length - 1 ? 'border-b border-gray-100' : ''
+                        index < displayAlerts.length - 1 ? 'border-b border-gray-100' : ''
                       }`}
                     >
                       {/* Incident name */}
                       <Text className="text-sm font-gilroy-medium text-gray-800 flex-1">
-                        {alert.title}
+                        {alert.incidentType || alert.title}
                       </Text>
 
                       {/* Risk level badge */}

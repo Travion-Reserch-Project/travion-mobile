@@ -13,6 +13,7 @@ export interface Alert {
   district?: string; // Added for location filtering
   isRead: boolean;
   reportCount?: number; // Number of tourists who reported this
+  incidentType?: string; // Type of incident (Theft, Scam, Pickpocket, etc.)
 }
 
 interface AlertCardProps {
@@ -98,10 +99,10 @@ export const AlertCard: React.FC<AlertCardProps> = ({ alert, onToggleRead }) => 
             <View className="flex-1">
               <View className="flex-row items-center justify-between">
                 <Text className="text-base font-gilroy-bold text-gray-900 flex-1">
-                  {alert.severity === 'high' || alert.severity === 'critical'
-                    ? `${
-                        alert.severity.charAt(0).toUpperCase() + alert.severity.slice(1)
-                      } Scam Risk – ${alert.title}`
+                  {alert.incidentType
+                    ? `${alert.severity.charAt(0).toUpperCase() + alert.severity.slice(1)} ${
+                        alert.incidentType
+                      } Risk${alert.title ? ` – ${alert.title}` : ''}`
                     : alert.title}
                 </Text>
                 {!alert.isRead && <View className="w-2 h-2 bg-primary rounded-full ml-2" />}

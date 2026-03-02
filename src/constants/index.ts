@@ -11,7 +11,7 @@ export const API_CONFIG = {
       : 'http://localhost:3001'
     : 'https://api.travion.online',
   API_VERSION: '/api/v1',
-  TIMEOUT: 30000,
+  TIMEOUT: 60000,
   USE_COOKIES: true,
   RETRY_ATTEMPTS: 3,
   RETRY_DELAY: 1000,

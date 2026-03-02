@@ -2,17 +2,27 @@ import React from 'react';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { UserProfileSetupScreen, MainAppScreen } from '@screens';
 import { MapScreen } from '@screens/MapScreen';
-import { ReportIncidentScreen } from '@screens/ReportIncidentScreen';
-import { PoliceHelpScreen } from '@screens/PoliceHelpScreen';
-import { AlertsScreen } from '@screens/AlertsScreen';
-import { ProfileScreen } from '@screens/ProfileScreen';
+import { ReportIncidentScreen } from '@screens/safety/ReportIncidentScreen';
+import { PoliceHelpScreen } from '@screens/safety/PoliceHelpScreen';
+import { AlertsScreen } from '@screens/safety/AlertsScreen';
+import { ProfileScreen } from '@screens/auth/ProfileScreen';
 import { ChatbotScreen } from '@screens/transport/ChatbotScreen';
 import { useAuthStore } from '@stores';
+import { useNotifications } from '@hooks/useNotifications';
 import { View, Text, StyleSheet } from 'react-native';
 import LottieView from 'lottie-react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
 import type { SafetyAlert } from '@components/explore/SafetyAlerts';
+import SunProtectionScreen from '@screens/weather/SunProtectionScreen';
+import SafetyAdvisorScreen from '@screens/weather/SafetyAdvisorScreen';
+import HealthProfileSetup from '@screens/weather/HealthProfileSetupScreen';
+import HealthProfileLanding from '@screens/weather/HealthProfileLanding';
+import SkinAnalysisScreen from '@screens/weather/SkinAnalysisScreen';
+import SkinAnalysisResultScreen from '@screens/weather/SkinAnalysisResultScreen';
+import SunburnHistoryScreen from '@screens/weather/SunburnHistoryScreen';
+import SkinHelthProfileScreen from '@screens/weather/SkinHelthProfileScreen';
+import FaceCaptureScreen from '@screens/weather/FaceCaptureScreen';
 
 const welcomeBackAnimation = require('@assets/animations/success.json');
 
@@ -29,6 +39,23 @@ export type MainStackParamList = {
   AlertsScreen: undefined;
   ProfileScreen: { userName?: string; userEmail?: string };
   ChatbotScreen: undefined;
+  SunProtection: undefined;
+  SafetyAdvisor: undefined;
+  HealthProfileSetup: { imageUrl?: string };
+  HealthProfileLanding: undefined;
+  SkinAnalysis: { imageUrl?: string; age?: number };
+  SkinAnalysisResult: { imageUrl: string; skinType: number; age?: number };
+  SunburnHistory: { imageUrl: string; skinType: number; age?: number };
+  SkinHelthProfile: {
+    imageUrl: string;
+    skinType: number;
+    skinProductInteraction: string;
+    useOfSunglasses: string;
+    historicalSunburnTimes: string;
+    age: number;
+    isExistingProfile?: boolean;
+  };
+  FaceCapture: undefined;
 };
 
 const Stack = createNativeStackNavigator<MainStackParamList>();
@@ -71,6 +98,9 @@ const WelcomeBackScreen: React.FC = () => {
 export const MainNavigator: React.FC = () => {
   const { user } = useAuthStore();
 
+  // Initialize notifications for authenticated users
+  useNotifications();
+
   // Simple logic: if user has profileStatus 'Complete', show welcome back, otherwise profile setup
   const hasCompleteProfile = user?.profileStatus === 'Complete';
 
@@ -92,6 +122,15 @@ export const MainNavigator: React.FC = () => {
           <Stack.Screen name="AlertsScreen" component={AlertsScreen} />
           <Stack.Screen name="ProfileScreen" component={ProfileScreen} />
           <Stack.Screen name="ChatbotScreen" component={ChatbotScreen} />
+          <Stack.Screen name="SunProtection" component={SunProtectionScreen} />
+          <Stack.Screen name="SafetyAdvisor" component={SafetyAdvisorScreen} />
+          <Stack.Screen name="HealthProfileSetup" component={HealthProfileSetup} />
+          <Stack.Screen name="HealthProfileLanding" component={HealthProfileLanding} />
+          <Stack.Screen name="SkinAnalysis" component={SkinAnalysisScreen} />
+          <Stack.Screen name="SkinAnalysisResult" component={SkinAnalysisResultScreen} />
+          <Stack.Screen name="SunburnHistory" component={SunburnHistoryScreen} />
+          <Stack.Screen name="SkinHelthProfile" component={SkinHelthProfileScreen} />
+          <Stack.Screen name="FaceCapture" component={FaceCaptureScreen} />
         </>
       ) : (
         <>
