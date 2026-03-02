@@ -36,15 +36,28 @@ export abstract class BaseApiService {
   }
 
   //Make authenticated GET request
-  protected async authenticatedGet<T>(endpoint: string): Promise<ApiResponse<T>> {
+  protected async authenticatedGet<T>(
+    endpoint: string,
+    options?: { timeout?: number; retries?: number },
+  ): Promise<ApiResponse<T>> {
     const headers = await this.getAuthHeaders();
-    return apiClient.get<T>(`${this.baseEndpoint}${endpoint}`, { headers });
+    return apiClient.get<T>(`${this.baseEndpoint}${endpoint}`, {
+      headers,
+      ...options,
+    });
   }
 
   //Make authenticated POST request
-  protected async authenticatedPost<T>(endpoint: string, data: any): Promise<ApiResponse<T>> {
+  protected async authenticatedPost<T>(
+    endpoint: string,
+    data: any,
+    options?: { timeout?: number; retries?: number },
+  ): Promise<ApiResponse<T>> {
     const headers = await this.getAuthHeaders();
-    return apiClient.post<T>(`${this.baseEndpoint}${endpoint}`, data, { headers });
+    return apiClient.post<T>(`${this.baseEndpoint}${endpoint}`, data, {
+      headers,
+      ...options,
+    });
   }
 
   //Make authenticated PUT request

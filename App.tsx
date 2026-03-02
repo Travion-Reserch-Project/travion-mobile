@@ -2,6 +2,16 @@ import React, { useEffect } from 'react';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { AppNavigator } from '@navigation';
 import { useAuthStore } from '@stores';
+import Geolocation from '@react-native-community/geolocation';
+
+// Configure geolocation to use Google Play Services (Fused Location Provider)
+// instead of the default Android LocationManager which often fails with
+// "No location provider available"
+Geolocation.setRNConfiguration({
+  skipPermissionRequests: false,
+  authorizationLevel: 'whenInUse',
+  locationProvider: 'playServices',
+});
 
 function AppContent() {
   const { initializeAuth, clearAllData } = useAuthStore();

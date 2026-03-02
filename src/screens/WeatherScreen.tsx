@@ -1,7 +1,7 @@
 import { MainStackParamList } from '@navigation/MainNavigator';
 import { useNavigation } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import {
   View,
   Text,
@@ -34,9 +34,99 @@ export const WeatherScreen: React.FC = () => {
   const [uvLevel, setUvLevel] = useState('Loading...');
   const [weatherData, setWeatherData] = useState<any>(null);
 
+  // Track whether the component is still mounted to prevent state updates after unmount
+  const isMountedRef = useRef(true);
+
+  // Default fallback coordinates (Colombo, Sri Lanka)
+  const DEFAULT_COORDS = { latitude: 6.9271, longitude: 79.8612 };
+
+  // Helper: fetch location name via reverse geocoding
+  const resolveLocationName = async (latitude: number, longitude: number) => {
+    try {
+      const results = await RNGeocoding.from(latitude, longitude);
+      if (results && results.results && results.results.length > 0) {
+        const address = results.results[0];
+        const parts = address.formatted_address.split(',').map((p: string) => p.trim());
+        if (parts.length >= 2) {
+          setLocationName(`${parts[parts.length - 3]}, ${parts[parts.length - 1]}`);
+        } else {
+          setLocationName(address.formatted_address);
+        }
+      }
+    } catch (err) {
+      console.error('Reverse geocoding error:', err);
+      setLocationName('Unknown Location');
+    }
+  };
+
+  // Helper: fetch weather data from backend for given coordinates with retry
+  const fetchWeatherForCoords = async (latitude: number, longitude: number, retries = 2) => {
+    for (let attempt = 0; attempt <= retries; attempt++) {
+      try {
+        if (!isMountedRef.current) return;
+
+        const response = await weatherService.getWeatherData(latitude, longitude);
+        console.log('Weather response:', response);
+
+        if (!isMountedRef.current) return;
+
+        // The response from handleApiResponse is the backend's JSON body
+        // which has { success, data } structure
+        const responseData = response?.data || response;
+        if (responseData) {
+          setWeatherData(responseData);
+
+          const fetchedUvIndex = responseData.uvIndex || responseData.uv_index || 0;
+          setUvIndex(fetchedUvIndex);
+
+          if (responseData.uvLevel || responseData.uv_level) {
+            setUvLevel(responseData.uvLevel || responseData.uv_level);
+          } else {
+            if (fetchedUvIndex <= 2) setUvLevel('Low');
+            else if (fetchedUvIndex <= 5) setUvLevel('Moderate');
+            else if (fetchedUvIndex <= 7) setUvLevel('High');
+            else if (fetchedUvIndex <= 10) setUvLevel('Very High');
+            else setUvLevel('Extreme');
+          }
+        }
+        // Success — break out of retry loop
+        break;
+      } catch (err: any) {
+        const isAbortError = err?.message === 'Aborted' || err?.name === 'AbortError';
+        console.warn(
+          `Weather fetch attempt ${attempt + 1}/${retries + 1} failed:`,
+          err?.message || err,
+        );
+
+        if (attempt < retries && isAbortError) {
+          // Wait before retrying (exponential backoff)
+          await new Promise<void>(resolve => setTimeout(() => resolve(), 1000 * (attempt + 1)));
+          continue;
+        }
+
+        // Final attempt failed — log but don't crash
+        console.error('Weather fetch error after all retries:', err);
+      }
+    }
+
+    if (isMountedRef.current) {
+      setLoading(false);
+    }
+  };
+
+  // Fallback: use default coordinates when geolocation completely fails
+  const fetchWeatherWithDefaults = async () => {
+    console.log('Using default location (Colombo, Sri Lanka)');
+    setLocationName('Colombo, Sri Lanka (Default)');
+    await fetchWeatherForCoords(DEFAULT_COORDS.latitude, DEFAULT_COORDS.longitude);
+  };
+
   useEffect(() => {
+    isMountedRef.current = true;
+
     const fetchWeather = async () => {
       try {
+        if (!isMountedRef.current) return;
         setLoading(true);
 
         // Request Location Permission
@@ -52,80 +142,64 @@ export const WeatherScreen: React.FC = () => {
             },
           );
           if (granted !== PermissionsAndroid.RESULTS.GRANTED) {
-            setLocationName('Permission denied');
-            setLoading(false);
+            if (isMountedRef.current) setLocationName('Permission denied');
+            // Still fetch weather with default coordinates
+            await fetchWeatherWithDefaults();
             return;
           }
         }
 
-        // Get Current Position
+        // Attempt 1: High accuracy (GPS via FusedLocationProvider)
         Geolocation.getCurrentPosition(
           async position => {
+            if (!isMountedRef.current) return;
             const { latitude, longitude } = position.coords;
-
-            // 1. Get Location Name
-            try {
-              const results = await RNGeocoding.from(latitude, longitude);
-              if (results && results.results && results.results.length > 0) {
-                const address = results.results[0];
-                const parts = address.formatted_address.split(',').map((p: string) => p.trim());
-                if (parts.length >= 2) {
-                  setLocationName(`${parts[parts.length - 3]}, ${parts[parts.length - 1]}`);
-                } else {
-                  setLocationName(address.formatted_address);
-                }
-              }
-            } catch (err) {
-              console.error('Reverse geocoding error:', err);
-              setLocationName('Unknown Location');
-            }
-
-            // 2. Fetch Weather from Backend
-            try {
-              const response = await weatherService.getWeatherData(latitude, longitude);
-              console.log('response', response);
-              if (response.success && response.data) {
-                const data = response.data;
-                setWeatherData(data);
-
-                // Map UV Index and Level
-                // Google Weather API structure might vary, but assuming fields based on user request
-                // Typically: data.uv_index or data.currentConditions.uvIndex etc.
-                // If the user wants specific fields, we might need to adjust this.
-                // For now, I'll search for typical Google Weather API fields.
-                const fetchedUvIndex = data.uvIndex || data.uv_index || 0;
-                setUvIndex(fetchedUvIndex);
-
-                // Determine UV Level if not provided
-                if (data.uvLevel || data.uv_level) {
-                  setUvLevel(data.uvLevel || data.uv_level);
-                } else {
-                  if (fetchedUvIndex <= 2) setUvLevel('Low');
-                  else if (fetchedUvIndex <= 5) setUvLevel('Moderate');
-                  else if (fetchedUvIndex <= 7) setUvLevel('High');
-                  else if (fetchedUvIndex <= 10) setUvLevel('Very High');
-                  else setUvLevel('Extreme');
-                }
-              }
-            } catch (err) {
-              console.error('Weather fetch error:', err);
-            } finally {
-              setLoading(false);
-            }
+            await resolveLocationName(latitude, longitude);
+            await fetchWeatherForCoords(latitude, longitude);
           },
-          error => {
-            console.error('Geolocation error:', error);
-            setLocationName('Location error');
-            setLoading(false);
+          _highAccuracyError => {
+            if (!isMountedRef.current) return;
+            console.warn(
+              'High accuracy geolocation failed, retrying with low accuracy...',
+              _highAccuracyError,
+            );
+
+            // Attempt 2: Low accuracy (network-based location)
+            Geolocation.getCurrentPosition(
+              async position => {
+                if (!isMountedRef.current) return;
+                const { latitude, longitude } = position.coords;
+                await resolveLocationName(latitude, longitude);
+                await fetchWeatherForCoords(latitude, longitude);
+              },
+              async _lowAccuracyError => {
+                if (!isMountedRef.current) return;
+                console.warn(
+                  'Low accuracy geolocation also failed, using default location.',
+                  _lowAccuracyError,
+                );
+                // Attempt 3: Fallback to default coordinates
+                await fetchWeatherWithDefaults();
+              },
+              { enableHighAccuracy: false, timeout: 15000, maximumAge: 60000 },
+            );
           },
+          { enableHighAccuracy: true, timeout: 10000, maximumAge: 10000 },
         );
       } catch (err) {
         console.error('Setup error:', err);
-        setLoading(false);
+        if (isMountedRef.current) {
+          await fetchWeatherWithDefaults();
+        }
       }
     };
 
     fetchWeather();
+
+    // Cleanup: mark as unmounted so callbacks don't update state
+    return () => {
+      isMountedRef.current = false;
+    };
   }, []);
 
   // Helper to format conditions from data

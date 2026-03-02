@@ -74,6 +74,7 @@ const SunProtectionScreen: React.FC = () => {
             // Fallback to default coordinates (Mirissa)
             fetchPredictionWithDefaults();
           },
+          { enableHighAccuracy: true, timeout: 15000, maximumAge: 10000 },
         );
       } catch (err) {
         console.error('Setup error:', err);
