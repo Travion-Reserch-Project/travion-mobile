@@ -15,8 +15,8 @@ import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import type { MainStackParamList } from '../navigation/MainNavigator';
 import colors from '../theme/colors';
-import Geolocation from '@react-native-community/geolocation';
 import Config from 'react-native-config';
+import { getCurrentPosition } from '@utils/geolocation';
 
 type NavigationProp = NativeStackNavigationProp<MainStackParamList>;
 
@@ -105,25 +105,22 @@ export const PoliceHelpScreen: React.FC = () => {
             return;
           }
         }
-        Geolocation.getCurrentPosition(
-          async pos => {
-            const { latitude, longitude } = pos.coords;
-            setUserLocation({ lat: latitude, lng: longitude });
-            await fetchNearbyStations(latitude, longitude, setStations, setError);
-            setMapRegion({
-              latitude,
-              longitude,
-              latitudeDelta: 0.05,
-              longitudeDelta: 0.05,
-            });
-            setLoading(false);
-          },
-          () => {
-            setError('Unable to get current location');
-            setLoading(false);
-          },
-          { enableHighAccuracy: true, timeout: 8000, maximumAge: 10000 },
-        );
+
+        const position = await getCurrentPosition({
+          timeout: 15000,
+          enableHighAccuracy: true,
+          retryAttempts: 2,
+        });
+        const { latitude, longitude } = position;
+        setUserLocation({ lat: latitude, lng: longitude });
+        await fetchNearbyStations(latitude, longitude, setStations, setError);
+        setMapRegion({
+          latitude,
+          longitude,
+          latitudeDelta: 0.05,
+          longitudeDelta: 0.05,
+        });
+        setLoading(false);
       } catch {
         setError('Unexpected error while getting location');
         setLoading(false);
