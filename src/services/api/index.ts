@@ -43,4 +43,3 @@ export type {
   TourPlanResponse,
   AcceptPlanResponse,
 } from './TourPlanService';
->>>>>>> ai-agent-v2
