@@ -9,8 +9,8 @@ export interface SimpleRecommendationRequest {
   preferences?: TravelPreferenceScores;
   max_distance_km?: number;
   top_k?: number;
-  outdoor_only?: boolean | null;  // true = outdoor only, false = indoor only, null/undefined = both
-  min_match_score?: number;  // Minimum match score threshold (0.0 to 1.0)
+  outdoor_only?: boolean | null; // true = outdoor only, false = indoor only, null/undefined = both
+  min_match_score?: number; // Minimum match score threshold (0.0 to 1.0)
 }
 
 // Simple Recommendation Location
@@ -139,19 +139,50 @@ class AIService extends BaseApiService {
    * POST /api/v1/ai/simple/recommend (Public - no auth required)
    */
   async getSimpleRecommendations(
-    request: SimpleRecommendationRequest
+    request: SimpleRecommendationRequest,
   ): Promise<SimpleRecommendationResponse> {
     try {
       console.log('AIService.getSimpleRecommendations - Request:', JSON.stringify(request));
-      const response = await this.publicPost<SimpleRecommendationResponse>('/simple/recommend', request);
-      console.log('AIService.getSimpleRecommendations - Raw response success:', response?.success);
-      const result = this.handleApiResponse(response);
+      const response = await this.publicPost<any>('/simple/recommend', request);
+      console.log('AIService.getSimpleRecommendations - Raw response:', JSON.stringify(response));
+
+      if (!response.success) {
+        console.error('Recommendation request failed:', response.error);
+        throw new Error(response.error || 'Recommendation failed');
+      }
+
+      // Handle different response formats
+      let result = response.data;
+
+      // If response.data is wrapped in nested properties
+      if (result && typeof result === 'object' && !result.recommendations) {
+        result = result.data || result.recommendations || result;
+      }
+
+      // Ensure we have the expected structure
+      if (!result) {
+        console.error('No data in response:', response);
+        throw new Error('No data in recommendation response');
+      }
+
+      // Set defaults for missing fields
+      const processedResult: SimpleRecommendationResponse = {
+        success: true,
+        user_location: result.user_location || { lat: request.latitude, lng: request.longitude },
+        max_distance_km: result.max_distance_km || request.max_distance_km || 50,
+        total_found:
+          result.total_found ||
+          (Array.isArray(result.recommendations) ? result.recommendations.length : 0),
+        recommendations: Array.isArray(result.recommendations) ? result.recommendations : [],
+      };
+
       console.log('AIService.getSimpleRecommendations - Processed result:', {
-        success: result?.success,
-        total_found: result?.total_found,
-        recommendations_count: result?.recommendations?.length,
+        success: processedResult.success,
+        total_found: processedResult.total_found,
+        recommendations_count: processedResult.recommendations.length,
       });
-      return result;
+
+      return processedResult;
     } catch (error: any) {
       console.error('Simple recommendations failed:', error);
       console.error('Error details:', error?.message, error?.code, error?.status);
@@ -163,15 +194,22 @@ class AIService extends BaseApiService {
    * Get simple crowd prediction by location name
    * POST /api/v1/ai/simple/crowd (Public - no auth required)
    */
-  async getSimpleCrowdPrediction(
-    locationName: string
-  ): Promise<SimpleCrowdPredictionResponse> {
+  async getSimpleCrowdPrediction(locationName: string): Promise<SimpleCrowdPredictionResponse> {
     try {
-      const response = await this.publicPost<SimpleCrowdPredictionResponse>(
-        '/simple/crowd',
-        { location_name: locationName }
-      );
-      return this.handleApiResponse(response);
+      const response = await this.publicPost<any>('/simple/crowd', { location_name: locationName });
+
+      if (!response.success) {
+        throw new Error(response.error || 'Crowd prediction failed');
+      }
+
+      let result = response.data;
+
+      // Handle nested response structure
+      if (result && typeof result === 'object' && result.data) {
+        result = result.data;
+      }
+
+      return result as SimpleCrowdPredictionResponse;
     } catch (error) {
       console.error('Simple crowd prediction failed:', error);
       throw error;
@@ -182,15 +220,24 @@ class AIService extends BaseApiService {
    * Get simple golden hour by location name
    * POST /api/v1/ai/simple/golden-hour (Public - no auth required)
    */
-  async getSimpleGoldenHour(
-    locationName: string
-  ): Promise<SimpleGoldenHourResponse> {
+  async getSimpleGoldenHour(locationName: string): Promise<SimpleGoldenHourResponse> {
     try {
-      const response = await this.publicPost<SimpleGoldenHourResponse>(
-        '/simple/golden-hour',
-        { location_name: locationName }
-      );
-      return this.handleApiResponse(response);
+      const response = await this.publicPost<any>('/simple/golden-hour', {
+        location_name: locationName,
+      });
+
+      if (!response.success) {
+        throw new Error(response.error || 'Golden hour request failed');
+      }
+
+      let result = response.data;
+
+      // Handle nested response structure
+      if (result && typeof result === 'object' && result.data) {
+        result = result.data;
+      }
+
+      return result as SimpleGoldenHourResponse;
     } catch (error) {
       console.error('Simple golden hour failed:', error);
       throw error;
@@ -203,17 +250,26 @@ class AIService extends BaseApiService {
    */
   async getSimpleDescription(
     locationName: string,
-    preferences: TravelPreferenceScores
+    preferences: TravelPreferenceScores,
   ): Promise<SimpleDescriptionResponse> {
     try {
-      const response = await this.publicPost<SimpleDescriptionResponse>(
-        '/simple/description',
-        {
-          location_name: locationName,
-          preference: preferences,
-        }
-      );
-      return this.handleApiResponse(response);
+      const response = await this.publicPost<any>('/simple/description', {
+        location_name: locationName,
+        preference: preferences,
+      });
+
+      if (!response.success) {
+        throw new Error(response.error || 'Description request failed');
+      }
+
+      let result = response.data;
+
+      // Handle nested response structure
+      if (result && typeof result === 'object' && result.data) {
+        result = result.data;
+      }
+
+      return result as SimpleDescriptionResponse;
     } catch (error) {
       console.error('Simple description failed:', error);
       throw error;
@@ -244,4 +300,3 @@ class AIService extends BaseApiService {
 }
 
 export const aiService = new AIService();
-

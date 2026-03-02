@@ -6,6 +6,7 @@ import { BottomTabBar, TabKey } from '@components/navigation/BottomTabBar';
 import { TravionBotButton } from '@components/common/TravionBotButton';
 import type { MainStackParamList } from '../../navigation/MainNavigator';
 import RecommendationsScreen from '@screens/agent/RecommendationsScreen';
+import TourGuideScreen from '@screens/agent/TourGuideScreen';
 // import RiskAnalyticsScreen from '../RiskAnalyticsScreen';
 
 type Props = NativeStackScreenProps<MainStackParamList, 'MainApp'>;
@@ -28,7 +29,7 @@ export const MainAppScreen: React.FC<Props> = ({ route, navigation }) => {
       case 'transport':
         return <TransportScreen navigation={navigation} />;
       case 'guide':
-        return <RecommendationsScreen />;
+        return <TourGuideScreen />;
       case 'safety':
         return <SafetyScreen />;
       // case 'weather':

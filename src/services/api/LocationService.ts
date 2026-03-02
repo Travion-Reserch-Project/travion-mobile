@@ -50,8 +50,9 @@ const PROXY_DOMAINS = ['upload.wikimedia.org', 'commons.wikimedia.org', 'en.wiki
  */
 function toProxyUrl(imageUrl: string): string {
   try {
-    const parsed = new URL(imageUrl);
-    if (PROXY_DOMAINS.some(domain => parsed.hostname.endsWith(domain))) {
+    // Check if URL contains any proxy domains
+    const containsProxyDomain = PROXY_DOMAINS.some(domain => imageUrl.includes(domain));
+    if (containsProxyDomain) {
       const baseUrl = `${API_CONFIG.BASE_URL}${API_CONFIG.API_VERSION}`;
       return `${baseUrl}/locations/image-proxy?url=${encodeURIComponent(imageUrl)}`;
     }
@@ -183,15 +184,33 @@ class LocationServiceClass extends BaseApiService {
    */
   async searchLocations(query: string, limit: number = 10): Promise<LocationDetailsResponse[]> {
     try {
-      const response = await this.publicGet<LocationDetailsResponse[]>(
+      const response = await this.publicGet<any>(
         `/search?q=${encodeURIComponent(query)}&limit=${limit}`,
       );
-      const results = this.handleApiResponse(response);
+
+      if (!response.success) {
+        console.error('Search failed:', response.error);
+        return [];
+      }
+
+      // Handle different response formats from backend
+      let results = response.data;
+
+      // If response.data is wrapped in a results property
+      if (results && typeof results === 'object' && !Array.isArray(results)) {
+        results = results.results || results.data || results;
+      }
+
+      // Ensure results is an array
+      if (!Array.isArray(results)) {
+        console.warn('Location search response is not an array:', results);
+        return [];
+      }
 
       // Proxy Wikimedia image URLs through backend
-      return results.map(result => ({
+      return results.map((result: LocationDetailsResponse) => ({
         ...result,
-        imageUrls: proxyImageUrls(result.imageUrls),
+        imageUrls: proxyImageUrls(result.imageUrls || []),
       }));
     } catch (error) {
       console.error('Search locations failed:', error);

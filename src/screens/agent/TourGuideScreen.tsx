@@ -136,9 +136,7 @@ const LocationCard: React.FC<LocationCardProps> = ({
       nature: scores.nature * preferences.nature,
       relaxation: scores.relaxation * preferences.relaxation,
     };
-    return Object.entries(userWeightedScores).reduce((a, b) =>
-      a[1] > b[1] ? a : b
-    )[0];
+    return Object.entries(userWeightedScores).reduce((a, b) => (a[1] > b[1] ? a : b))[0];
   };
 
   const primaryCategory = getPrimaryCategory();
@@ -190,11 +188,7 @@ const LocationCard: React.FC<LocationCardProps> = ({
         opacity,
       }}
     >
-      <TouchableOpacity
-        activeOpacity={0.9}
-        onPress={onPress}
-        className="mb-4 mx-4"
-      >
+      <TouchableOpacity activeOpacity={0.9} onPress={onPress} className="mb-4 mx-4">
         <View className="bg-white rounded-3xl overflow-hidden shadow-lg">
           {/* Image Header */}
           <View className="h-48 relative">
@@ -209,19 +203,12 @@ const LocationCard: React.FC<LocationCardProps> = ({
             {/* Rank Badge */}
             <View className="absolute top-3 left-3 bg-primary px-3 py-1.5 rounded-full flex-row items-center">
               <FontAwesome5 name="medal" size={12} color="white" />
-              <Text className="ml-1.5 text-sm font-gilroy-bold text-white">
-                #{location.rank}
-              </Text>
+              <Text className="ml-1.5 text-sm font-gilroy-bold text-white">#{location.rank}</Text>
             </View>
 
             {/* Match Badge */}
-            <View
-              className="absolute top-3 right-3 px-3 py-1.5 rounded-full bg-white/90"
-            >
-              <Text
-                className="text-sm font-gilroy-bold"
-                style={{ color: categoryConfig.color }}
-              >
+            <View className="absolute top-3 right-3 px-3 py-1.5 rounded-full bg-white/90">
+              <Text className="text-sm font-gilroy-bold" style={{ color: categoryConfig.color }}>
                 {matchPercentage}% Match
               </Text>
             </View>
@@ -247,9 +234,7 @@ const LocationCard: React.FC<LocationCardProps> = ({
                   ) : (
                     <>
                       <FontAwesome5 name="home" size={10} color="#60A5FA" />
-                      <Text className="ml-1 text-xs font-gilroy-medium text-blue-400">
-                        Indoor
-                      </Text>
+                      <Text className="ml-1 text-xs font-gilroy-medium text-blue-400">Indoor</Text>
                     </>
                   )}
                 </View>
@@ -273,11 +258,7 @@ const LocationCard: React.FC<LocationCardProps> = ({
                       className="flex-row items-center px-2.5 py-1 rounded-full"
                       style={{ backgroundColor: config.bgColor }}
                     >
-                      <FontAwesome5
-                        name={config.icon}
-                        size={10}
-                        color={config.color}
-                      />
+                      <FontAwesome5 name={config.icon} size={10} color={config.color} />
                       <Text
                         className="ml-1 text-xs font-gilroy-medium capitalize"
                         style={{ color: config.color }}
@@ -302,11 +283,7 @@ const LocationCard: React.FC<LocationCardProps> = ({
                 className="flex-row items-center px-3 py-2 rounded-xl mb-3"
                 style={{ backgroundColor: crowdColor?.bg }}
               >
-                <MaterialCommunityIcons
-                  name="account-group"
-                  size={18}
-                  color={crowdColor?.color}
-                />
+                <MaterialCommunityIcons name="account-group" size={18} color={crowdColor?.color} />
                 <Text
                   className="ml-2 text-sm font-gilroy-medium"
                   style={{ color: crowdColor?.color }}
@@ -326,15 +303,8 @@ const LocationCard: React.FC<LocationCardProps> = ({
                 style={{ backgroundColor: categoryConfig.bgColor }}
                 onPress={onPress}
               >
-                <FontAwesome5
-                  name="directions"
-                  size={14}
-                  color={categoryConfig.color}
-                />
-                <Text
-                  className="ml-2 font-gilroy-bold"
-                  style={{ color: categoryConfig.color }}
-                >
+                <FontAwesome5 name="directions" size={14} color={categoryConfig.color} />
+                <Text className="ml-2 font-gilroy-bold" style={{ color: categoryConfig.color }}>
                   Explore
                 </Text>
               </TouchableOpacity>
@@ -344,9 +314,7 @@ const LocationCard: React.FC<LocationCardProps> = ({
                 onPress={onChatPress}
               >
                 <FontAwesome5 name="robot" size={14} color="white" />
-                <Text className="ml-2 font-gilroy-bold text-white">
-                  Ask AI
-                </Text>
+                <Text className="ml-2 font-gilroy-bold text-white">Ask AI</Text>
               </TouchableOpacity>
             </View>
           </View>
@@ -361,10 +329,7 @@ interface TourGuideScreenProps {
   navigation?: any;
 }
 
-export const TourGuideScreen: React.FC<TourGuideScreenProps> = ({
-  onChatbotPress,
-  navigation,
-}) => {
+export const TourGuideScreen: React.FC<TourGuideScreenProps> = ({ onChatbotPress, navigation }) => {
   const { user } = useAuthStore();
   const [isLoading, setIsLoading] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
@@ -447,33 +412,36 @@ export const TourGuideScreen: React.FC<TourGuideScreenProps> = ({
   }, []);
 
   // Handle search result selection
-  const handleSearchResultSelect = useCallback((location: LocationDetailsResponse) => {
-    clearSearch();
-    // Calculate distance if user location is available
-    let distance: number | undefined;
-    if (userLocation?.latitude && userLocation?.longitude) {
-      distance = haversineDistance(
-        userLocation.latitude,
-        userLocation.longitude,
-        location.coordinates.latitude,
-        location.coordinates.longitude
-      );
-    }
+  const handleSearchResultSelect = useCallback(
+    (location: LocationDetailsResponse) => {
+      clearSearch();
+      // Calculate distance if user location is available
+      let distance: number | undefined;
+      if (userLocation?.latitude && userLocation?.longitude) {
+        distance = haversineDistance(
+          userLocation.latitude,
+          userLocation.longitude,
+          location.coordinates.latitude,
+          location.coordinates.longitude,
+        );
+      }
 
-    // Calculate match score using current preferences
-    const matchScore = calculateMatchScore(preferences, location.preferenceScores);
+      // Calculate match score using current preferences
+      const matchScore = calculateMatchScore(preferences, location.preferenceScores);
 
-    // Navigate to location details with calculated values
-    if (navigation) {
-      navigation.navigate('LocationDetails', {
-        locationName: location.name,
-        distance: distance,
-        matchScore: matchScore,
-        userLatitude: userLocation?.latitude,
-        userLongitude: userLocation?.longitude,
-      });
-    }
-  }, [clearSearch, navigation, userLocation, preferences]);
+      // Navigate to location details with calculated values
+      if (navigation) {
+        navigation.navigate('LocationDetails', {
+          locationName: location.name,
+          distance: distance,
+          matchScore: matchScore,
+          userLatitude: userLocation?.latitude,
+          userLongitude: userLocation?.longitude,
+        });
+      }
+    },
+    [clearSearch, navigation, userLocation, preferences],
+  );
 
   // Reverse geocoding to get city name from coordinates using Google Maps API
   const reverseGeocode = async (latitude: number, longitude: number): Promise<string> => {
@@ -485,9 +453,9 @@ export const TourGuideScreen: React.FC<TourGuideScreenProps> = ({
 
         // Try to find city/locality
         const city = addressComponents.find(
-          (component) =>
+          component =>
             component.types.includes('locality') ||
-            component.types.includes('administrative_area_level_2')
+            component.types.includes('administrative_area_level_2'),
         );
 
         if (city) {
@@ -495,8 +463,8 @@ export const TourGuideScreen: React.FC<TourGuideScreenProps> = ({
         }
 
         // Fallback to administrative area
-        const area = addressComponents.find((component) =>
-          component.types.includes('administrative_area_level_1')
+        const area = addressComponents.find(component =>
+          component.types.includes('administrative_area_level_1'),
         );
 
         if (area) {
@@ -524,12 +492,11 @@ export const TourGuideScreen: React.FC<TourGuideScreenProps> = ({
           PermissionsAndroid.PERMISSIONS.ACCESS_FINE_LOCATION,
           {
             title: 'Location Permission',
-            message:
-              'Travion needs access to your location to recommend nearby places.',
+            message: 'Travion needs access to your location to recommend nearby places.',
             buttonNeutral: 'Ask Me Later',
             buttonNegative: 'Cancel',
             buttonPositive: 'OK',
-          }
+          },
         );
         if (granted !== PermissionsAndroid.RESULTS.GRANTED) {
           console.log('Location permission denied, using default location');
@@ -556,7 +523,7 @@ export const TourGuideScreen: React.FC<TourGuideScreenProps> = ({
 
   const getCurrentLocation = async () => {
     Geolocation.getCurrentPosition(
-      async (position) => {
+      async position => {
         const { latitude, longitude } = position.coords;
         console.log('Location obtained:', latitude, longitude);
 
@@ -567,12 +534,12 @@ export const TourGuideScreen: React.FC<TourGuideScreenProps> = ({
         setUserLocation({ latitude, longitude, address: cityName });
         fetchRecommendations(latitude, longitude);
       },
-      async (error) => {
+      async error => {
         console.error('Location error:', error.message);
         Alert.alert(
           'Location Error',
           'Unable to get your current location. Using default location (Colombo).',
-          [{ text: 'OK' }]
+          [{ text: 'OK' }],
         );
 
         // Use default location (Colombo, Sri Lanka)
@@ -586,7 +553,7 @@ export const TourGuideScreen: React.FC<TourGuideScreenProps> = ({
         enableHighAccuracy: true,
         timeout: 20000,
         maximumAge: 10000,
-      }
+      },
     );
   };
 
@@ -594,7 +561,7 @@ export const TourGuideScreen: React.FC<TourGuideScreenProps> = ({
     lat: number,
     lng: number,
     distanceOverride?: number,
-    locationTypeOverride?: LocationTypeFilter
+    locationTypeOverride?: LocationTypeFilter,
   ) => {
     try {
       setIsLoading(true);
@@ -613,22 +580,22 @@ export const TourGuideScreen: React.FC<TourGuideScreenProps> = ({
         longitude: lng,
         preferences: preferences,
         max_distance_km: maxDistance,
-        top_k: 20,  // Max allowed by backend validation
+        top_k: 20, // Max allowed by backend validation
         outdoor_only: outdoorOnly,
-        min_match_score: 0.35,  // Only show 35%+ matches
+        min_match_score: 0.35, // Only show 35%+ matches
       });
 
       if (response.recommendations && response.recommendations.length > 0) {
         // Fetch images for all recommended locations
-        const locationNames = response.recommendations.map((r) => r.name);
+        const locationNames = response.recommendations.map(r => r.name);
         const imagesData = await locationService.getBulkLocationImages(locationNames);
 
         // Merge recommendations with images
         const recommendationsWithImages: RecommendationWithImage[] = response.recommendations.map(
-          (rec) => ({
+          rec => ({
             ...rec,
             imageUrl: imagesData[rec.name]?.primaryImage || null,
-          })
+          }),
         );
 
         setRecommendations(recommendationsWithImages);
@@ -667,11 +634,9 @@ export const TourGuideScreen: React.FC<TourGuideScreenProps> = ({
   };
 
   // Filter recommendations by category (min_match_score and outdoor_only handled server-side)
-  const filteredRecommendations = recommendations.filter((loc) => {
+  const filteredRecommendations = recommendations.filter(loc => {
     if (!selectedCategory) return true;
-    return loc.preference_scores[
-      selectedCategory as keyof typeof loc.preference_scores
-    ] > 0.5;
+    return loc.preference_scores[selectedCategory as keyof typeof loc.preference_scores] > 0.5;
   });
 
   const getGreeting = () => {
@@ -719,15 +684,22 @@ export const TourGuideScreen: React.FC<TourGuideScreenProps> = ({
       {userLocation && (
         <View className="px-6 pb-3">
           <View className="flex-row items-center">
-            <View className="w-8 h-8 rounded-full items-center justify-center" style={{ backgroundColor: 'rgba(255,255,255,0.2)' }}>
+            <View
+              className="w-8 h-8 rounded-full items-center justify-center"
+              style={{ backgroundColor: 'rgba(255,255,255,0.2)' }}
+            >
               <MaterialCommunityIcons name="map-marker" size={18} color="white" />
             </View>
             <View className="flex-1 ml-2">
-              <Text style={{ color: 'rgba(255,255,255,0.8)' }} className="font-gilroy-regular text-xs">
+              <Text
+                style={{ color: 'rgba(255,255,255,0.8)' }}
+                className="font-gilroy-regular text-xs"
+              >
                 Your Location
               </Text>
               <Text className="text-white font-gilroy-medium text-sm mt-0.5">
-                {userLocation.address || `${userLocation.latitude.toFixed(4)}, ${userLocation.longitude.toFixed(4)}`}
+                {userLocation.address ||
+                  `${userLocation.latitude.toFixed(4)}, ${userLocation.longitude.toFixed(4)}`}
               </Text>
             </View>
             <TouchableOpacity
@@ -881,13 +853,17 @@ export const TourGuideScreen: React.FC<TourGuideScreenProps> = ({
         activeOpacity={0.7}
       >
         <View className="flex-row items-center">
-          <View className="w-10 h-10 rounded-xl items-center justify-center" style={{ backgroundColor: '#FFF3E0' }}>
+          <View
+            className="w-10 h-10 rounded-xl items-center justify-center"
+            style={{ backgroundColor: '#FFF3E0' }}
+          >
             <FontAwesome5 name="sliders-h" size={16} color="#F5840E" />
           </View>
           <View className="ml-3">
             <Text className="text-base font-gilroy-bold text-gray-900">Smart Filters</Text>
             <Text className="text-xs font-gilroy-regular text-gray-500 mt-0.5">
-              {selectedDistance}km • {LOCATION_TYPE_OPTIONS.find(o => o.key === selectedLocationType)?.label}
+              {selectedDistance}km •{' '}
+              {LOCATION_TYPE_OPTIONS.find(o => o.key === selectedLocationType)?.label}
               {selectedCategory ? ` • ${selectedCategory}` : ''}
             </Text>
           </View>
@@ -898,11 +874,7 @@ export const TourGuideScreen: React.FC<TourGuideScreenProps> = ({
               {filteredRecommendations.length} results
             </Text>
           </View>
-          <Ionicons
-            name={showFilters ? 'chevron-up' : 'chevron-down'}
-            size={20}
-            color="#9CA3AF"
-          />
+          <Ionicons name={showFilters ? 'chevron-up' : 'chevron-down'} size={20} color="#9CA3AF" />
         </View>
       </TouchableOpacity>
 
@@ -916,7 +888,7 @@ export const TourGuideScreen: React.FC<TourGuideScreenProps> = ({
               <Text className="ml-2 text-sm font-gilroy-bold text-gray-700">Location Type</Text>
             </View>
             <View className="flex-row bg-gray-100 rounded-xl p-1">
-              {LOCATION_TYPE_OPTIONS.map((option) => (
+              {LOCATION_TYPE_OPTIONS.map(option => (
                 <TouchableOpacity
                   key={option.key}
                   className={`flex-1 flex-row items-center justify-center py-2.5 rounded-lg ${
@@ -929,7 +901,7 @@ export const TourGuideScreen: React.FC<TourGuideScreenProps> = ({
                         userLocation.latitude,
                         userLocation.longitude,
                         selectedDistance,
-                        option.key
+                        option.key,
                       );
                     }
                   }}
@@ -958,13 +930,11 @@ export const TourGuideScreen: React.FC<TourGuideScreenProps> = ({
               <Text className="ml-2 text-sm font-gilroy-bold text-gray-700">Search Radius</Text>
             </View>
             <View className="flex-row flex-wrap gap-2">
-              {DISTANCE_OPTIONS.map((distance) => (
+              {DISTANCE_OPTIONS.map(distance => (
                 <TouchableOpacity
                   key={distance}
                   className={`px-4 py-2.5 rounded-xl ${
-                    selectedDistance === distance
-                      ? 'bg-primary'
-                      : 'bg-gray-100'
+                    selectedDistance === distance ? 'bg-primary' : 'bg-gray-100'
                   }`}
                   onPress={() => {
                     setSelectedDistance(distance);
@@ -1110,9 +1080,7 @@ export const TourGuideScreen: React.FC<TourGuideScreenProps> = ({
             {recommendations.length}
           </Text>
         </View>
-        <Text className="text-sm font-gilroy-regular text-gray-500">
-          Places Found
-        </Text>
+        <Text className="text-sm font-gilroy-regular text-gray-500">Places Found</Text>
       </View>
 
       <View className="flex-1 bg-white rounded-2xl p-4 shadow-sm">
@@ -1121,12 +1089,10 @@ export const TourGuideScreen: React.FC<TourGuideScreenProps> = ({
             <FontAwesome5 name="walking" size={14} color="#10B981" />
           </View>
           <Text className="ml-2 text-2xl font-gilroy-bold text-gray-900">
-            {recommendations.filter((r) => r.distance_km < 10).length}
+            {recommendations.filter(r => r.distance_km < 10).length}
           </Text>
         </View>
-        <Text className="text-sm font-gilroy-regular text-gray-500">
-          Within 10km
-        </Text>
+        <Text className="text-sm font-gilroy-regular text-gray-500">Within 10km</Text>
       </View>
 
       <View className="flex-1 bg-white rounded-2xl p-4 shadow-sm">
@@ -1135,26 +1101,26 @@ export const TourGuideScreen: React.FC<TourGuideScreenProps> = ({
             <FontAwesome5 name="fire" size={14} color="#F59E0B" />
           </View>
           <Text className="ml-2 text-2xl font-gilroy-bold text-gray-900">
-            {recommendations.filter((r) => r.similarity_score > 0.7).length}
+            {recommendations.filter(r => r.similarity_score > 0.7).length}
           </Text>
         </View>
-        <Text className="text-sm font-gilroy-regular text-gray-500">
-          Top Matches
-        </Text>
+        <Text className="text-sm font-gilroy-regular text-gray-500">Top Matches</Text>
       </View>
     </View>
   );
 
   const renderAIAssistantBanner = () => (
-    <TouchableOpacity
-      className="mx-4 mb-4"
-      activeOpacity={0.9}
-      onPress={onChatbotPress}
-    >
+    <TouchableOpacity className="mx-4 mb-4" activeOpacity={0.9} onPress={onChatbotPress}>
       <View className="rounded-3xl overflow-hidden" style={styles.aiBanner}>
         {/* Decorative Elements */}
-        <View className="absolute top-0 right-0 w-32 h-32 rounded-full opacity-10" style={{ backgroundColor: 'white', transform: [{ translateX: 40 }, { translateY: -40 }] }} />
-        <View className="absolute bottom-0 left-0 w-24 h-24 rounded-full opacity-10" style={{ backgroundColor: 'white', transform: [{ translateX: -30 }, { translateY: 30 }] }} />
+        <View
+          className="absolute top-0 right-0 w-32 h-32 rounded-full opacity-10"
+          style={{ backgroundColor: 'white', transform: [{ translateX: 40 }, { translateY: -40 }] }}
+        />
+        <View
+          className="absolute bottom-0 left-0 w-24 h-24 rounded-full opacity-10"
+          style={{ backgroundColor: 'white', transform: [{ translateX: -30 }, { translateY: 30 }] }}
+        />
 
         <View className="p-5 flex-row items-center">
           <View
@@ -1170,14 +1136,15 @@ export const TourGuideScreen: React.FC<TourGuideScreenProps> = ({
           </View>
           <View className="flex-1 ml-4">
             <View className="flex-row items-center">
-              <Text className="text-white font-gilroy-bold text-lg">
-                Your AI Travel Companion
-              </Text>
+              <Text className="text-white font-gilroy-bold text-lg">Your AI Travel Companion</Text>
               <View className="ml-2 bg-white/20 px-2 py-0.5 rounded-full">
                 <Text className="text-white text-xs font-gilroy-medium">SMART</Text>
               </View>
             </View>
-            <Text style={{ color: 'rgba(255,255,255,0.85)' }} className="font-gilroy-regular text-sm mt-1">
+            <Text
+              style={{ color: 'rgba(255,255,255,0.85)' }}
+              className="font-gilroy-regular text-sm mt-1"
+            >
               Ask anything • Plan trips • Get local insights
             </Text>
           </View>
@@ -1191,12 +1158,7 @@ export const TourGuideScreen: React.FC<TourGuideScreenProps> = ({
 
   const renderLoadingState = () => (
     <View className="flex-1 items-center justify-center px-6">
-      <LottieView
-        source={loadingAnimation}
-        autoPlay
-        loop
-        style={{ width: 200, height: 200 }}
-      />
+      <LottieView source={loadingAnimation} autoPlay loop style={{ width: 200, height: 200 }} />
       <Text className="text-xl font-gilroy-bold text-gray-900 mt-4 text-center">
         Discovering Amazing Places...
       </Text>
@@ -1214,13 +1176,8 @@ export const TourGuideScreen: React.FC<TourGuideScreenProps> = ({
       <Text className="text-xl font-gilroy-bold text-gray-900 text-center">
         Oops! Something went wrong
       </Text>
-      <Text className="text-base font-gilroy-regular text-gray-500 mt-2 text-center">
-        {error}
-      </Text>
-      <TouchableOpacity
-        className="mt-6 bg-primary px-8 py-3 rounded-full"
-        onPress={handleRefresh}
-      >
+      <Text className="text-base font-gilroy-regular text-gray-500 mt-2 text-center">{error}</Text>
+      <TouchableOpacity className="mt-6 bg-primary px-8 py-3 rounded-full" onPress={handleRefresh}>
         <Text className="text-white font-gilroy-bold">Try Again</Text>
       </TouchableOpacity>
     </View>
@@ -1231,9 +1188,7 @@ export const TourGuideScreen: React.FC<TourGuideScreenProps> = ({
       <View className="w-24 h-24 bg-gray-100 rounded-full items-center justify-center mb-6">
         <FontAwesome5 name="map-marked-alt" size={40} color="#9CA3AF" />
       </View>
-      <Text className="text-xl font-gilroy-bold text-gray-900 text-center">
-        No Places Found
-      </Text>
+      <Text className="text-xl font-gilroy-bold text-gray-900 text-center">No Places Found</Text>
       <Text className="text-base font-gilroy-regular text-gray-500 mt-2 text-center">
         Try adjusting your filters or expanding the search area
       </Text>
@@ -1285,9 +1240,7 @@ export const TourGuideScreen: React.FC<TourGuideScreenProps> = ({
               </View>
               <View>
                 <View className="flex-row items-center">
-                  <Text className="text-lg font-gilroy-bold text-gray-900">
-                    AI Recommendations
-                  </Text>
+                  <Text className="text-lg font-gilroy-bold text-gray-900">AI Recommendations</Text>
                   <View className="ml-2 w-2 h-2 bg-green-500 rounded-full" />
                 </View>
                 <Text className="text-xs font-gilroy-regular text-gray-500 mt-0.5">
@@ -1304,20 +1257,18 @@ export const TourGuideScreen: React.FC<TourGuideScreenProps> = ({
           </View>
 
           {/* Recommendations List */}
-          {filteredRecommendations.length > 0 ? (
-            filteredRecommendations.map((location, index) => (
-              <LocationCard
-                key={location.name}
-                location={location}
-                index={index}
-                onPress={() => handleLocationPress(location)}
-                onChatPress={() => onChatbotPress?.()}
-                preferences={preferences}
-              />
-            ))
-          ) : (
-            renderEmptyState()
-          )}
+          {filteredRecommendations.length > 0
+            ? filteredRecommendations.map((location, index) => (
+                <LocationCard
+                  key={location.name}
+                  location={location}
+                  index={index}
+                  onPress={() => handleLocationPress(location)}
+                  onChatPress={() => onChatbotPress?.()}
+                  preferences={preferences}
+                />
+              ))
+            : renderEmptyState()}
 
           {/* Bottom Spacing */}
           <View className="h-24" />
@@ -1349,4 +1300,3 @@ const styles = StyleSheet.create({
 });
 
 export default TourGuideScreen;
-

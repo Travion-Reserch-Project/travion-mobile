@@ -25,8 +25,8 @@ import MaterialCommunityIcons from 'react-native-vector-icons/MaterialCommunityI
 import FontAwesome5 from 'react-native-vector-icons/FontAwesome5';
 import LinearGradient from 'react-native-linear-gradient';
 import Markdown from 'react-native-markdown-display';
-import { TourPlanCard } from '../components/chat';
-import { ApiError } from '../services/api/client';
+import { TourPlanCard } from '../../components/chat/TourPlanCard';
+import { ApiError } from '../../services/api/client';
 import {
   tourPlanService,
   type TourPlanResponse,
@@ -34,11 +34,9 @@ import {
   type ItinerarySlot,
   type TourPlanMetadata,
   type ClarificationQuestion,
-  type ClarificationOption,
-  type StepResult,
   type CulturalTip,
   type EventInfo,
-} from '../services/api';
+} from '../../services/api';
 
 const { width } = Dimensions.get('window');
 const BOTTOM_PADDING = Platform.OS === 'ios' ? 34 : 16;
@@ -139,7 +137,7 @@ const EventBubble: React.FC<{ events: EventInfo[] }> = ({ events }) => {
       duration: 300,
       useNativeDriver: true,
     }).start();
-  }, []);
+  }, [fadeAnim]);
 
   const getEventColor = (type: string): string => {
     if (type === 'poya') return THEME.poya;
@@ -206,7 +204,7 @@ const ClarificationBubble: React.FC<{
       duration: 300,
       useNativeDriver: true,
     }).start();
-  }, []);
+  }, [fadeAnim]);
 
   if (!message.clarificationData) return null;
 
@@ -275,7 +273,7 @@ const MessageBubble: React.FC<{
       duration: 200,
       useNativeDriver: true,
     }).start();
-  }, []);
+  }, [fadeAnim]);
 
   // Markdown styles for AI messages
   const markdownStyles = {
@@ -357,7 +355,7 @@ const TypingIndicator: React.FC<{ message?: string }> = ({ message = 'typing...'
         Animated.timing(pulseAnim, { toValue: 0.3, duration: 600, useNativeDriver: true }),
       ]),
     ).start();
-  }, []);
+  }, [pulseAnim]);
 
   return (
     <View style={styles.aiBubbleRow}>
