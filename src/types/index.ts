@@ -1,6 +1,7 @@
 // Common types for the application
 
 export interface User {
+  preferences: { history: number; adventure: number; nature: number; relaxation: number; };
   userId: string;
   name: string;
   userName?: string;
@@ -8,6 +9,7 @@ export interface User {
   avatar?: string;
   verified?: boolean;
   profileStatus?: 'Incomplete' | 'Complete';
+  hasSetPreferences?: boolean; // Flag to check if travel preferences are set
 }
 
 export interface AuthTokens {
@@ -44,5 +46,16 @@ export interface ApiResponse<T = any> {
 
 export type LoadingState = 'idle' | 'loading' | 'success' | 'error';
 
+// Travel Preference Scores (0-1 scale)
+export interface TravelPreferenceScores {
+  history: number;     // Interest in historical/cultural sites
+  adventure: number;   // Interest in adventure activities
+  nature: number;      // Interest in nature/wildlife
+  relaxation: number;  // Interest in relaxation/spiritual experiences
+}
+
 // Export service types
 export * from './services';
+
+// Export chat types
+export * from './chat';

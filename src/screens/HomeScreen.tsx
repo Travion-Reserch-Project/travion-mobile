@@ -1,5 +1,5 @@
 import React from 'react';
-import { View, Text, ScrollView, StatusBar, StyleSheet, TouchableOpacity } from 'react-native';
+import { View, Text, ScrollView, StatusBar, StyleSheet, TouchableOpacity, Image } from 'react-native';
 import FontAwesome5 from 'react-native-vector-icons/FontAwesome5';
 import { useAuthStore } from '@stores';
 
@@ -11,8 +11,8 @@ interface HomeScreenProps {
 
 export const HomeScreen: React.FC<HomeScreenProps> = ({ onAlertsPress, onProfilePress }) => {
   const { user } = useAuthStore();
-  const handleAlerts = onAlertsPress || (() => {});
-  const handleProfile = onProfilePress || (() => {});
+  const handleAlerts = onAlertsPress || (() => { });
+  const handleProfile = onProfilePress || (() => { });
   return (
     <View className="flex-1 bg-gray-50">
       <StatusBar barStyle="dark-content" backgroundColor="#F9FAFB" />
@@ -25,12 +25,30 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ onAlertsPress, onProfile
         {/* Header */}
         <View className="bg-white px-6 pt-12 pb-8 rounded-b-3xl shadow-sm">
           <View className="flex-row items-center justify-between mb-4">
-            <TouchableOpacity onPress={handleProfile} activeOpacity={0.7}>
-              <Text className="text-lg font-gilroy-regular text-gray-600">Welcome back,</Text>
-              <Text className="text-2xl font-gilroy-bold text-gray-900">
+            {/* Profile Icon */}
+            <TouchableOpacity
+              className="w-12 h-12 bg-gray-100 rounded-full items-center justify-center overflow-hidden"
+              onPress={handleProfile}
+              activeOpacity={0.7}
+            >
+              {user?.photoUrl ? (
+                <Image
+                  source={{ uri: user.photoUrl }}
+                  className="w-12 h-12 rounded-full"
+                  resizeMode="cover"
+                />
+              ) : (
+                <FontAwesome5 name="user" size={18} color="#F5840E" />
+              )}
+            </TouchableOpacity>
+
+            {/* Welcome Text */}
+            <View className="flex-1 ml-3">
+              <Text className="text-sm font-gilroy-regular text-gray-500">Welcome back,</Text>
+              <Text className="text-lg font-gilroy-bold text-gray-900">
                 {user?.userName || 'Traveler'}
               </Text>
-            </TouchableOpacity>
+            </View>
 
             {/* Notification Bell */}
             <TouchableOpacity
