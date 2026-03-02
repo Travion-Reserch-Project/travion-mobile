@@ -3,7 +3,17 @@ import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { ToastProvider, Toast } from 'react-native-toast-notifications';
 import { AppNavigator } from '@navigation';
 import { useAuthStore } from '@stores';
-import { initializeFirebaseMessaging } from '@services';
+import { initializeFirebaseMessaging, NotificationPayload } from '@services';
+import Geolocation from '@react-native-community/geolocation';
+
+// Configure geolocation to use Google Play Services (Fused Location Provider)
+// instead of the default Android LocationManager which often fails with
+// "No location provider available"
+Geolocation.setRNConfiguration({
+  skipPermissionRequests: false,
+  authorizationLevel: 'whenInUse',
+  locationProvider: 'playServices',
+});
 
 function AppContent() {
   const { initializeAuth, clearAllData } = useAuthStore();
@@ -21,30 +31,28 @@ function AppContent() {
   }, [initializeAuth, clearAllData]);
 
   useEffect(() => {
-    let unsubscribeMessaging: (() => void) | undefined;
-
     const setupMessaging = async () => {
-      unsubscribeMessaging = await initializeFirebaseMessaging((title, message) => {
-        try {
-          Toast.show(message, {
-            type: 'success',
-            placement: 'top',
-            duration: 4000,
-            animationType: 'slide-in',
-          });
-        } catch (error) {
-          console.warn('Failed to show toast notification:', error);
-        }
-      });
+      try {
+        await initializeFirebaseMessaging(
+          (data: NotificationPayload, title: string, message: string) => {
+            try {
+              Toast.show(message, {
+                type: 'success',
+                placement: 'top',
+                duration: 4000,
+                animationType: 'slide-in',
+              });
+            } catch (error) {
+              console.warn('Failed to show toast notification:', error);
+            }
+          },
+        );
+      } catch (error) {
+        console.error('Failed to initialize messaging:', error);
+      }
     };
 
     setupMessaging();
-
-    return () => {
-      if (unsubscribeMessaging) {
-        unsubscribeMessaging();
-      }
-    };
   }, []);
 
   return <AppNavigator />;

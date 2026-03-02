@@ -5,6 +5,7 @@ import { AuthNavigator } from './AuthNavigator';
 import { MainNavigator } from './MainNavigator';
 import { useAuthStore } from '@stores';
 import { LoadingScreen } from '@screens';
+import { navigationRef } from './navigationRef';
 
 const Stack = createNativeStackNavigator();
 
@@ -16,7 +17,7 @@ export const AppNavigator: React.FC = () => {
   }
 
   return (
-    <NavigationContainer>
+    <NavigationContainer ref={navigationRef}>
       <Stack.Navigator screenOptions={{ headerShown: false }}>
         {isAuthenticated ? (
           <Stack.Screen name="Main" component={MainNavigator} />

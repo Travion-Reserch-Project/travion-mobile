@@ -1,5 +1,11 @@
 export { authService } from './api/AuthService';
 export { chatService } from './api/ChatService';
+export { SafetyService } from './api/SafetyService';
 export { apiClient } from './api/client';
+export { aiService } from './api/AIService';
+export { locationService } from './api/LocationService';
+export { tourPlanService } from './api/TourPlanService';
 export { initializeFirebaseMessaging, registerBackgroundMessageHandler } from './firebaseMessaging';
 export type { AuthTokens, User } from '@types';
+export type { SafetyAlert, SafetyPredictionResponse } from './api/SafetyService';
+export type { NotificationPayload } from './firebaseMessaging';

@@ -11,15 +11,12 @@ export abstract class BaseApiService {
 
   //Get authenticated headers for API requests
   protected async getAuthHeaders(): Promise<Record<string, string>> {
+    const headers: Record<string, string> = {};
     const tokens = await AuthUtils.getStoredTokens();
-    if (!tokens || !tokens.accessToken || tokens.accessToken === '') {
-      throw new Error('Authentication required');
+    if (tokens?.accessToken) {
+      headers.Authorization = `Bearer ${tokens.accessToken}`;
     }
-
-    return {
-      Authorization: `Bearer ${tokens.accessToken}`,
-      'Content-Type': 'application/json',
-    };
+    return headers;
   }
 
   //Handle API response with consistent error handling and data extraction
@@ -36,15 +33,28 @@ export abstract class BaseApiService {
   }
 
   //Make authenticated GET request
-  protected async authenticatedGet<T>(endpoint: string): Promise<ApiResponse<T>> {
+  protected async authenticatedGet<T>(
+    endpoint: string,
+    options?: { timeout?: number; retries?: number },
+  ): Promise<ApiResponse<T>> {
     const headers = await this.getAuthHeaders();
-    return apiClient.get<T>(`${this.baseEndpoint}${endpoint}`, { headers });
+    return apiClient.get<T>(`${this.baseEndpoint}${endpoint}`, {
+      headers,
+      ...options,
+    });
   }
 
   //Make authenticated POST request
-  protected async authenticatedPost<T>(endpoint: string, data: any): Promise<ApiResponse<T>> {
+  protected async authenticatedPost<T>(
+    endpoint: string,
+    data: any,
+    options?: { timeout?: number; retries?: number },
+  ): Promise<ApiResponse<T>> {
     const headers = await this.getAuthHeaders();
-    return apiClient.post<T>(`${this.baseEndpoint}${endpoint}`, data, { headers });
+    return apiClient.post<T>(`${this.baseEndpoint}${endpoint}`, data, {
+      headers,
+      ...options,
+    });
   }
 
   //Make authenticated PUT request

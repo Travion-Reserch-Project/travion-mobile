@@ -40,6 +40,7 @@ export const useAuthStore = create<AuthState>()(
       isLoading: false,
       hasSeenOnboarding: false,
       isAuthenticated: false,
+      photoUrl: '',
 
       // Actions
       login: async (email: string, password: string) => {
@@ -78,7 +79,8 @@ export const useAuthStore = create<AuthState>()(
 
           // Store the tokens and user data returned from backend
           // Convert expiresIn from seconds to timestamp
-          const tokensWithTimestamp = response.tokens
+          const hasValidToken = response.tokens?.accessToken && response.tokens.accessToken !== '';
+          const tokensWithTimestamp = hasValidToken
             ? {
                 ...response.tokens,
                 expiresIn: Date.now() + response.tokens.expiresIn * 1000, // Convert seconds to milliseconds and add to now

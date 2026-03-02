@@ -63,7 +63,7 @@ class AuthService extends BaseApiService {
       const response = await this.unauthenticatedPost<AuthResponse>('/google', requestPayload);
 
       const authData = this.handleApiResponse(response);
-
+      console.log('Backend Google auth succeeded:', authData); 
       await AuthUtils.storeTokens(authData.tokens);
       const normalizedUser = {
         ...authData.user,
@@ -74,21 +74,8 @@ class AuthService extends BaseApiService {
 
       return { ...authData, user: normalizedUser };
     } catch (error) {
-      console.warn('Backend Google auth failed, using fallback:', error);
-
-      const normalizedUser = {
-        ...googleAuthData.user,
-        userId: googleAuthData.user.userId || (googleAuthData.user as any)._id,
-        profileStatus: 'Incomplete' as const, // Default to Incomplete for new Google users
-      };
-
-      await AuthUtils.clearAuthData();
-      await AuthUtils.storeUser(normalizedUser);
-
-      return {
-        tokens: { accessToken: '', refreshToken: '', expiresIn: 0 },
-        user: normalizedUser,
-      };
+      console.error('Backend Google auth failed:', error);
+      throw error;
     }
   }
 

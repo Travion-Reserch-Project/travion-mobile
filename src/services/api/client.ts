@@ -149,18 +149,15 @@ class ApiClient {
           ...finalConfig.headers,
         },
         signal: controller.signal,
-        credentials: API_CONFIG.USE_COOKIES ? 'include' : 'same-origin', // Enable cookies
-        ...finalConfig,
+        credentials: API_CONFIG.USE_COOKIES ? 'include' : 'same-origin',
       };
 
-      console.log('Request method - finalConfig.body:', finalConfig.body);
       if (finalConfig.body) {
         if (finalConfig.body instanceof FormData) {
           delete (requestInit.headers as Record<string, string>)['Content-Type'];
           requestInit.body = finalConfig.body;
         } else {
           const serializedBody = JSON.stringify(finalConfig.body);
-          console.log('Serialized body:', serializedBody);
           requestInit.body = serializedBody;
         }
       }
@@ -168,7 +165,7 @@ class ApiClient {
       // Make request
       const response = await fetch(`${this.baseURL}${endpoint}`, requestInit);
       clearTimeout(timeoutId);
-
+      console.log('Raw response:', response);
       // Apply response interceptors
       const finalResponse = await this.applyResponseInterceptors(response);
 
@@ -211,12 +208,21 @@ class ApiClient {
         headers: finalResponse.headers,
       };
     } catch (error) {
-      // Handle network errors and retries
+      // Detect abort/timeout errors (AbortController fires when request exceeds timeout)
+      const isAbortError =
+        error instanceof Error && (error.name === 'AbortError' || error.message === 'Aborted');
+
+      // Handle network errors, server errors, and timeout/abort errors with retries
       if (
         attempt < (config.retries || this.retryAttempts) &&
         (error instanceof TypeError ||
+          isAbortError ||
           (error instanceof ApiError && error.status !== undefined && error.status >= 500)) // Server error
       ) {
+        console.warn(
+          `Request to ${endpoint} failed (attempt ${attempt + 1}), retrying...`,
+          (error as Error).message,
+        );
         await this.sleep(this.retryDelay * Math.pow(2, attempt)); // Exponential backoff
         return this.request(endpoint, config, attempt + 1);
       }

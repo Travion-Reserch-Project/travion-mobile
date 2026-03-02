@@ -1,10 +1,8 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import {
   View,
   Text,
   TouchableOpacity,
-  PermissionsAndroid,
-  Platform,
   ActivityIndicator,
   Animated,
   useWindowDimensions,
@@ -12,19 +10,27 @@ import {
 } from 'react-native';
 import FontAwesome5 from 'react-native-vector-icons/FontAwesome5';
 import MapView, { Marker, Circle, PROVIDER_GOOGLE } from 'react-native-maps';
-import Geolocation from '@react-native-community/geolocation';
 import RNGeocoding from 'react-native-geocoding';
+import { getCurrentPosition, LocationCoords } from '@utils/geolocation';
 import Config from 'react-native-config';
+import SafetyService from '@services/api/SafetyService';
 
 // Initialize geocoding with API key
 RNGeocoding.init(Config.GOOGLE_MAPS_API_KEY as string);
-
 export interface SafetyAlert {
   id: string;
   title: string;
   description: string;
   level: 'low' | 'medium' | 'high';
   location: string;
+  incidentType:
+    | 'Scam'
+    | 'Pickpocket'
+    | 'Theft'
+    | 'Money Theft'
+    | 'Harassment'
+    | 'Bag Snatching'
+    | 'Extortion';
 }
 
 interface SafetyAlertsProps {
@@ -34,26 +40,25 @@ interface SafetyAlertsProps {
   onPoliceHelp?: () => void;
   onViewAlerts?: () => void;
   onAlertSelected?: (alert: SafetyAlert) => void;
-}
-interface LocationCoords {
-  latitude: number;
-  longitude: number;
+  onAlertsLoaded?: (alerts: SafetyAlert[]) => void;
 }
 
 const defaultAlerts: SafetyAlert[] = [
   {
     id: '1',
-    title: 'Current Risk Level: High',
-    description: 'Gang activity reported in this area. Avoid traveling alone.',
+    title: 'Scam Risk Level: High',
+    description: 'Scam activity reported in this area. Stay alert and avoid strangers.',
     level: 'high',
     location: 'Current Location',
+    incidentType: 'Scam',
   },
   {
     id: '2',
-    title: 'Current Risk Level: Medium',
+    title: 'Pickpocket Risk Level: Medium',
     description: 'Pickpocketing risk increases at this hour. Stay alert.',
     level: 'medium',
     location: 'Current Location',
+    incidentType: 'Pickpocket',
   },
 ];
 
@@ -66,18 +71,22 @@ const DEFAULT_REGION = {
 };
 
 export const SafetyAlerts: React.FC<SafetyAlertsProps> = ({
-  alerts = defaultAlerts,
+  alerts: propsAlerts,
   onViewFullMap,
   onReportIncident,
   onPoliceHelp,
   onViewAlerts,
   onAlertSelected,
+  onAlertsLoaded,
 }) => {
   const [userLocation, setUserLocation] = useState<LocationCoords | null>(null);
   const [locationName, setLocationName] = useState<string>('Current Location');
   const [locationLoading, setLocationLoading] = useState(true);
   const [mapRegion, setMapRegion] = useState(DEFAULT_REGION);
   const [selectedAlertIndex, setSelectedAlertIndex] = useState(0);
+  const [alerts, setAlerts] = useState<SafetyAlert[]>(propsAlerts || []);
+  const [fetchingAlerts, setFetchingAlerts] = useState(true);
+
   const { width } = useWindowDimensions();
   // Account for horizontal padding (px-6 = 24 each side)
   // Reduce effective card width so next card peeks visibly
@@ -85,18 +94,75 @@ export const SafetyAlerts: React.FC<SafetyAlertsProps> = ({
   const cardHeight = 160;
   const scrollRef = useRef<ScrollView | null>(null);
 
-  // Check if there are any high or medium risk incidents
-  const hasAnyRisk = alerts.some(alert => alert.level === 'high' || alert.level === 'medium');
+  // Memoize filtered alerts to prevent infinite loop
+  const filteredAlerts = useMemo(() => {
+    // Check if there are any high or medium risk incidents
+    const hasAnyRisk = alerts.some(alert => alert.level === 'high' || alert.level === 'medium');
 
-  // Filter alerts: if there are risks, exclude low-risk "Safe Area" cards
-  const filteredAlerts = hasAnyRisk ? alerts.filter(alert => alert.level !== 'low') : alerts;
+    // Check if all alerts are low risk
+    const allLowRisk = alerts.every(alert => alert.level === 'low');
+
+    // Sort alerts by risk level: High → Medium → Low
+    const sortedAlerts = [...alerts].sort((a, b) => {
+      const riskOrder = { high: 0, medium: 1, low: 2 };
+      return riskOrder[a.level] - riskOrder[b.level];
+    });
+
+    // Filter alerts based on risk levels
+    if (allLowRisk) {
+      return [
+        {
+          id: 'safe-1',
+          title: 'Safe Area ✓',
+          description: 'No significant risks detected in this location. You are safe!',
+          level: 'low' as const,
+          location: locationName,
+          incidentType: 'Scam' as const,
+        },
+      ];
+    }
+
+    if (hasAnyRisk) {
+      return sortedAlerts.filter(alert => alert.level !== 'low');
+    }
+
+    return sortedAlerts;
+  }, [alerts, locationName]);
+
+  // Animation for pulsing dot - must be declared before any conditional logic
+  const pulseAnim = useRef(new Animated.Value(0)).current;
 
   // Get selected alert (or default if index out of range)
   const selectedAlert = filteredAlerts[selectedAlertIndex] || filteredAlerts[0] || defaultAlerts[0];
   const currentRiskLevel = selectedAlert.level;
 
-  // Animation for pulsing dot
-  const pulseAnim = useRef(new Animated.Value(0)).current;
+  // Fetch safety predictions from backend
+  const fetchSafetyPredictions = useCallback(async (latitude: number, longitude: number) => {
+    try {
+      setFetchingAlerts(true);
+      console.log('Fetching safety predictions for:', latitude, longitude);
+
+      const prediction = await SafetyService.getSafetyPredictions(latitude, longitude);
+
+      if (prediction && prediction.alerts && prediction.alerts.length > 0) {
+        console.log('Received alerts:', prediction.alerts);
+        setAlerts(prediction.alerts);
+
+        // Update location name from backend if available
+        if (prediction.location && prediction.location.locationName) {
+          setLocationName(prediction.location.locationName);
+        }
+      } else {
+        console.log('No alerts received, using defaults');
+        setAlerts(defaultAlerts);
+      }
+    } catch (error) {
+      console.error('Error fetching safety predictions:', error);
+      setAlerts(defaultAlerts);
+    } finally {
+      setFetchingAlerts(false);
+    }
+  }, []);
 
   // Helper functions
   const getRiskLevelColor = (level: string) => {
@@ -116,20 +182,20 @@ export const SafetyAlerts: React.FC<SafetyAlertsProps> = ({
     // Radius in meters for the risk circle
     switch (level) {
       case 'high':
-        return 600; // 600m radius for high risk
+        return 300; // 300m radius for high risk
       case 'medium':
-        return 400; // 400m radius for medium risk
+        return 200; // 200m radius for medium risk
       case 'low':
-        return 200; // 200m radius for low risk
+        return 200; // 100m radius for low risk
       default:
-        return 300;
+        return 150;
     }
   };
 
   const getMapZoomLevel = (radius: number) => {
     // Calculate appropriate latitudeDelta/longitudeDelta to show the full circle
     // Add padding factor to ensure circle is fully visible
-    const paddingFactor = 2.5;
+    const paddingFactor = 6.0;
     // Convert radius in meters to degrees (roughly)
     const degreesPerMeter = 0.00001;
     const delta = radius * degreesPerMeter * paddingFactor;
@@ -157,123 +223,134 @@ export const SafetyAlerts: React.FC<SafetyAlertsProps> = ({
     return () => pulse.stop();
   }, [pulseAnim]);
 
-  // Notify parent when selected alert changes
+  // Notify parent when selected alert index changes
   useEffect(() => {
     if (onAlertSelected && selectedAlert) {
       onAlertSelected(selectedAlert);
     }
-  }, [selectedAlert, onAlertSelected]);
+  }, [onAlertSelected, selectedAlert]);
+
+  // Notify parent when alerts are loaded/changed
+  useEffect(() => {
+    if (onAlertsLoaded && filteredAlerts.length > 0) {
+      onAlertsLoaded(filteredAlerts);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [filteredAlerts]);
 
   // Request location permissions and get current location
   useEffect(() => {
-    const requestLocationPermission = async () => {
+    const getLocationAndFetchAlerts = async () => {
       try {
-        if (Platform.OS === 'android') {
-          const granted = await PermissionsAndroid.request(
-            PermissionsAndroid.PERMISSIONS.ACCESS_FINE_LOCATION,
-            {
-              title: 'Location Permission',
-              message: 'Travion needs access to your location for safety alerts.',
-              buttonNeutral: 'Ask Me Later',
-              buttonNegative: 'Cancel',
-              buttonPositive: 'OK',
-            },
-          );
-          if (granted !== PermissionsAndroid.RESULTS.GRANTED) {
-            setLocationLoading(false);
-            return;
-          }
-        }
+        console.log('[SafetyAlerts] Getting current position...');
 
-        // Get current position
-        Geolocation.getCurrentPosition(
-          async position => {
-            const { latitude, longitude } = position.coords;
-            const newLocation = { latitude, longitude };
-            setUserLocation(newLocation);
+        // Get current position using the utility (handles permissions internally)
+        const position = await getCurrentPosition({
+          timeout: 15000,
+          enableHighAccuracy: true,
+          retryAttempts: 2,
+        });
 
-            // Calculate zoom level based on risk radius
-            const radius = getRiskRadius(currentRiskLevel);
-            const zoomLevel = getMapZoomLevel(radius);
+        const { latitude, longitude } = position;
+        const newLocation = { latitude, longitude };
+        setUserLocation(newLocation);
 
-            setMapRegion({
-              latitude,
-              longitude,
-              ...zoomLevel,
-            });
+        // Calculate zoom level based on risk radius
+        const radius = getRiskRadius(currentRiskLevel);
+        const zoomLevel = getMapZoomLevel(radius);
 
-            // Reverse geocode to get location name
-            try {
-              console.log('Starting reverse geocoding for:', latitude, longitude);
-              const results = await RNGeocoding.from(latitude, longitude);
-              console.log('Geocoding results:', results);
-              if (results && results.results && results.results.length > 0) {
-                const address = results.results[0];
-                const locationString = address.formatted_address || 'Current Location';
-                console.log('Formatted address:', locationString);
-                // Extract location names, removing postal codes
-                const parts = locationString.split(',').map(p => p.trim());
-                // Filter and clean location parts
-                const locationParts = parts
-                  .map(p => {
-                    // Remove trailing digits and spaces (postal codes like "Galle 80000" -> "Galle")
-                    return p.replace(/\s*\d+\s*$/, '').trim();
-                  })
-                  .filter(p => {
-                    // Skip if part is only digits (pure postal code like "94102")
-                    if (/^\d+$/.test(p)) return false;
-                    // Skip if part is only 2 chars (state codes like "CA", "NY")
-                    if (/^[A-Z]{2}$/.test(p)) return false;
-                    // Skip empty strings
-                    if (p === '') return false;
-                    return true;
-                  });
+        setMapRegion({
+          latitude,
+          longitude,
+          ...zoomLevel,
+        });
 
-                // Get at least 2 location names
-                let displayName = 'Current Location';
-                if (locationParts.length >= 2) {
-                  displayName = `${locationParts[0]}, ${locationParts[1]}`;
-                } else if (locationParts.length === 1) {
-                  displayName = locationParts[0];
-                }
+        // Fetch safety predictions from backend (includes location name)
+        await fetchSafetyPredictions(latitude, longitude);
 
-                console.log('Extracted location name:', displayName);
-                setLocationName(displayName);
-              } else {
-                console.log('No results found from geocoding');
-                setLocationName(`Coordinates: ${latitude.toFixed(4)}, ${longitude.toFixed(4)}`);
-              }
-            } catch (err) {
-              console.error('Reverse geocoding error:', err);
-              // Fallback: show coordinates if geocoding fails
-              setLocationName(`Coordinates: ${latitude.toFixed(4)}, ${longitude.toFixed(4)}`);
+        // Reverse geocode to get location name (fallback if backend doesn't provide)
+        try {
+          console.log('Starting reverse geocoding for:', latitude, longitude);
+          const results = await RNGeocoding.from(latitude, longitude);
+          console.log('Geocoding results:', results);
+          if (results && results.results && results.results.length > 0) {
+            const address = results.results[0];
+            const locationString = address.formatted_address || 'Current Location';
+            console.log('Formatted address:', locationString);
+            // Extract location names, removing postal codes
+            const parts = locationString.split(',').map(p => p.trim());
+            // Filter and clean location parts
+            const locationParts = parts
+              .map(p => {
+                // Remove trailing digits and spaces (postal codes like "Galle 80000" -> "Galle")
+                return p.replace(/\s*\d+\s*$/, '').trim();
+              })
+              .filter(p => {
+                // Skip if part is only digits (pure postal code like "94102")
+                if (/^\d+$/.test(p)) return false;
+                // Skip if part is only 2 chars (state codes like "CA", "NY")
+                if (/^[A-Z]{2}$/.test(p)) return false;
+                // Skip empty strings
+                if (p === '') return false;
+                return true;
+              });
+
+            // Get at least 2 location names
+            let displayName = 'Current Location';
+            if (locationParts.length >= 2) {
+              displayName = `${locationParts[0]}, ${locationParts[1]}`;
+            } else if (locationParts.length === 1) {
+              displayName = locationParts[0];
             }
 
-            setLocationLoading(false);
-          },
-          error => {
-            console.log('Geolocation error:', error);
-            setLocationLoading(false);
-          },
-          { enableHighAccuracy: true, timeout: 15000, maximumAge: 10000 },
-        );
-      } catch (error) {
-        console.error('Permission error:', error);
+            console.log('Extracted location name:', displayName);
+            setLocationName(displayName);
+          } else {
+            console.log('No results found from geocoding');
+            setLocationName(`Coordinates: ${latitude.toFixed(4)}, ${longitude.toFixed(4)}`);
+          }
+        } catch (err) {
+          console.error('Reverse geocoding error:', err);
+          // Fallback: show coordinates if geocoding fails
+          setLocationName(`Coordinates: ${latitude.toFixed(4)}, ${longitude.toFixed(4)}`);
+        }
+
+        setLocationLoading(false);
+      } catch (error: any) {
+        console.error('[SafetyAlerts] Location error:', error);
+        // Show error message to user
+        setLocationName(error.message || 'Unable to get location');
         setLocationLoading(false);
       }
     };
 
-    requestLocationPermission();
-  }, [selectedAlertIndex, currentRiskLevel]);
+    getLocationAndFetchAlerts();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []); // Run only once on mount
+
+  // const fetchAlerts = useCallback(async () => {
+  //   try {
+  //     const lat = userLocation?.latitude || DEFAULT_REGION.latitude;
+  //     const lon = userLocation?.longitude || DEFAULT_REGION.longitude;
+  //     const fetchedAlerts = await SafetyService.getSafetyPredictions(lat, lon);
+  //     setAlerts(fetchedAlerts ?? []);
+  //   } catch (err: any) {
+  //     console.error('Error fetching quick safety alerts:', err);
+  //   }
+  // }, [userLocation]);
 
   return (
     <View className="px-6">
       {/* Location Status */}
       <View className="flex-row items-center mb-6">
         <Text className="text-base font-gilroy-medium text-gray-700" numberOfLines={1}>
-          {locationLoading ? 'Getting location...' : locationName}
+          {locationLoading
+            ? 'Getting location...'
+            : fetchingAlerts
+            ? 'Loading predictions...'
+            : locationName}
         </Text>
-        {!locationLoading && (
+        {!locationLoading && !fetchingAlerts && (
           <View className="flex-row items-center ml-2">
             <Animated.View
               className="w-2 h-2 rounded-full mr-1"
@@ -290,82 +367,215 @@ export const SafetyAlerts: React.FC<SafetyAlertsProps> = ({
       </View>
 
       {/* Risk Alert Carousel */}
-      {alerts.length > 0 ? (
+      {fetchingAlerts ? (
         <View className="mb-6">
-          <View className="-mx-6">
-            <Animated.ScrollView
-              ref={scrollRef as any}
-              horizontal
-              pagingEnabled
-              showsHorizontalScrollIndicator={false}
-              decelerationRate="fast"
-              snapToInterval={carouselWidth}
-              snapToAlignment="start"
-              contentContainerStyle={{ paddingHorizontal: 0 }}
-              onMomentumScrollEnd={event => {
-                const index = Math.round(event.nativeEvent.contentOffset.x / carouselWidth);
-                setSelectedAlertIndex(Math.min(Math.max(index, 0), filteredAlerts.length - 1));
+          <Animated.View
+            className="rounded-2xl p-6"
+            style={{
+              backgroundColor: '#edeef0',
+              height: cardHeight,
+              shadowColor: '#000',
+              shadowOffset: { width: 0, height: 4 },
+              shadowOpacity: 0.15,
+              shadowRadius: 12,
+              elevation: 6,
+            }}
+          >
+            <View className="flex-row items-start justify-between">
+              <View className="flex-1">
+                {/* Animated skeleton for title */}
+                <Animated.View
+                  className="h-6 rounded-lg mb-3"
+                  style={{
+                    backgroundColor: '#D1D5DB',
+                    width: '70%',
+                    opacity: pulseAnim.interpolate({
+                      inputRange: [0, 1],
+                      outputRange: [0.5, 1],
+                    }),
+                  }}
+                />
+                {/* Animated skeleton for description line 1 */}
+                <Animated.View
+                  className="h-4 rounded-lg mb-2"
+                  style={{
+                    backgroundColor: '#D1D5DB',
+                    width: '90%',
+                    opacity: pulseAnim.interpolate({
+                      inputRange: [0, 1],
+                      outputRange: [0.5, 1],
+                    }),
+                  }}
+                />
+                {/* Animated skeleton for description line 2 */}
+                <Animated.View
+                  className="h-4 rounded-lg mb-2"
+                  style={{
+                    backgroundColor: '#D1D5DB',
+                    width: '75%',
+                    opacity: pulseAnim.interpolate({
+                      inputRange: [0, 1],
+                      outputRange: [0.5, 1],
+                    }),
+                  }}
+                />
+              </View>
+              {/* Icon placeholder with pulsing animation */}
+              <Animated.View
+                className="w-12 h-12 rounded-full items-center justify-center ml-4"
+                style={{
+                  backgroundColor: '#D1D5DB',
+                  opacity: pulseAnim.interpolate({
+                    inputRange: [0, 1],
+                    outputRange: [0.5, 1],
+                  }),
+                }}
+              >
+                <FontAwesome5 name="shield-alt" size={20} color="#9CA3AF" />
+              </Animated.View>
+            </View>
+            {/* Loading text at bottom */}
+            <View className="absolute bottom-4 left-6 right-6 flex-row items-center justify-center">
+              <ActivityIndicator size="small" color="#6B7280" />
+              <Text className="text-sm font-gilroy-medium text-gray-600 ml-2">
+                Loading safety alerts...
+              </Text>
+            </View>
+          </Animated.View>
+        </View>
+      ) : alerts.length > 0 ? (
+        <View className="mb-6">
+          {filteredAlerts.length === 1 ? (
+            // Single card - full width, no carousel
+            <View
+              className="rounded-2xl p-6"
+              style={{
+                backgroundColor: getRiskLevelColor(filteredAlerts[0].level),
+                height: cardHeight,
+                shadowColor: '#000',
+                shadowOffset: { width: 0, height: 4 },
+                shadowOpacity: 0.15,
+                shadowRadius: 12,
+                elevation: 6,
               }}
             >
-              {filteredAlerts.map((alert, index) => (
-                <View
-                  key={alert.id || index}
-                  style={{ width: carouselWidth, paddingHorizontal: 18 }}
-                >
-                  <View
-                    className="rounded-2xl p-6"
-                    style={{
-                      backgroundColor: getRiskLevelColor(alert.level),
-                      height: cardHeight,
-                      shadowColor: '#000',
-                      shadowOffset: { width: 0, height: 4 },
-                      shadowOpacity: 0.15,
-                      shadowRadius: 12,
-                      elevation: 6,
-                    }}
-                  >
-                    {alert.level === 'low' ? (
-                      // Safe Area Message
-                      <View className="flex-row items-start justify-between">
-                        <View className="flex-1">
-                          <Text className="text-2xl font-gilroy-bold text-white mb-2">
-                            Safe Area ✓
-                          </Text>
-                          <Text className="text-base font-gilroy-regular text-white/90">
-                            No risks detected in this location. You are safe!
-                          </Text>
-                        </View>
-                        <View className="w-12 h-12 bg-white/20 rounded-full items-center justify-center ml-4">
-                          <FontAwesome5 name="check-circle" size={20} color="white" />
-                        </View>
-                      </View>
-                    ) : (
-                      // High/Medium Risk Message
-                      <View className="flex-row items-start justify-between">
-                        <View className="flex-1">
-                          <Text className="text-xl font-gilroy-bold text-white mb-2">
-                            {alert.title}
-                          </Text>
-                          <Text className="text-base font-gilroy-regular text-white/90">
-                            {alert.description}
-                          </Text>
-                        </View>
-                        <View className="w-12 h-12 bg-white/20 rounded-full items-center justify-center ml-4">
-                          <FontAwesome5
-                            name={
-                              alert.level === 'high' ? 'exclamation-circle' : 'exclamation-triangle'
-                            }
-                            size={20}
-                            color="white"
-                          />
-                        </View>
-                      </View>
-                    )}
+              {filteredAlerts[0].level === 'low' ? (
+                // Safe Area Message
+                <View className="flex-row items-start justify-between">
+                  <View className="flex-1">
+                    <Text className="text-2xl font-gilroy-bold text-white mb-2">Safe Area ✓</Text>
+                    <Text className="text-base font-gilroy-regular text-white/90">
+                      No risks detected in this location. You are safe!
+                    </Text>
+                  </View>
+                  <View className="w-12 h-12 bg-white/20 rounded-full items-center justify-center ml-4">
+                    <FontAwesome5 name="check-circle" size={20} color="white" />
                   </View>
                 </View>
-              ))}
-            </Animated.ScrollView>
-          </View>
+              ) : (
+                // High/Medium Risk Message
+                <View className="flex-row items-start justify-between">
+                  <View className="flex-1">
+                    <Text className="text-xl font-gilroy-bold text-white mb-2">
+                      {filteredAlerts[0].title}
+                    </Text>
+                    <Text className="text-base font-gilroy-regular text-white/90">
+                      {filteredAlerts[0].description}
+                    </Text>
+                  </View>
+                  <View className="w-12 h-12 bg-white/20 rounded-full items-center justify-center ml-4">
+                    <FontAwesome5
+                      name={
+                        filteredAlerts[0].level === 'high'
+                          ? 'exclamation-circle'
+                          : 'exclamation-triangle'
+                      }
+                      size={20}
+                      color="white"
+                    />
+                  </View>
+                </View>
+              )}
+            </View>
+          ) : (
+            // Multiple cards - carousel with peek
+            <View className="-mx-6">
+              <Animated.ScrollView
+                ref={scrollRef as any}
+                horizontal
+                pagingEnabled
+                showsHorizontalScrollIndicator={false}
+                decelerationRate="fast"
+                snapToInterval={carouselWidth}
+                snapToAlignment="start"
+                contentContainerStyle={{ paddingHorizontal: 0 }}
+                onMomentumScrollEnd={event => {
+                  const index = Math.round(event.nativeEvent.contentOffset.x / carouselWidth);
+                  setSelectedAlertIndex(Math.min(Math.max(index, 0), filteredAlerts.length - 1));
+                }}
+              >
+                {filteredAlerts.map((alert, index) => (
+                  <View
+                    key={alert.id || index}
+                    style={{ width: carouselWidth, paddingHorizontal: 18 }}
+                  >
+                    <View
+                      className="rounded-2xl p-6"
+                      style={{
+                        backgroundColor: getRiskLevelColor(alert.level),
+                        height: cardHeight,
+                        shadowColor: '#000',
+                        shadowOffset: { width: 0, height: 4 },
+                        shadowOpacity: 0.15,
+                        shadowRadius: 12,
+                        elevation: 6,
+                      }}
+                    >
+                      {alert.level === 'low' ? (
+                        // Safe Area Message
+                        <View className="flex-row items-start justify-between">
+                          <View className="flex-1">
+                            <Text className="text-2xl font-gilroy-bold text-white mb-2">
+                              Safe Area ✓
+                            </Text>
+                            <Text className="text-base font-gilroy-regular text-white/90">
+                              No risks detected in this location. You are safe!
+                            </Text>
+                          </View>
+                          <View className="w-12 h-12 bg-white/20 rounded-full items-center justify-center ml-4">
+                            <FontAwesome5 name="check-circle" size={20} color="white" />
+                          </View>
+                        </View>
+                      ) : (
+                        // High/Medium Risk Message
+                        <View className="flex-row items-start justify-between">
+                          <View className="flex-1">
+                            <Text className="text-xl font-gilroy-bold text-white mb-2">
+                              {alert.title}
+                            </Text>
+                            <Text className="text-base font-gilroy-regular text-white/90">
+                              {alert.description}
+                            </Text>
+                          </View>
+                          <View className="w-12 h-12 bg-white/20 rounded-full items-center justify-center ml-4">
+                            <FontAwesome5
+                              name={
+                                alert.level === 'high'
+                                  ? 'exclamation-circle'
+                                  : 'exclamation-triangle'
+                              }
+                              size={20}
+                              color="white"
+                            />
+                          </View>
+                        </View>
+                      )}
+                    </View>
+                  </View>
+                ))}
+              </Animated.ScrollView>
+            </View>
+          )}
 
           {/* Carousel Indicators - Only show if multiple alerts */}
           {filteredAlerts.length > 1 && (
@@ -406,6 +616,13 @@ export const SafetyAlerts: React.FC<SafetyAlertsProps> = ({
           )}
         </View>
       ) : null}
+
+      {/* <Button
+        title="Refresh Alerts"
+        onPress={() => fetchSafetyPredictions(userLocation?.latitude!, userLocation?.longitude!)}
+        variant="primary"
+        className="w-full"
+      /> */}
 
       {/* Live Map Preview */}
       <View className="bg-white rounded-2xl overflow-hidden mb-6 shadow-sm">
