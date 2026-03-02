@@ -118,7 +118,6 @@ export const WeatherScreen: React.FC = () => {
             setLocationName('Location error');
             setLoading(false);
           },
-          { enableHighAccuracy: true, timeout: 15000, maximumAge: 10000 },
         );
       } catch (err) {
         console.error('Setup error:', err);
