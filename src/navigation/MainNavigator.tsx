@@ -14,6 +14,15 @@ import LottieView from 'lottie-react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
 import type { SafetyAlert } from '@components/explore/SafetyAlerts';
+import SunProtectionScreen from '@screens/SunProtectionScreen';
+import SafetyAdvisorScreen from '@screens/SafetyAdvisorScreen';
+import HealthProfileSetup from '@screens/HealthProfileSetupScreen';
+import HealthProfileLanding from '@screens/HealthProfileLanding';
+import SkinAnalysisScreen from '@screens/SkinAnalysisScreen';
+import SkinAnalysisResultScreen from '@screens/SkinAnalysisResultScreen';
+import SunburnHistoryScreen from '@screens/SunburnHistoryScreen';
+import SkinHelthProfileScreen from '@screens/SkinHelthProfileScreen';
+import FaceCaptureScreen from '@screens/FaceCaptureScreen';
 
 const welcomeBackAnimation = require('@assets/animations/success.json');
 
@@ -30,6 +39,23 @@ export type MainStackParamList = {
   AlertsScreen: undefined;
   ProfileScreen: { userName?: string; userEmail?: string };
   ChatbotScreen: undefined;
+  SunProtection: undefined;
+  SafetyAdvisor: undefined;
+  HealthProfileSetup: { imageUrl?: string };
+  HealthProfileLanding: undefined;
+  SkinAnalysis: { imageUrl?: string; age?: number };
+  SkinAnalysisResult: { imageUrl: string; skinType: number; age?: number };
+  SunburnHistory: { imageUrl: string; skinType: number; age?: number };
+  SkinHelthProfile: {
+    imageUrl: string;
+    skinType: number;
+    skinProductInteraction: string;
+    useOfSunglasses: string;
+    historicalSunburnTimes: string;
+    age: number;
+    isExistingProfile?: boolean;
+  };
+  FaceCapture: undefined;
 };
 
 const Stack = createNativeStackNavigator<MainStackParamList>();
@@ -96,6 +122,15 @@ export const MainNavigator: React.FC = () => {
           <Stack.Screen name="AlertsScreen" component={AlertsScreen} />
           <Stack.Screen name="ProfileScreen" component={ProfileScreen} />
           <Stack.Screen name="ChatbotScreen" component={ChatbotScreen} />
+          <Stack.Screen name="SunProtection" component={SunProtectionScreen} />
+          <Stack.Screen name="SafetyAdvisor" component={SafetyAdvisorScreen} />
+          <Stack.Screen name="HealthProfileSetup" component={HealthProfileSetup} />
+          <Stack.Screen name="HealthProfileLanding" component={HealthProfileLanding} />
+          <Stack.Screen name="SkinAnalysis" component={SkinAnalysisScreen} />
+          <Stack.Screen name="SkinAnalysisResult" component={SkinAnalysisResultScreen} />
+          <Stack.Screen name="SunburnHistory" component={SunburnHistoryScreen} />
+          <Stack.Screen name="SkinHelthProfile" component={SkinHelthProfileScreen} />
+          <Stack.Screen name="FaceCapture" component={FaceCaptureScreen} />
         </>
       ) : (
         <>

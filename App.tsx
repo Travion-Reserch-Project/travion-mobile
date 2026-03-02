@@ -4,6 +4,16 @@ import { ToastProvider, Toast } from 'react-native-toast-notifications';
 import { AppNavigator } from '@navigation';
 import { useAuthStore } from '@stores';
 import { initializeFirebaseMessaging, NotificationPayload } from '@services';
+import Geolocation from '@react-native-community/geolocation';
+
+// Configure geolocation to use Google Play Services (Fused Location Provider)
+// instead of the default Android LocationManager which often fails with
+// "No location provider available"
+Geolocation.setRNConfiguration({
+  skipPermissionRequests: false,
+  authorizationLevel: 'whenInUse',
+  locationProvider: 'playServices',
+});
 
 function AppContent() {
   const { initializeAuth, clearAllData } = useAuthStore();

@@ -9,6 +9,8 @@ export { locationService } from './LocationService';
 export { tourPlanService } from './TourPlanService';
 export { BaseApiService } from './BaseApiService';
 export { CookieManager } from '../../utils/cookieManager';
+export { healthProfileService } from './HealthProfileService';
+export { weatherService } from './WeatherService';
 
 // Re-export AI service types
 export type {

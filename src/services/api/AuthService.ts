@@ -63,7 +63,7 @@ class AuthService extends BaseApiService {
       const response = await this.unauthenticatedPost<AuthResponse>('/google', requestPayload);
 
       const authData = this.handleApiResponse(response);
-
+      console.log('Backend Google auth succeeded:', authData); 
       await AuthUtils.storeTokens(authData.tokens);
       const normalizedUser = {
         ...authData.user,

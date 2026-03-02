@@ -1,0 +1,47 @@
+{
+  "project_info": {
+    "project_number": "119774457316",
+    "project_id": "travion-479418",
+    "storage_bucket": "travion-479418.appspot.com"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:119774457316:android:YOUR_ANDROID_APP_ID",
+        "android_client_info": {
+          "package_name": "com.travionmobile"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "119774457316-logngo04ikcqje71u774f89i88gut80c.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.travionmobile",
+            "certificate_hash": "5E:8F:16:06:2E:A3:CD:2C:4A:0D:54:78:76:BA:A6:F3:8C:AB:F6:25"
+          }
+        },
+        {
+          "client_id": "119774457316-logngo04ikcqje71u774f89i88gut80c.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBIUGcKCsStdWH4_t7ONphytkTqm35XNks"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "119774457316-logngo04ikcqje71u774f89i88gut80c.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

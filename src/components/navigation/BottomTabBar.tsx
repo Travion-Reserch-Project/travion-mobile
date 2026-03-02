@@ -63,12 +63,7 @@ export const BottomTabBar: React.FC<BottomTabBarProps> = ({ activeTab, onTabPres
     }
 
     return (
-      <FontAwesome5
-        name={tab.icon}
-        size={20}
-        color={color}
-        solid={tab.iconType === 'solid'}
-      />
+      <FontAwesome5 name={tab.icon} size={20} color={color} solid={tab.iconType === 'solid'} />
     );
   };
 
@@ -86,8 +81,9 @@ export const BottomTabBar: React.FC<BottomTabBarProps> = ({ activeTab, onTabPres
             <View className="items-center">
               {renderIcon(tab, isActive)}
               <Text
-                className={`text-xs font-gilroy-medium mt-1 ${isActive ? 'text-primary font-bold' : 'text-gray-500'
-                  }`}
+                className={`text-xs font-gilroy-medium mt-1 ${
+                  isActive ? 'text-primary font-bold' : 'text-gray-500'
+                }`}
               >
                 {tab.label}
               </Text>
