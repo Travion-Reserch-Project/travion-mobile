@@ -3,7 +3,7 @@
  * A floating modal for planning tours with date selection and nearby location recommendations
  */
 
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
     View,
     Text,
@@ -11,7 +11,6 @@ import {
     TouchableOpacity,
     ScrollView,
     Image,
-    Animated,
     Dimensions,
     Platform,
     ActivityIndicator,
@@ -22,9 +21,9 @@ import MaterialCommunityIcons from 'react-native-vector-icons/MaterialCommunityI
 import Ionicons from 'react-native-vector-icons/Ionicons';
 import LinearGradient from 'react-native-linear-gradient';
 import DateTimePickerModal from 'react-native-modal-datetime-picker';
-import { aiService, locationService } from '@services/api';
-import type { SimpleRecommendationLocation } from '@services/api/AIService';
-import type { LocationDetailsResponse } from '@services/api/LocationService';
+import { aiService, locationService } from '../../services/api';
+import type { SimpleRecommendationLocation } from '../../services/api/AIService';
+import type { LocationDetailsResponse } from '../../services/api/LocationService';
 
 const { width, height } = Dimensions.get('window');
 
@@ -98,12 +97,12 @@ export const TourPlanModal: React.FC<TourPlanModalProps> = ({
     const [isLoadingNearby, setIsLoadingNearby] = useState(false);
     const [locationImages, setLocationImages] = useState<Record<string, string>>({});
 
-    const slideAnim = useRef(new Animated.Value(height)).current;
-    const fadeAnim = useRef(new Animated.Value(0)).current;
-    const scaleAnim = useRef(new Animated.Value(0.9)).current;
-
     useEffect(() => {
-        if (visible && selectedLocation.coordinates.latitude !== 0) {
+        if (visible && selectedLocation.coordinates.latitude !== 0 && selectedLocation.coordinates.longitude !== 0) {
+            // Reset state when modal opens
+            setNearbyLocations([]);
+            setLocationImages({});
+
             // Initialize with selected location
             setSelectedLocations([{
                 name: selectedLocation.name,
@@ -112,36 +111,17 @@ export const TourPlanModal: React.FC<TourPlanModalProps> = ({
                 imageUrl: selectedLocation.imageUrls?.[0],
             }]);
 
-            // Animate modal in
-            Animated.parallel([
-                Animated.spring(slideAnim, {
-                    toValue: 0,
-                    useNativeDriver: true,
-                    tension: 65,
-                    friction: 10,
-                }),
-                Animated.timing(fadeAnim, {
-                    toValue: 1,
-                    duration: 300,
-                    useNativeDriver: true,
-                }),
-                Animated.spring(scaleAnim, {
-                    toValue: 1,
-                    useNativeDriver: true,
-                    tension: 65,
-                    friction: 10,
-                }),
-            ]).start();
+            // Reset dates
+            const today = new Date();
+            setStartDate(today);
+            const tomorrow = new Date();
+            tomorrow.setDate(tomorrow.getDate() + 1);
+            setEndDate(tomorrow);
 
             // Load nearby locations
             loadNearbyLocations();
-        } else if (!visible) {
-            // Reset animations
-            slideAnim.setValue(height);
-            fadeAnim.setValue(0);
-            scaleAnim.setValue(0.9);
         }
-    }, [visible, selectedLocation]);
+    }, [visible, selectedLocation.name, selectedLocation.coordinates.latitude, selectedLocation.coordinates.longitude]);
 
     const loadNearbyLocations = async () => {
         if (selectedLocation.coordinates.latitude === 0 || selectedLocation.coordinates.longitude === 0) {
@@ -186,20 +166,7 @@ export const TourPlanModal: React.FC<TourPlanModalProps> = ({
     };
 
     const handleClose = () => {
-        Animated.parallel([
-            Animated.timing(slideAnim, {
-                toValue: height,
-                duration: 250,
-                useNativeDriver: true,
-            }),
-            Animated.timing(fadeAnim, {
-                toValue: 0,
-                duration: 200,
-                useNativeDriver: true,
-            }),
-        ]).start(() => {
-            onClose();
-        });
+        onClose();
     };
 
     const handleStartDateConfirm = (date: Date) => {
@@ -267,46 +234,31 @@ export const TourPlanModal: React.FC<TourPlanModalProps> = ({
     };
 
     const handleGeneratePlan = () => {
-        onGeneratePlan({
-            startDate,
-            endDate,
-            selectedLocations,
-        });
-        handleClose();
+        const planData = { startDate, endDate, selectedLocations };
+        // Close modal first, then navigate after unmount
+        onClose();
+        setTimeout(() => {
+            onGeneratePlan(planData);
+        }, 100);
     };
 
     return (
         <Modal
             visible={visible}
             transparent
-            animationType="none"
+            animationType="slide"
             onRequestClose={handleClose}
-            statusBarTranslucent
         >
             <View style={styles.modalContainer}>
                 {/* Backdrop */}
-                <Animated.View
-                    style={[styles.backdrop, { opacity: fadeAnim }]}
-                >
-                    <TouchableOpacity
-                        style={StyleSheet.absoluteFill}
-                        activeOpacity={1}
-                        onPress={handleClose}
-                    />
-                </Animated.View>
+                <TouchableOpacity
+                    style={styles.backdrop}
+                    activeOpacity={1}
+                    onPress={handleClose}
+                />
 
                 {/* Modal Content */}
-                <Animated.View
-                    style={[
-                        styles.modalContent,
-                        {
-                            transform: [
-                                { translateY: slideAnim },
-                                { scale: scaleAnim },
-                            ],
-                        },
-                    ]}
-                >
+                <View style={styles.modalContent}>
                     {/* Header */}
                     <View style={styles.header}>
                         <View style={styles.dragHandle} />
@@ -627,7 +579,7 @@ export const TourPlanModal: React.FC<TourPlanModalProps> = ({
                             </TouchableOpacity>
                         </View>
                     </View>
-                </Animated.View>
+                </View>
 
                 {/* Date Pickers */}
                 <DateTimePickerModal

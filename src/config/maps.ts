@@ -12,7 +12,7 @@
  */
 
 // TODO: Replace with your actual Google Maps API key
-export const GOOGLE_MAPS_API_KEY = 'AIzaSyBWeTK-SESXh19T4xFuASkxuj6UQvkCMoQ';
+export const GOOGLE_MAPS_API_KEY = 'AIzaSyBIUGcKCsStdWH4_t7ONphytkTqm35XNks';
 
 // Alternative: Use environment variable
 // export const GOOGLE_MAPS_API_KEY = process.env.GOOGLE_MAPS_API_KEY || 'YOUR_KEY_HERE';

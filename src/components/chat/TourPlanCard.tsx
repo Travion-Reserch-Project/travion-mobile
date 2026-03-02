@@ -18,7 +18,7 @@ import FontAwesome5 from 'react-native-vector-icons/FontAwesome5';
 import MaterialCommunityIcons from 'react-native-vector-icons/MaterialCommunityIcons';
 import Ionicons from 'react-native-vector-icons/Ionicons';
 import LinearGradient from 'react-native-linear-gradient';
-import type { ItinerarySlot, TourPlanMetadata, ConstraintViolation } from '@services/api';
+import type { ItinerarySlot, TourPlanMetadata, ConstraintViolation, CulturalTip } from '@services/api';
 
 const { width } = Dimensions.get('window');
 
@@ -71,6 +71,7 @@ interface TourPlanCardProps {
     constraints?: ConstraintViolation[];
     warnings?: string[];
     tips?: string[];
+    culturalTips?: CulturalTip[];
     onAccept: () => void;
     onModify: () => void;
     isLoading?: boolean;
@@ -171,27 +172,42 @@ const TimelineItem: React.FC<{
                 <Text style={styles.timelineLocation}>{slot.location}</Text>
                 <Text style={styles.timelineActivity}>{slot.activity}</Text>
 
-                {/* Metrics row */}
-                <View style={styles.metricsRow}>
-                    {/* Crowd Level */}
-                    <View style={styles.metricItem}>
-                        <MaterialCommunityIcons
-                            name="account-group"
-                            size={12}
-                            color={
-                                slot.crowd_prediction <= 3
-                                    ? THEME.success
-                                    : slot.crowd_prediction <= 6
-                                        ? THEME.warning
-                                        : THEME.error
-                            }
-                        />
-                        <Text style={styles.metricText}>
-                            {slot.crowd_prediction <= 3 ? 'Low' : slot.crowd_prediction <= 6 ? 'Medium' : 'High'}
+                {/* Crowd Gauge */}
+                <View style={styles.crowdGaugeContainer}>
+                    <View style={styles.crowdGaugeHeader}>
+                        <MaterialCommunityIcons name="account-group" size={12} color={THEME.gray[600]} />
+                        <Text style={styles.crowdGaugeLabel}>Crowd</Text>
+                        <Text style={[styles.crowdGaugeValue, {
+                            color: slot.crowd_prediction <= 30 ? THEME.success
+                                : slot.crowd_prediction <= 60 ? '#D97706'
+                                : slot.crowd_prediction <= 80 ? THEME.accent
+                                : THEME.error,
+                        }]}>
+                            {slot.crowd_prediction}%
                         </Text>
                     </View>
+                    <View style={styles.crowdGaugeBar}>
+                        <View style={[
+                            styles.crowdGaugeFill,
+                            {
+                                width: `${Math.min(slot.crowd_prediction, 100)}%`,
+                                backgroundColor: slot.crowd_prediction <= 30 ? THEME.success
+                                    : slot.crowd_prediction <= 60 ? '#D97706'
+                                    : slot.crowd_prediction <= 80 ? THEME.accent
+                                    : THEME.error,
+                            },
+                        ]} />
+                    </View>
+                    {slot.crowd_prediction <= 25 && (
+                        <View style={styles.bestTimeBadge}>
+                            <FontAwesome5 name="star" size={8} color={THEME.success} solid />
+                            <Text style={styles.bestTimeText}>Best Time</Text>
+                        </View>
+                    )}
+                </View>
 
-                    {/* Lighting Quality */}
+                {/* Lighting & Golden Hour */}
+                <View style={styles.metricsRow}>
                     <View style={styles.metricItem}>
                         <MaterialCommunityIcons
                             name={
@@ -212,13 +228,48 @@ const TimelineItem: React.FC<{
                         />
                         <Text style={styles.metricText}>{slot.lighting_quality || 'Good'}</Text>
                     </View>
+
+                    {/* Best Photo Time */}
+                    {slot.best_photo_time && (
+                        <View style={styles.metricItem}>
+                            <FontAwesome5 name="camera" size={10} color={THEME.primary} />
+                            <Text style={[styles.metricText, { color: THEME.primary }]}>{slot.best_photo_time}</Text>
+                        </View>
+                    )}
                 </View>
+
+                {/* Golden Hour Badge */}
+                {slot.lighting_quality === 'golden' && (
+                    <View style={styles.goldenHourBadge}>
+                        <MaterialCommunityIcons name="weather-sunset" size={14} color="#D97706" />
+                        <Text style={styles.goldenHourText}>Golden Hour</Text>
+                        {slot.best_photo_time && (
+                            <Text style={styles.goldenHourTime}>{slot.best_photo_time}</Text>
+                        )}
+                    </View>
+                )}
 
                 {/* AI Insight */}
                 {slot.ai_insight && (
                     <View style={styles.aiInsightContainer}>
                         <MaterialCommunityIcons name="lightbulb-outline" size={12} color={THEME.secondary} />
                         <Text style={styles.aiInsightText}>{slot.ai_insight}</Text>
+                    </View>
+                )}
+
+                {/* Cultural Tip */}
+                {slot.cultural_tip && (
+                    <View style={styles.culturalTipContainer}>
+                        <MaterialCommunityIcons name="hand-heart" size={12} color="#7C3AED" />
+                        <Text style={styles.culturalTipText}>{slot.cultural_tip}</Text>
+                    </View>
+                )}
+
+                {/* Ethical Note */}
+                {slot.ethical_note && (
+                    <View style={styles.ethicalNoteContainer}>
+                        <MaterialCommunityIcons name="shield-alert-outline" size={12} color={THEME.warning} />
+                        <Text style={styles.ethicalNoteText}>{slot.ethical_note}</Text>
                     </View>
                 )}
 
@@ -268,6 +319,7 @@ export const TourPlanCard: React.FC<TourPlanCardProps> = ({
     constraints,
     warnings,
     tips,
+    culturalTips,
     onAccept,
     onModify,
     isLoading = false,
@@ -421,6 +473,50 @@ export const TourPlanCard: React.FC<TourPlanCardProps> = ({
                 </View>
             )}
 
+            {/* Cultural Tips Section */}
+            {culturalTips && culturalTips.length > 0 && (
+                <View style={styles.culturalTipsSection}>
+                    <Text style={styles.sectionTitle}>
+                        <MaterialCommunityIcons name="hand-heart" size={14} color="#7C3AED" /> Cultural Guide
+                    </Text>
+                    {culturalTips.map((tip, index) => (
+                        <View key={index} style={styles.culturalTipItem}>
+                            <View style={[
+                                styles.culturalTipCategoryBadge,
+                                {
+                                    backgroundColor: tip.category === 'etiquette' ? '#EDE9FE'
+                                        : tip.category === 'ethical' ? '#FEF3C7'
+                                        : tip.category === 'safety' ? '#FEE2E2'
+                                        : '#E0E7FF',
+                                },
+                            ]}>
+                                <Text style={[
+                                    styles.culturalTipCategoryText,
+                                    {
+                                        color: tip.category === 'etiquette' ? '#7C3AED'
+                                            : tip.category === 'ethical' ? '#D97706'
+                                            : tip.category === 'safety' ? THEME.error
+                                            : '#4F46E5',
+                                    },
+                                ]}>
+                                    {tip.category}
+                                </Text>
+                            </View>
+                            <Text style={styles.culturalTipItemLocation}>{tip.location}</Text>
+                            <Text style={styles.culturalTipItemText}>{tip.tip}</Text>
+                        </View>
+                    ))}
+                </View>
+            )}
+
+            {/* Preference Match */}
+            {metadata.preference_match_explanation && (
+                <View style={styles.preferenceMatchContainer}>
+                    <MaterialCommunityIcons name="target" size={14} color={THEME.success} />
+                    <Text style={styles.preferenceMatchText}>{metadata.preference_match_explanation}</Text>
+                </View>
+            )}
+
             {/* Action Buttons */}
             <View style={styles.actionButtons}>
                 <TouchableOpacity
@@ -456,15 +552,15 @@ export const TourPlanCard: React.FC<TourPlanCardProps> = ({
 const styles = StyleSheet.create({
     container: {
         backgroundColor: THEME.white,
-        borderRadius: 20,
-        marginHorizontal: 16,
-        marginVertical: 8,
-        padding: 16,
+        borderRadius: 12,
+        marginHorizontal: 0,
+        marginVertical: 4,
+        padding: 14,
         shadowColor: '#000',
-        shadowOffset: { width: 0, height: 4 },
-        shadowOpacity: 0.1,
-        shadowRadius: 12,
-        elevation: 6,
+        shadowOffset: { width: 0, height: 1 },
+        shadowOpacity: 0.05,
+        shadowRadius: 4,
+        elevation: 2,
     },
     header: {
         flexDirection: 'row',
@@ -701,6 +797,157 @@ const styles = StyleSheet.create({
         color: THEME.secondary,
         flex: 1,
         lineHeight: 16,
+    },
+    // Crowd Gauge
+    crowdGaugeContainer: {
+        marginBottom: 6,
+    },
+    crowdGaugeHeader: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 4,
+        marginBottom: 4,
+    },
+    crowdGaugeLabel: {
+        fontSize: 11,
+        fontFamily: 'Gilroy-Medium',
+        color: THEME.gray[600],
+        flex: 1,
+    },
+    crowdGaugeValue: {
+        fontSize: 11,
+        fontFamily: 'Gilroy-Bold',
+    },
+    crowdGaugeBar: {
+        height: 4,
+        backgroundColor: THEME.gray[200],
+        borderRadius: 2,
+        overflow: 'hidden',
+    },
+    crowdGaugeFill: {
+        height: '100%',
+        borderRadius: 2,
+    },
+    bestTimeBadge: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 3,
+        marginTop: 3,
+    },
+    bestTimeText: {
+        fontSize: 9,
+        fontFamily: 'Gilroy-Bold',
+        color: THEME.success,
+    },
+    // Golden Hour Badge
+    goldenHourBadge: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        backgroundColor: '#FEF3C7',
+        paddingHorizontal: 8,
+        paddingVertical: 5,
+        borderRadius: 8,
+        borderWidth: 1,
+        borderColor: '#FDE68A',
+        marginTop: 6,
+        gap: 5,
+    },
+    goldenHourText: {
+        fontSize: 11,
+        fontFamily: 'Gilroy-Bold',
+        color: '#D97706',
+    },
+    goldenHourTime: {
+        fontSize: 10,
+        fontFamily: 'Gilroy-Medium',
+        color: '#92400E',
+        marginLeft: 'auto',
+    },
+    // Cultural Tip (per-activity)
+    culturalTipContainer: {
+        flexDirection: 'row',
+        alignItems: 'flex-start',
+        backgroundColor: '#F5F3FF',
+        padding: 8,
+        borderRadius: 8,
+        marginTop: 6,
+        gap: 6,
+    },
+    culturalTipText: {
+        fontSize: 11,
+        fontFamily: 'Gilroy-Medium',
+        color: '#7C3AED',
+        flex: 1,
+        lineHeight: 16,
+    },
+    // Ethical Note (per-activity)
+    ethicalNoteContainer: {
+        flexDirection: 'row',
+        alignItems: 'flex-start',
+        backgroundColor: '#FFFBEB',
+        padding: 8,
+        borderRadius: 8,
+        marginTop: 4,
+        gap: 6,
+    },
+    ethicalNoteText: {
+        fontSize: 11,
+        fontFamily: 'Gilroy-Medium',
+        color: '#92400E',
+        flex: 1,
+        lineHeight: 16,
+    },
+    // Cultural Tips Section (card-level)
+    culturalTipsSection: {
+        backgroundColor: '#F5F3FF',
+        borderRadius: 12,
+        padding: 12,
+        marginTop: 12,
+    },
+    culturalTipItem: {
+        marginBottom: 8,
+    },
+    culturalTipCategoryBadge: {
+        alignSelf: 'flex-start',
+        paddingHorizontal: 8,
+        paddingVertical: 2,
+        borderRadius: 8,
+        marginBottom: 4,
+    },
+    culturalTipCategoryText: {
+        fontSize: 9,
+        fontFamily: 'Gilroy-Bold',
+        textTransform: 'uppercase',
+        letterSpacing: 0.3,
+    },
+    culturalTipItemLocation: {
+        fontSize: 12,
+        fontFamily: 'Gilroy-Bold',
+        color: THEME.dark,
+        marginBottom: 2,
+    },
+    culturalTipItemText: {
+        fontSize: 12,
+        fontFamily: 'Gilroy-Medium',
+        color: THEME.gray[700],
+        lineHeight: 18,
+    },
+    // Preference Match
+    preferenceMatchContainer: {
+        flexDirection: 'row',
+        alignItems: 'flex-start',
+        backgroundColor: '#ECFDF5',
+        padding: 12,
+        borderRadius: 12,
+        marginTop: 12,
+        gap: 8,
+    },
+    preferenceMatchText: {
+        fontSize: 12,
+        fontFamily: 'Gilroy-Medium',
+        color: '#065F46',
+        flex: 1,
+        lineHeight: 18,
     },
     timelineNotes: {
         fontSize: 11,

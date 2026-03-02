@@ -42,4 +42,9 @@ export type {
   AcceptPlanRequest,
   TourPlanResponse,
   AcceptPlanResponse,
+  ClarificationQuestion,
+  ClarificationOption,
+  StepResult,
+  CulturalTip,
+  EventInfo,
 } from './TourPlanService';

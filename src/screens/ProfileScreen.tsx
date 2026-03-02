@@ -1,8 +1,10 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { View, Text, StatusBar, ScrollView, Alert } from 'react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import FontAwesome5 from 'react-native-vector-icons/FontAwesome5';
 import { Button } from '@components/common';
-import { useAuthStore } from '@stores';
+import { useAuthStore, useChatStore } from '@stores';
+import { CookieManager } from '@utils/cookieManager';
 
 interface ProfileScreenProps {
   userName?: string;
@@ -13,6 +15,40 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
   userEmail = 'travel@example.com',
 }) => {
   const { logout, user } = useAuthStore();
+  const [isClearing, setIsClearing] = useState(false);
+
+  const handleClearCache = () => {
+    Alert.alert(
+      'Clear Cache',
+      'This will clear all cached data including chat history and cookies. You will remain logged in.',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Clear',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              setIsClearing(true);
+
+              // Clear chat store
+              await AsyncStorage.removeItem('chat-store');
+              useChatStore.setState({ locationChats: {}, currentLocation: null });
+
+              // Clear cookies
+              await CookieManager.clearCookies();
+
+              Alert.alert('Success', 'Cache cleared successfully.');
+            } catch (error) {
+              console.error('Error clearing cache:', error);
+              Alert.alert('Error', 'Failed to clear cache. Please try again.');
+            } finally {
+              setIsClearing(false);
+            }
+          },
+        },
+      ],
+    );
+  };
 
   const handleSignOut = () => {
     Alert.alert('Sign Out', 'Are you sure you want to sign out?', [
@@ -106,8 +142,14 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
             ))}
           </View>
 
-          {/* Logout Button */}
-          <View className="mb-6">
+          {/* Clear Cache & Logout */}
+          <View className="mb-6 gap-3">
+            <Button
+              title={isClearing ? 'Clearing...' : 'Clear Cache'}
+              variant="outline"
+              onPress={handleClearCache}
+              disabled={isClearing}
+            />
             <Button title="Sign Out" variant="outline" onPress={handleSignOut} />
           </View>
         </View>

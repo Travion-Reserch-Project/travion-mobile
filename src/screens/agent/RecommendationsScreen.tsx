@@ -26,6 +26,13 @@ import type { TravelPreferenceScores } from '@types';
 // Default placeholder image
 const PLACEHOLDER_IMAGE = 'https://images.unsplash.com/photo-1506905925346-21bda4d32df4?w=400';
 
+// Headers required for Wikimedia/Wikipedia image URLs
+// Wikimedia blocks non-browser User-Agents (returns 403), so we use a browser-like UA
+const IMAGE_HEADERS = {
+  'User-Agent':
+    'Mozilla/5.0 (Linux; Android 14; Pixel 8) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Mobile Safari/537.36',
+};
+
 interface LocationState {
   latitude: number;
   longitude: number;
@@ -329,9 +336,23 @@ export const RecommendationsScreen: React.FC<RecommendationsScreenProps> = ({ na
       {/* Image */}
       <View className="relative">
         <Image
-          source={{ uri: item.imageUrl || PLACEHOLDER_IMAGE }}
+          source={
+            (item.imageUrl || PLACEHOLDER_IMAGE).includes('/image-proxy')
+              ? { uri: item.imageUrl || PLACEHOLDER_IMAGE }
+              : { uri: item.imageUrl || PLACEHOLDER_IMAGE, headers: IMAGE_HEADERS }
+          }
           className="w-full h-48"
           resizeMode="cover"
+          onError={() => {
+            // If image fails to load, update to placeholder (avoid infinite loop)
+            if (item.imageUrl !== PLACEHOLDER_IMAGE) {
+              setRecommendations((prev) =>
+                prev.map((rec, i) =>
+                  i === index ? { ...rec, imageUrl: PLACEHOLDER_IMAGE } : rec
+                )
+              );
+            }
+          }}
         />
         {/* Overlay for text visibility */}
         <View className="absolute bottom-0 left-0 right-0 h-20 bg-black/40" />

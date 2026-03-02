@@ -17,17 +17,17 @@ import MaterialCommunityIcons from 'react-native-vector-icons/MaterialCommunityI
 import Ionicons from 'react-native-vector-icons/Ionicons';
 import LinearGradient from 'react-native-linear-gradient';
 import LottieView from 'lottie-react-native';
-import { aiService, locationService } from '@services/api';
-import { useAuthStore } from '@stores';
-import { haversineDistance, calculateMatchScore } from '@utils';
-import { TourPlanModal } from '@components/modals/TourPlanModal';
-import type { TravelPreferenceScores } from '@types';
+import { aiService, locationService } from '../services/api';
+import { useAuthStore } from '../stores';
+import { haversineDistance, calculateMatchScore } from '../utils';
+import { TourPlanModal } from '../components/modals/TourPlanModal';
+import type { TravelPreferenceScores } from '../types';
 import type {
     SimpleCrowdPredictionResponse,
     SimpleGoldenHourResponse,
     SimpleDescriptionResponse,
-} from '@services/api/AIService';
-import type { LocationDetailsResponse } from '@services/api/LocationService';
+} from '../services/api/AIService';
+import type { LocationDetailsResponse } from '../services/api/LocationService';
 
 const { width, height } = Dimensions.get('window');
 const IMAGE_HEIGHT = height * 0.45;
@@ -35,7 +35,7 @@ const BOTTOM_BAR_HEIGHT = Platform.OS === 'ios' ? 100 : 85;
 const STATUS_BAR_HEIGHT = Platform.OS === 'ios' ? 50 : StatusBar.currentHeight || 24;
 
 // Loading animation
-const loadingAnimation = require('@assets/animations/onbord1.json');
+const loadingAnimation = require('../assets/animations/onbord1.json');
 
 // App Theme Colors
 const THEME = {
@@ -60,6 +60,16 @@ const THEME = {
         800: '#1F2937',
     },
     white: '#FFFFFF',
+};
+
+// Default placeholder image for failed loads
+const PLACEHOLDER_IMAGE = 'https://images.unsplash.com/photo-1506905925346-21bda4d32df4?w=400';
+
+// Headers required for Wikimedia/Wikipedia image URLs
+// Wikimedia blocks non-browser User-Agents (returns 403), so we use a browser-like UA
+const IMAGE_HEADERS = {
+    'User-Agent':
+        'Mozilla/5.0 (Linux; Android 14; Pixel 8) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Mobile Safari/537.36',
 };
 
 // Category colors with gradients - updated with theme colors
@@ -107,6 +117,7 @@ export const LocationDetailsScreen: React.FC<LocationDetailsScreenProps> = ({
     const [isFavorite, setIsFavorite] = useState(false);
     const [activeTab, setActiveTab] = useState<'overview' | 'details' | 'reviews'>('overview');
     const [showTourPlanModal, setShowTourPlanModal] = useState(false);
+    const [failedImages, setFailedImages] = useState<Set<number>>(new Set());
 
     // Calculated values when not provided
     const [calculatedDistance, setCalculatedDistance] = useState<number | undefined>(providedDistance);
@@ -394,14 +405,27 @@ export const LocationDetailsScreen: React.FC<LocationDetailsScreenProps> = ({
                                 onScroll={handleImageScroll}
                                 scrollEventThrottle={16}
                             >
-                                {images.map((imageUrl, index) => (
-                                    <Image
-                                        key={index}
-                                        source={{ uri: imageUrl }}
-                                        style={styles.heroImage}
-                                        resizeMode="cover"
-                                    />
-                                ))}
+                                {images.map((imageUrl, index) => {
+                                    const displayUrl = failedImages.has(index) ? PLACEHOLDER_IMAGE : imageUrl;
+                                    const isProxied = displayUrl.includes('/image-proxy');
+                                    return (
+                                        <Image
+                                            key={index}
+                                            source={
+                                                isProxied
+                                                    ? { uri: displayUrl }
+                                                    : { uri: displayUrl, headers: IMAGE_HEADERS }
+                                            }
+                                            style={styles.heroImage}
+                                            resizeMode="cover"
+                                            onError={() => {
+                                                if (!failedImages.has(index)) {
+                                                    setFailedImages((prev) => new Set(prev).add(index));
+                                                }
+                                            }}
+                                        />
+                                    );
+                                })}
                             </ScrollView>
 
                             {/* Image Pagination Dots */}
@@ -792,43 +816,44 @@ export const LocationDetailsScreen: React.FC<LocationDetailsScreenProps> = ({
                 </View>
             </View>
 
-            {/* Tour Plan Modal */}
-            <TourPlanModal
-                visible={showTourPlanModal && locationDetails !== null}
-                onClose={() => setShowTourPlanModal(false)}
-                selectedLocation={{
-                    name: locationDetails?.name || locationName,
-                    coordinates: locationDetails?.coordinates || { latitude: 0, longitude: 0 },
-                    imageUrls: locationDetails?.imageUrls,
-                }}
-                onGeneratePlan={(planData) => {
-                    console.log('Tour Plan Data:', planData);
-                    // Close the modal first
-                    setShowTourPlanModal(false);
+            {/* Tour Plan Modal - only mount when locationDetails is available */}
+            {showTourPlanModal && locationDetails !== null && (
+                <TourPlanModal
+                    visible={true}
+                    onClose={() => setShowTourPlanModal(false)}
+                    selectedLocation={{
+                        name: locationDetails.name,
+                        coordinates: locationDetails.coordinates,
+                        imageUrls: locationDetails.imageUrls,
+                    }}
+                    onGeneratePlan={(planData) => {
+                        console.log('Tour Plan Data:', planData);
 
-                    // Format dates to YYYY-MM-DD format
-                    const formatDateToYYYYMMDD = (date: Date): string => {
-                        const year = date.getFullYear();
-                        const month = String(date.getMonth() + 1).padStart(2, '0');
-                        const day = String(date.getDate()).padStart(2, '0');
-                        return `${year}-${month}-${day}`;
-                    };
+                        // Format dates to YYYY-MM-DD format
+                        const formatDateToYYYYMMDD = (date: Date): string => {
+                            const year = date.getFullYear();
+                            const month = String(date.getMonth() + 1).padStart(2, '0');
+                            const day = String(date.getDate()).padStart(2, '0');
+                            return `${year}-${month}-${day}`;
+                        };
 
-                    // Navigate to tour plan chat screen with the data
-                    navigation.navigate('TourPlanChat', {
-                        selectedLocations: planData.selectedLocations.map(loc => ({
-                            name: loc.name,
-                            latitude: loc.latitude,
-                            longitude: loc.longitude,
-                            imageUrl: loc.imageUrl,
-                            distance_km: loc.distance_km,
-                        })),
-                        startDate: formatDateToYYYYMMDD(planData.startDate),
-                        endDate: formatDateToYYYYMMDD(planData.endDate),
-                        preferences: [], // Can be enhanced to collect preferences from user
-                    });
-                }}
-            />
+                        // Navigate to tour plan chat screen
+                        // Modal is already closed by TourPlanModal before this callback fires
+                        navigation.navigate('TourPlanChat', {
+                            selectedLocations: planData.selectedLocations.map(loc => ({
+                                name: loc.name,
+                                latitude: loc.latitude,
+                                longitude: loc.longitude,
+                                imageUrl: loc.imageUrl,
+                                distance_km: loc.distance_km,
+                            })),
+                            startDate: formatDateToYYYYMMDD(planData.startDate),
+                            endDate: formatDateToYYYYMMDD(planData.endDate),
+                            preferences: [],
+                        });
+                    }}
+                />
+            )}
         </View>
     );
 };

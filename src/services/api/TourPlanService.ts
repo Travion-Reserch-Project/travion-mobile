@@ -31,6 +31,9 @@ export interface ItinerarySlot {
   icon?: string;
   highlight?: boolean;
   ai_insight?: string;
+  cultural_tip?: string;
+  ethical_note?: string;
+  best_photo_time?: string;
 }
 
 export interface TourPlanMetadata {
@@ -40,6 +43,41 @@ export interface TourPlanMetadata {
   golden_hour_optimized: boolean;
   crowd_optimized: boolean;
   event_aware: boolean;
+  preference_match_explanation?: string;
+}
+
+export interface StepResult {
+  node: string;
+  status: string;
+  summary: string;
+  duration_ms: number;
+}
+
+export interface ClarificationOption {
+  label: string;
+  description: string;
+  recommended: boolean;
+}
+
+export interface ClarificationQuestion {
+  question: string;
+  options: ClarificationOption[];
+  context: string;
+  type: 'single_select' | 'multi_select';
+}
+
+export interface CulturalTip {
+  location: string;
+  tip: string;
+  category: 'cultural' | 'ethical' | 'safety' | 'etiquette';
+}
+
+export interface EventInfo {
+  date: string;
+  name: string;
+  type: string; // 'poya' | 'holiday' | 'festival' | 'school_holiday'
+  impact: string;
+  warnings: string[];
 }
 
 export interface ConstraintViolation {
@@ -82,6 +120,10 @@ export interface TourPlanResponse {
   constraints?: ConstraintViolation[];
   warnings?: string[];
   tips?: string[];
+  stepResults?: StepResult[];
+  clarificationQuestion?: ClarificationQuestion;
+  culturalTips?: CulturalTip[];
+  events?: EventInfo[];
 }
 
 export interface AcceptPlanResponse {
