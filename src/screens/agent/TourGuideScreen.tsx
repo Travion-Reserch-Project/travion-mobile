@@ -5,7 +5,6 @@ import {
   ScrollView,
   StatusBar,
   TouchableOpacity,
-  Dimensions,
   RefreshControl,
   Animated,
   Platform,
@@ -39,8 +38,6 @@ Geocoder.init(GOOGLE_MAPS_API_KEY, { language: 'en' });
 
 // Default placeholder image
 const PLACEHOLDER_IMAGE = 'https://images.unsplash.com/photo-1506905925346-21bda4d32df4?w=400';
-
-const { width: screenWidth } = Dimensions.get('window');
 
 // Animations
 const loadingAnimation = require('@assets/animations/onbord1.json');

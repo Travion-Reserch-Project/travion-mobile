@@ -345,7 +345,7 @@ const MessageBubble: React.FC<{
 };
 
 // Typing indicator (WhatsApp style)
-const TypingIndicator: React.FC<{ message?: string }> = ({ message = 'typing...' }) => {
+const TypingIndicator: React.FC<{ message?: string }> = () => {
   const pulseAnim = useRef(new Animated.Value(0.3)).current;
 
   useEffect(() => {
@@ -401,7 +401,7 @@ export const TourPlanChatScreen: React.FC<TourPlanChatScreenProps> = ({ route, n
   // Initial plan generation
   useEffect(() => {
     generateInitialPlan();
-  }, []);
+  });
 
   // Scroll to bottom on new messages
   useEffect(() => {

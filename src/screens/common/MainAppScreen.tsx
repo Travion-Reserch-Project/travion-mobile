@@ -5,7 +5,6 @@ import { HomeScreen, SafetyScreen, TransportScreen } from '@screens';
 import { BottomTabBar, TabKey } from '@components/navigation/BottomTabBar';
 import { TravionBotButton } from '@components/common/TravionBotButton';
 import type { MainStackParamList } from '../../navigation/MainNavigator';
-import RecommendationsScreen from '@screens/agent/RecommendationsScreen';
 import TourGuideScreen from '@screens/agent/TourGuideScreen';
 // import RiskAnalyticsScreen from '../RiskAnalyticsScreen';
 
