@@ -200,7 +200,7 @@ export const WeatherScreen: React.FC = () => {
     return () => {
       isMountedRef.current = false;
     };
-  }, []);
+  });
 
   // Helper to format conditions from data
   const getConditionValue = (type: string, defaultValue: string) => {
