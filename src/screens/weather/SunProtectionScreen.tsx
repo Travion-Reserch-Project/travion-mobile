@@ -15,7 +15,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import FontAwesome from 'react-native-vector-icons/FontAwesome';
 import Geolocation from '@react-native-community/geolocation';
 import RNGeocoding from 'react-native-geocoding';
-import { weatherService } from '../services/api/WeatherService';
+import { weatherService } from '../../services/api/WeatherService';
 
 type NavigationProp = NativeStackNavigationProp<MainStackParamList>;
 

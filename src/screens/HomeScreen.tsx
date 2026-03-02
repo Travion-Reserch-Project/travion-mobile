@@ -1,5 +1,13 @@
 import React from 'react';
-import { View, Text, ScrollView, StatusBar, StyleSheet, TouchableOpacity, Image } from 'react-native';
+import {
+  View,
+  Text,
+  ScrollView,
+  StatusBar,
+  StyleSheet,
+  TouchableOpacity,
+  Image,
+} from 'react-native';
 import FontAwesome5 from 'react-native-vector-icons/FontAwesome5';
 import { useAuthStore } from '@stores';
 
@@ -11,8 +19,8 @@ interface HomeScreenProps {
 
 export const HomeScreen: React.FC<HomeScreenProps> = ({ onAlertsPress, onProfilePress }) => {
   const { user } = useAuthStore();
-  const handleAlerts = onAlertsPress || (() => { });
-  const handleProfile = onProfilePress || (() => { });
+  const handleAlerts = onAlertsPress || (() => {});
+  const handleProfile = onProfilePress || (() => {});
   return (
     <View className="flex-1 bg-gray-50">
       <StatusBar barStyle="dark-content" backgroundColor="#F9FAFB" />

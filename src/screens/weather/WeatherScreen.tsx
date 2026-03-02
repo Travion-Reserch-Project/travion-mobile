@@ -16,7 +16,7 @@ import FontAwesome5 from 'react-native-vector-icons/FontAwesome5';
 import Geolocation from '@react-native-community/geolocation';
 import RNGeocoding from 'react-native-geocoding';
 import Config from 'react-native-config';
-import { weatherService } from '../services/api/WeatherService';
+import { weatherService } from '../../services/api/WeatherService';
 
 // Initialize geocoding with API key
 if (Config.GOOGLE_MAPS_API_KEY) {

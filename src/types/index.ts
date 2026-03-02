@@ -1,10 +1,11 @@
 // Common types for the application
 
 export interface User {
-  preferences: { history: number; adventure: number; nature: number; relaxation: number; };
+  preferences: { history: number; adventure: number; nature: number; relaxation: number };
   userId: string;
   name: string;
   userName?: string;
+  photoUrl?: string;
   email: string;
   avatar?: string;
   verified?: boolean;
@@ -48,10 +49,10 @@ export type LoadingState = 'idle' | 'loading' | 'success' | 'error';
 
 // Travel Preference Scores (0-1 scale)
 export interface TravelPreferenceScores {
-  history: number;     // Interest in historical/cultural sites
-  adventure: number;   // Interest in adventure activities
-  nature: number;      // Interest in nature/wildlife
-  relaxation: number;  // Interest in relaxation/spiritual experiences
+  history: number; // Interest in historical/cultural sites
+  adventure: number; // Interest in adventure activities
+  nature: number; // Interest in nature/wildlife
+  relaxation: number; // Interest in relaxation/spiritual experiences
 }
 
 // Export service types

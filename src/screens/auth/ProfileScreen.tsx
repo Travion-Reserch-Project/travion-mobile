@@ -7,7 +7,7 @@ import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import { MainStackParamList } from '@navigation/MainNavigator';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { healthProfileService } from '@services/api';
-import { HealthProfile } from '../types';
+import { HealthProfile } from '../../types';
 
 interface ProfileScreenProps {
   userName?: string;

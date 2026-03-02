@@ -22,7 +22,7 @@ const forecastData: ForecastItem[] = [
 
 const SafetyAdvisorScreen: React.FC = () => {
   return (
-    <SafeAreaView className="flex-1 bg-[#FFF8F3]">
+    <SafeAreaView className="flex-1">
       {/* Header */}
       <View className="flex-row items-center justify-between px-5 py-3">
         <TouchableOpacity>
