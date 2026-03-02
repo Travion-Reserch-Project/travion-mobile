@@ -13,8 +13,8 @@ import MapView, { Marker, Circle, Callout, PROVIDER_GOOGLE, type Region } from '
 import FontAwesome5 from 'react-native-vector-icons/FontAwesome5';
 import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
-import type { MainStackParamList } from '../navigation/MainNavigator';
-import colors from '../theme/colors';
+import type { MainStackParamList } from '../../navigation/MainNavigator';
+import colors from '../../theme/colors';
 import Config from 'react-native-config';
 import { getCurrentPosition } from '@utils/geolocation';
 

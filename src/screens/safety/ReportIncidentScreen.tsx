@@ -20,9 +20,9 @@ import Config from 'react-native-config';
 import { launchImageLibrary } from 'react-native-image-picker';
 import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
-import type { MainStackParamList } from '../navigation/MainNavigator';
-import colors from '../theme/colors';
-import typography from '../theme/typography';
+import type { MainStackParamList } from '../../navigation/MainNavigator';
+import colors from '../../theme/colors';
+import typography from '../../theme/typography';
 import { incidentReportService } from '@services/api';
 import { getCurrentPosition } from '@utils/geolocation';
 

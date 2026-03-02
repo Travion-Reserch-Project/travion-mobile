@@ -1,11 +1,11 @@
 import React, { useState } from 'react';
 import { View, Text, StatusBar, ScrollView, TouchableOpacity } from 'react-native';
 import FontAwesome5 from 'react-native-vector-icons/FontAwesome5';
-import { SafetyAlertsContainer, HealthTips, Activities } from '../components/explore';
-import type { SafetyAlert } from '../components/explore/SafetyAlerts';
+import { SafetyAlertsContainer, HealthTips, Activities } from '../../components/explore';
+import type { SafetyAlert } from '../../components/explore/SafetyAlerts';
 import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
-import type { MainStackParamList } from '../navigation/MainNavigator';
+import type { MainStackParamList } from '../../navigation/MainNavigator';
 
 type TabType = 'activities' | 'health' | 'safety';
 

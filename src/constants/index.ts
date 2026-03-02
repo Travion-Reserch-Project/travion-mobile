@@ -7,7 +7,7 @@ export const APP_VERSION = '1.0.0';
 export const API_CONFIG = {
   BASE_URL: __DEV__
     ? Platform.OS === 'android'
-      ? 'http://192.168.43.235:3001'
+      ? 'http://10.0.2.2:3001'
       : 'http://localhost:3001'
     : 'https://api.travion.online',
   API_VERSION: '/api/v1',

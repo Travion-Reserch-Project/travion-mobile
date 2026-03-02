@@ -10,7 +10,7 @@ import {
   Platform,
 } from 'react-native';
 import FontAwesome5 from 'react-native-vector-icons/FontAwesome5';
-import { AlertCard, FilterTabs, EmptyState, Alert } from '../components/alerts';
+import { AlertCard, FilterTabs, EmptyState, Alert } from '../../components/alerts';
 import SafetyService, { SafetyAlert } from '@services/api/SafetyService';
 import { useRoute, RouteProp } from '@react-navigation/native';
 import { getCurrentPosition } from '@utils/geolocation';
