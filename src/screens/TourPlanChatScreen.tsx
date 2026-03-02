@@ -1,7 +1,6 @@
 /**
  * TourPlanChatScreen
- * AI-powered chat screen for tour plan generation and refinement
- * Similar to LocationChatScreen but focused on tour planning workflow
+ * WhatsApp-style AI-powered chat screen for tour plan generation and refinement
  */
 
 import React, { useState, useEffect, useRef, useCallback } from 'react';
@@ -25,48 +24,50 @@ import Ionicons from 'react-native-vector-icons/Ionicons';
 import MaterialCommunityIcons from 'react-native-vector-icons/MaterialCommunityIcons';
 import FontAwesome5 from 'react-native-vector-icons/FontAwesome5';
 import LinearGradient from 'react-native-linear-gradient';
-import LottieView from 'lottie-react-native';
 import Markdown from 'react-native-markdown-display';
-import { TourPlanCard } from '@components/chat';
-import { ApiError } from '@services/api/client';
+import { TourPlanCard } from '../components/chat';
+import { ApiError } from '../services/api/client';
 import {
     tourPlanService,
     type TourPlanResponse,
     type SelectedLocation,
     type ItinerarySlot,
     type TourPlanMetadata,
-} from '@services/api';
+    type ClarificationQuestion,
+    type ClarificationOption,
+    type StepResult,
+    type CulturalTip,
+    type EventInfo,
+} from '../services/api';
 
-const { width, height } = Dimensions.get('window');
-const BOTTOM_PADDING = Platform.OS === 'ios' ? 34 : 20;
+const { width } = Dimensions.get('window');
+const BOTTOM_PADDING = Platform.OS === 'ios' ? 34 : 16;
 
-// App Theme Colors
+// WhatsApp-inspired theme
 const THEME = {
-    primary: '#F5840E',
-    primaryLight: '#FFF7ED',
+    primary: '#F5840E',        // Brand orange (header only)
     primaryDark: '#C2410C',
-    secondary: '#5856D6',
-    accent: '#FF6B35',
+    chatBg: '#ECE5DD',         // WhatsApp chat background
+    userBubble: '#DCF8C6',     // WhatsApp green bubble
+    aiBubble: '#FFFFFF',       // White AI bubble
+    headerBg: '#075E54',       // WhatsApp dark green header (or keep brand)
+    inputBg: '#FFFFFF',
+    sendBtn: '#075E54',
+    tickColor: '#4FC3F7',      // Blue double-tick
+    dark: '#1F2937',
+    gray: {
+        50: '#F9FAFB', 100: '#F3F4F6', 200: '#E5E7EB',
+        300: '#D1D5DB', 400: '#9CA3AF', 500: '#6B7280',
+        600: '#4B5563', 700: '#374151', 800: '#1F2937',
+    },
+    white: '#FFFFFF',
     success: '#10B981',
     warning: '#FBBF24',
     error: '#EF4444',
-    dark: '#1F2937',
-    gray: {
-        50: '#F9FAFB',
-        100: '#F3F4F6',
-        200: '#E5E7EB',
-        300: '#D1D5DB',
-        400: '#9CA3AF',
-        500: '#6B7280',
-        600: '#4B5563',
-        700: '#374151',
-        800: '#1F2937',
-    },
-    white: '#FFFFFF',
+    poya: '#7C3AED',           // Purple for Poya events
+    holiday: '#3B82F6',        // Blue for holidays
+    festival: '#F59E0B',       // Amber for festivals
 };
-
-// Loading animation
-const typingAnimation = require('@assets/animations/onbord1.json');
 
 interface TourPlanChatScreenProps {
     route: {
@@ -82,7 +83,7 @@ interface TourPlanChatScreenProps {
 
 interface ChatMessage {
     id: string;
-    role: 'user' | 'assistant' | 'plan';
+    role: 'user' | 'assistant' | 'plan' | 'clarification' | 'event';
     content: string;
     timestamp: Date;
     planData?: {
@@ -90,10 +91,13 @@ interface ChatMessage {
         metadata: TourPlanMetadata;
         warnings?: string[];
         tips?: string[];
+        culturalTips?: CulturalTip[];
     };
+    clarificationData?: ClarificationQuestion;
+    events?: EventInfo[];
 }
 
-// Format timestamp
+// Format timestamp like WhatsApp (HH:MM)
 const formatTime = (date: Date): string => {
     const d = new Date(date);
     return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
@@ -107,7 +111,141 @@ const formatDateRange = (start: string, end: string): string => {
     return `${startDate.toLocaleDateString('en-US', options)} - ${endDate.toLocaleDateString('en-US', options)}`;
 };
 
-// Message bubble component
+// Date separator component (WhatsApp style)
+const DateSeparator: React.FC<{ date: string }> = ({ date }) => (
+    <View style={styles.dateSeparator}>
+        <View style={styles.dateSeparatorPill}>
+            <Text style={styles.dateSeparatorText}>{date}</Text>
+        </View>
+    </View>
+);
+
+// Event info bubble
+const EventBubble: React.FC<{ events: EventInfo[] }> = ({ events }) => {
+    const fadeAnim = useRef(new Animated.Value(0)).current;
+
+    useEffect(() => {
+        Animated.timing(fadeAnim, {
+            toValue: 1,
+            duration: 300,
+            useNativeDriver: true,
+        }).start();
+    }, []);
+
+    const getEventColor = (type: string): string => {
+        if (type === 'poya') return THEME.poya;
+        if (type === 'holiday') return THEME.holiday;
+        if (type === 'festival') return THEME.festival;
+        return THEME.gray[600];
+    };
+
+    const getEventIcon = (type: string): string => {
+        if (type === 'poya') return 'moon-waning-crescent';
+        if (type === 'holiday') return 'flag-variant';
+        if (type === 'festival') return 'party-popper';
+        return 'calendar';
+    };
+
+    return (
+        <Animated.View style={[styles.eventContainer, { opacity: fadeAnim }]}>
+            <View style={styles.eventBubble}>
+                <View style={styles.eventHeader}>
+                    <MaterialCommunityIcons name="calendar-alert" size={16} color={THEME.poya} />
+                    <Text style={styles.eventHeaderText}>Special Events</Text>
+                </View>
+                {events.map((event, index) => (
+                    <View key={index} style={styles.eventItem}>
+                        <View style={[styles.eventDot, { backgroundColor: getEventColor(event.type) }]}>
+                            <MaterialCommunityIcons
+                                name={getEventIcon(event.type)}
+                                size={12}
+                                color={THEME.white}
+                            />
+                        </View>
+                        <View style={styles.eventContent}>
+                            <Text style={styles.eventName}>{event.name}</Text>
+                            {event.date ? <Text style={styles.eventDate}>{event.date}</Text> : null}
+                            {event.impact ? <Text style={styles.eventImpact}>{event.impact}</Text> : null}
+                            {event.warnings && event.warnings.length > 0 && (
+                                <View style={styles.eventWarnings}>
+                                    {event.warnings.map((w, i) => (
+                                        <Text key={i} style={styles.eventWarningText}>{w}</Text>
+                                    ))}
+                                </View>
+                            )}
+                        </View>
+                    </View>
+                ))}
+            </View>
+        </Animated.View>
+    );
+};
+
+// Clarification question bubble
+const ClarificationBubble: React.FC<{
+    message: ChatMessage;
+    onSelectOption: (optionLabel: string) => void;
+    disabled: boolean;
+}> = ({ message, onSelectOption, disabled }) => {
+    const fadeAnim = useRef(new Animated.Value(0)).current;
+
+    useEffect(() => {
+        Animated.timing(fadeAnim, {
+            toValue: 1,
+            duration: 300,
+            useNativeDriver: true,
+        }).start();
+    }, []);
+
+    if (!message.clarificationData) return null;
+
+    const { question, options, context } = message.clarificationData;
+
+    return (
+        <Animated.View style={[styles.aiBubbleRow, { opacity: fadeAnim }]}>
+            <View style={styles.clarificationBubble}>
+                <View style={styles.clarificationHeader}>
+                    <MaterialCommunityIcons name="help-circle" size={16} color={THEME.primary} />
+                    <Text style={styles.clarificationLabel}>Quick Question</Text>
+                </View>
+                <Text style={styles.clarificationQuestion}>{question}</Text>
+                {context ? <Text style={styles.clarificationContext}>{context}</Text> : null}
+                <View style={styles.clarificationOptions}>
+                    {options.map((option, index) => (
+                        <TouchableOpacity
+                            key={index}
+                            style={[
+                                styles.clarificationOption,
+                                option.recommended && styles.clarificationOptionRecommended,
+                            ]}
+                            onPress={() => onSelectOption(option.label)}
+                            disabled={disabled}
+                            activeOpacity={0.7}
+                        >
+                            <View style={styles.clarificationOptionRow}>
+                                <Text style={[
+                                    styles.clarificationOptionLabel,
+                                    option.recommended && styles.clarificationOptionLabelHighlight,
+                                ]}>
+                                    {option.label}
+                                </Text>
+                                {option.recommended && (
+                                    <View style={styles.recommendedBadge}>
+                                        <Text style={styles.recommendedBadgeText}>Recommended</Text>
+                                    </View>
+                                )}
+                            </View>
+                            <Text style={styles.clarificationOptionDesc}>{option.description}</Text>
+                        </TouchableOpacity>
+                    ))}
+                </View>
+                <Text style={styles.bubbleTime}>{formatTime(message.timestamp)}</Text>
+            </View>
+        </Animated.View>
+    );
+};
+
+// WhatsApp-style message bubble
 const MessageBubble: React.FC<{
     message: ChatMessage;
     onAcceptPlan: () => void;
@@ -117,187 +255,116 @@ const MessageBubble: React.FC<{
     const isUser = message.role === 'user';
     const isPlan = message.role === 'plan';
     const fadeAnim = useRef(new Animated.Value(0)).current;
-    const slideAnim = useRef(new Animated.Value(isUser ? 20 : -20)).current;
 
     useEffect(() => {
-        Animated.parallel([
-            Animated.timing(fadeAnim, {
-                toValue: 1,
-                duration: 300,
-                useNativeDriver: true,
-            }),
-            Animated.timing(slideAnim, {
-                toValue: 0,
-                duration: 300,
-                useNativeDriver: true,
-            }),
-        ]).start();
+        Animated.timing(fadeAnim, {
+            toValue: 1,
+            duration: 200,
+            useNativeDriver: true,
+        }).start();
     }, []);
 
-    // Markdown styles
+    // Markdown styles for AI messages
     const markdownStyles = {
         body: {
-            fontSize: 15,
+            fontSize: 14.5,
             fontFamily: 'Gilroy-Regular',
             color: THEME.dark,
-            lineHeight: 23,
+            lineHeight: 21,
         },
-        paragraph: {
-            marginTop: 0,
-            marginBottom: 10,
-        },
-        strong: {
-            fontFamily: 'Gilroy-Bold',
-            color: THEME.dark,
-        },
-        heading1: {
-            fontSize: 18,
-            fontFamily: 'Gilroy-Bold',
-            color: THEME.primary,
-            marginBottom: 10,
-        },
-        heading2: {
-            fontSize: 16,
-            fontFamily: 'Gilroy-Bold',
-            color: THEME.primaryDark,
-            marginBottom: 8,
-        },
-        bullet_list_icon: {
-            marginRight: 10,
-            color: THEME.primary,
-        },
+        paragraph: { marginTop: 0, marginBottom: 6 },
+        strong: { fontFamily: 'Gilroy-Bold', color: THEME.dark },
+        heading1: { fontSize: 16, fontFamily: 'Gilroy-Bold', color: THEME.primary, marginBottom: 6 },
+        heading2: { fontSize: 15, fontFamily: 'Gilroy-Bold', color: THEME.primaryDark, marginBottom: 4 },
+        bullet_list_icon: { marginRight: 8, color: THEME.primary },
     };
 
     if (isPlan && message.planData) {
         return (
-            <View style={styles.planBubbleContainer}>
+            <Animated.View style={[styles.planBubbleContainer, { opacity: fadeAnim }]}>
                 <TourPlanCard
                     itinerary={message.planData.itinerary}
                     metadata={message.planData.metadata}
                     warnings={message.planData.warnings}
                     tips={message.planData.tips}
+                    culturalTips={message.planData.culturalTips}
                     onAccept={onAcceptPlan}
                     onModify={onModifyPlan}
                     isLoading={isAccepting}
                 />
-            </View>
+            </Animated.View>
         );
     }
 
     return (
         <Animated.View
             style={[
-                styles.messageBubbleContainer,
-                isUser ? styles.userBubbleContainer : styles.assistantBubbleContainer,
-                {
-                    opacity: fadeAnim,
-                    transform: [{ translateX: slideAnim }],
-                },
+                isUser ? styles.userBubbleRow : styles.aiBubbleRow,
+                { opacity: fadeAnim },
             ]}
         >
-            {!isUser && (
-                <View style={styles.avatarContainer}>
-                    <LinearGradient
-                        colors={[THEME.primary, THEME.accent]}
-                        style={styles.aiAvatar}
-                        start={{ x: 0, y: 0 }}
-                        end={{ x: 1, y: 1 }}
-                    >
-                        <MaterialCommunityIcons name="robot-happy-outline" size={16} color={THEME.white} />
-                    </LinearGradient>
-                </View>
-            )}
-            <View
-                style={[
-                    styles.messageBubble,
-                    isUser ? styles.userBubble : styles.assistantBubble,
-                ]}
-            >
+            <View style={[
+                styles.messageBubble,
+                isUser ? styles.userBubble : styles.assistantBubble,
+            ]}>
+                {/* Bubble tail */}
+                <View style={isUser ? styles.userBubbleTail : styles.aiBubbleTail} />
+
                 {isUser ? (
-                    <LinearGradient
-                        colors={[THEME.primary, THEME.primaryDark]}
-                        style={styles.userBubbleGradient}
-                        start={{ x: 0, y: 0 }}
-                        end={{ x: 1, y: 1 }}
-                    >
+                    <>
                         <Text style={styles.userMessageText}>{message.content}</Text>
-                        <Text style={styles.userMessageTime}>{formatTime(message.timestamp)}</Text>
-                    </LinearGradient>
-                ) : (
-                    <View style={styles.assistantBubbleContent}>
-                        <Markdown style={markdownStyles}>{message.content}</Markdown>
-                        <View style={styles.assistantMessageFooter}>
-                            <MaterialCommunityIcons name="sparkles" size={12} color={THEME.primary} />
-                            <Text style={styles.assistantMessageTime}>{formatTime(message.timestamp)}</Text>
+                        <View style={styles.userBubbleFooter}>
+                            <Text style={styles.bubbleTimeUser}>{formatTime(message.timestamp)}</Text>
+                            <Ionicons name="checkmark-done" size={14} color={THEME.tickColor} style={{ marginLeft: 4 }} />
                         </View>
-                    </View>
+                    </>
+                ) : (
+                    <>
+                        <Markdown style={markdownStyles}>{message.content}</Markdown>
+                        <Text style={styles.bubbleTime}>{formatTime(message.timestamp)}</Text>
+                    </>
                 )}
             </View>
-            {isUser && (
-                <View style={styles.userAvatarContainer}>
-                    <View style={styles.userAvatar}>
-                        <Ionicons name="person" size={14} color={THEME.white} />
-                    </View>
-                </View>
-            )}
         </Animated.View>
     );
 };
 
-// Typing indicator
-const TypingIndicator: React.FC<{ message?: string }> = ({ message = 'AI is creating your plan...' }) => {
-    const pulseAnim = useRef(new Animated.Value(0.4)).current;
+// Typing indicator (WhatsApp style)
+const TypingIndicator: React.FC<{ message?: string }> = ({ message = 'typing...' }) => {
+    const pulseAnim = useRef(new Animated.Value(0.3)).current;
 
     useEffect(() => {
         Animated.loop(
             Animated.sequence([
-                Animated.timing(pulseAnim, {
-                    toValue: 1,
-                    duration: 800,
-                    useNativeDriver: true,
-                }),
-                Animated.timing(pulseAnim, {
-                    toValue: 0.4,
-                    duration: 800,
-                    useNativeDriver: true,
-                }),
+                Animated.timing(pulseAnim, { toValue: 1, duration: 600, useNativeDriver: true }),
+                Animated.timing(pulseAnim, { toValue: 0.3, duration: 600, useNativeDriver: true }),
             ])
         ).start();
     }, []);
 
     return (
-        <View style={styles.typingContainer}>
-            <View style={styles.avatarContainer}>
-                <LinearGradient
-                    colors={[THEME.primary, THEME.accent]}
-                    style={styles.aiAvatar}
-                    start={{ x: 0, y: 0 }}
-                    end={{ x: 1, y: 1 }}
-                >
-                    <MaterialCommunityIcons name="robot-happy-outline" size={16} color={THEME.white} />
-                </LinearGradient>
-            </View>
-            <View style={styles.typingBubble}>
-                <View style={styles.typingDotsContainer}>
+        <View style={styles.aiBubbleRow}>
+            <View style={[styles.messageBubble, styles.assistantBubble, styles.typingBubble]}>
+                <View style={styles.aiBubbleTail} />
+                <View style={styles.typingDotsRow}>
                     <Animated.View style={[styles.typingDot, { opacity: pulseAnim }]} />
-                    <Animated.View style={[styles.typingDot, styles.typingDotMiddle, { opacity: pulseAnim }]} />
+                    <Animated.View style={[styles.typingDot, { opacity: pulseAnim, marginHorizontal: 4 }]} />
                     <Animated.View style={[styles.typingDot, { opacity: pulseAnim }]} />
                 </View>
-                <Text style={styles.typingText}>{message}</Text>
             </View>
         </View>
     );
 };
 
-// Quick suggestion chip
-const SuggestionChip: React.FC<{
+// Quick reply chip
+const QuickReply: React.FC<{
     text: string;
     icon: string;
     onPress: () => void;
 }> = ({ text, icon, onPress }) => (
-    <TouchableOpacity style={styles.suggestionChip} onPress={onPress} activeOpacity={0.7}>
-        <FontAwesome5 name={icon} size={12} color={THEME.primary} />
-        <Text style={styles.suggestionChipText}>{text}</Text>
+    <TouchableOpacity style={styles.quickReply} onPress={onPress} activeOpacity={0.7}>
+        <FontAwesome5 name={icon} size={11} color={THEME.primary} />
+        <Text style={styles.quickReplyText}>{text}</Text>
     </TouchableOpacity>
 );
 
@@ -342,14 +409,66 @@ export const TourPlanChatScreen: React.FC<TourPlanChatScreenProps> = ({
         }
     }, [error]);
 
+    const handleApiResponse = (response: TourPlanResponse) => {
+        setCurrentPlan(response);
+        const newMessages: ChatMessage[] = [];
+
+        // Show events if available
+        if (response.events && response.events.length > 0) {
+            newMessages.push({
+                id: (Date.now() + 1).toString(),
+                role: 'event',
+                content: 'Special events detected',
+                timestamp: new Date(),
+                events: response.events,
+            });
+        }
+
+        // Check if clarification is needed
+        if (response.clarificationQuestion) {
+            newMessages.push({
+                id: (Date.now() + 2).toString(),
+                role: 'clarification',
+                content: response.clarificationQuestion.question,
+                timestamp: new Date(),
+                clarificationData: response.clarificationQuestion,
+            });
+        } else if (response.itinerary && response.itinerary.length > 0) {
+            // Add plan message
+            newMessages.push({
+                id: (Date.now() + 3).toString(),
+                role: 'plan',
+                content: response.response,
+                timestamp: new Date(),
+                planData: {
+                    itinerary: response.itinerary,
+                    metadata: response.metadata,
+                    warnings: response.warnings,
+                    tips: response.tips,
+                    culturalTips: response.culturalTips,
+                },
+            });
+        } else {
+            // Just a text response
+            newMessages.push({
+                id: (Date.now() + 3).toString(),
+                role: 'assistant',
+                content: response.response,
+                timestamp: new Date(),
+            });
+        }
+
+        setMessages(prev => [...prev, ...newMessages]);
+    };
+
     const generateInitialPlan = async () => {
         setIsLoading(true);
 
-        // Add initial system message
+        // Add initial welcome message
         const welcomeMessage: ChatMessage = {
             id: Date.now().toString(),
             role: 'assistant',
-            content: `🎯 **Creating your personalized tour plan!**\n\nI'm analyzing your ${selectedLocations.length} selected locations for ${formatDateRange(startDate, endDate)}. I'll optimize for:\n\n• 🌅 Best lighting conditions\n• 👥 Crowd avoidance\n• 🗓️ Local events\n• 🚗 Efficient routes\n\nPlease wait while I craft the perfect itinerary...`,
+            content: `Creating your personalized tour plan for **${selectedLocations.length} locations** (${formatDateRange(startDate, endDate)}).\n\nOptimizing for golden hour, crowd levels, and local events...`,
             timestamp: new Date(),
         };
         setMessages([welcomeMessage]);
@@ -364,61 +483,31 @@ export const TourPlanChatScreen: React.FC<TourPlanChatScreenProps> = ({
             });
 
             setThreadId(response.threadId);
-            setCurrentPlan(response);
-
-            // Add plan message
-            const planMessage: ChatMessage = {
-                id: (Date.now() + 1).toString(),
-                role: 'plan',
-                content: response.response,
-                timestamp: new Date(),
-                planData: {
-                    itinerary: response.itinerary,
-                    metadata: response.metadata,
-                    warnings: response.warnings,
-                    tips: response.tips,
-                },
-            };
-
-            setMessages(prev => [...prev, planMessage]);
+            handleApiResponse(response);
         } catch (err: any) {
             console.error('Plan generation failed:', err);
 
-            // Check if it's an authentication error
             const isAuthError =
                 (err instanceof ApiError && (err.status === 401 || err.code === 'AUTH_EXPIRED')) ||
                 err.message?.toLowerCase().includes('auth') ||
                 err.message?.toLowerCase().includes('expired') ||
-                err.message?.toLowerCase().includes('401') ||
-                err.message?.toLowerCase().includes('unauthorized');
+                err.message?.toLowerCase().includes('401');
 
-            let errorContent: string;
-            if (isAuthError) {
-                errorContent = `❌ **Session Expired**\n\nYour session has expired. Please go back and log in again to continue planning your tour.\n\n_Tip: After logging in, navigate back to this location and try generating the plan again._`;
-            } else {
-                errorContent = `❌ **Oops! Something went wrong.**\n\nI couldn't generate your tour plan right now. Please try again or go back and adjust your selections.\n\n_Error: ${err.message || 'Unknown error'}_`;
-            }
+            const errorContent = isAuthError
+                ? `Session expired. Please go back and log in again.`
+                : `Something went wrong. Please try again.\n\n_${err.message || 'Unknown error'}_`;
 
-            const errorMessage: ChatMessage = {
+            setMessages(prev => [...prev, {
                 id: (Date.now() + 1).toString(),
                 role: 'assistant',
                 content: errorContent,
                 timestamp: new Date(),
-            };
-            setMessages(prev => [...prev, errorMessage]);
+            }]);
 
-            // If auth error, show alert with option to go back
             if (isAuthError) {
-                Alert.alert(
-                    'Session Expired',
-                    'Your session has expired. Please log in again to continue.',
-                    [
-                        {
-                            text: 'Go Back',
-                            onPress: () => navigation.goBack(),
-                        },
-                    ]
-                );
+                Alert.alert('Session Expired', 'Please log in again.', [
+                    { text: 'Go Back', onPress: () => navigation.goBack() },
+                ]);
             }
         } finally {
             setIsLoading(false);
@@ -432,7 +521,6 @@ export const TourPlanChatScreen: React.FC<TourPlanChatScreenProps> = ({
         setInputText('');
         setIsSending(true);
 
-        // Add user message
         const userMessage: ChatMessage = {
             id: Date.now().toString(),
             role: 'user',
@@ -451,50 +539,22 @@ export const TourPlanChatScreen: React.FC<TourPlanChatScreenProps> = ({
                 preferences,
             });
 
-            setCurrentPlan(response);
-
-            // Add plan message
-            const planMessage: ChatMessage = {
-                id: (Date.now() + 1).toString(),
-                role: 'plan',
-                content: response.response,
-                timestamp: new Date(),
-                planData: {
-                    itinerary: response.itinerary,
-                    metadata: response.metadata,
-                    warnings: response.warnings,
-                    tips: response.tips,
-                },
-            };
-
-            setMessages(prev => [...prev, planMessage]);
+            handleApiResponse(response);
         } catch (err: any) {
             console.error('Plan refinement failed:', err);
-            const errorMessage: ChatMessage = {
+            setMessages(prev => [...prev, {
                 id: (Date.now() + 1).toString(),
                 role: 'assistant',
-                content: `I couldn't update your plan. Please try again.\n\n_Error: ${err.message || 'Unknown error'}_`,
+                content: `Couldn't update your plan. Please try again.`,
                 timestamp: new Date(),
-            };
-            setMessages(prev => [...prev, errorMessage]);
+            }]);
         } finally {
             setIsSending(false);
         }
     }, [inputText, isSending, threadId, selectedLocations, startDate, endDate, preferences]);
 
-    const handleSuggestionPress = useCallback((text: string) => {
-        setInputText(text);
-        setTimeout(() => {
-            const trimmedText = text.trim();
-            if (trimmedText && !isSending && threadId) {
-                setInputText('');
-                // Trigger send with the suggestion
-                handleSendWithText(trimmedText);
-            }
-        }, 100);
-    }, [isSending, threadId]);
-
-    const handleSendWithText = async (text: string) => {
+    const handleQuickReply = useCallback((text: string) => {
+        if (isSending || !threadId) return;
         setIsSending(true);
 
         const userMessage: ChatMessage = {
@@ -505,53 +565,34 @@ export const TourPlanChatScreen: React.FC<TourPlanChatScreenProps> = ({
         };
         setMessages(prev => [...prev, userMessage]);
 
-        try {
-            const response = await tourPlanService.refinePlan({
-                threadId: threadId!,
-                message: text,
-                selectedLocations,
-                startDate,
-                endDate,
-                preferences,
-            });
-
-            setCurrentPlan(response);
-
-            const planMessage: ChatMessage = {
-                id: (Date.now() + 1).toString(),
-                role: 'plan',
-                content: response.response,
-                timestamp: new Date(),
-                planData: {
-                    itinerary: response.itinerary,
-                    metadata: response.metadata,
-                    warnings: response.warnings,
-                    tips: response.tips,
-                },
-            };
-
-            setMessages(prev => [...prev, planMessage]);
-        } catch (err: any) {
-            console.error('Plan refinement failed:', err);
-            const errorMessage: ChatMessage = {
+        tourPlanService.refinePlan({
+            threadId,
+            message: text,
+            selectedLocations,
+            startDate,
+            endDate,
+            preferences,
+        }).then(response => {
+            handleApiResponse(response);
+        }).catch(err => {
+            console.error('Quick reply failed:', err);
+            setMessages(prev => [...prev, {
                 id: (Date.now() + 1).toString(),
                 role: 'assistant',
-                content: `I couldn't update your plan. Please try again.`,
+                content: `Couldn't update your plan. Please try again.`,
                 timestamp: new Date(),
-            };
-            setMessages(prev => [...prev, errorMessage]);
-        } finally {
+            }]);
+        }).finally(() => {
             setIsSending(false);
-        }
-    };
+        });
+    }, [isSending, threadId, selectedLocations, startDate, endDate, preferences]);
 
     const handleAcceptPlan = useCallback(async () => {
         if (!currentPlan || !threadId) return;
-
         setIsAccepting(true);
 
         try {
-            const result = await tourPlanService.acceptPlan({
+            await tourPlanService.acceptPlan({
                 threadId,
                 title: `Trip to ${selectedLocations[0]?.name || 'Sri Lanka'}`,
                 description: `AI-optimized tour from ${formatDateRange(startDate, endDate)}`,
@@ -560,17 +601,11 @@ export const TourPlanChatScreen: React.FC<TourPlanChatScreenProps> = ({
             });
 
             Alert.alert(
-                '🎉 Plan Saved!',
-                'Your tour plan has been saved successfully. You can find it in your trips.',
+                'Plan Saved!',
+                'Your tour plan has been saved. You can find it in your trips.',
                 [
-                    {
-                        text: 'View Trips',
-                        onPress: () => navigation.navigate('Trips'),
-                    },
-                    {
-                        text: 'Done',
-                        onPress: () => navigation.goBack(),
-                    },
+                    { text: 'View Trips', onPress: () => navigation.navigate('Trips') },
+                    { text: 'Done', onPress: () => navigation.goBack() },
                 ]
             );
         } catch (err: any) {
@@ -582,24 +617,63 @@ export const TourPlanChatScreen: React.FC<TourPlanChatScreenProps> = ({
     }, [currentPlan, threadId, selectedLocations, startDate, endDate, navigation]);
 
     const handleModifyPlan = useCallback(() => {
-        // Focus on input and show suggestions
         inputRef.current?.focus();
     }, []);
 
-    const suggestions = [
-        { text: 'Add more photography time', icon: 'camera' },
-        { text: 'Avoid crowded times', icon: 'users' },
-        { text: 'Include local food spots', icon: 'utensils' },
-        { text: 'More relaxation time', icon: 'spa' },
-        { text: 'Start later in the morning', icon: 'clock' },
-        { text: 'Add sunrise viewing', icon: 'sun' },
+    const handleClarificationAnswer = useCallback(async (optionLabel: string) => {
+        if (!threadId || isSending) return;
+
+        const userMessage: ChatMessage = {
+            id: Date.now().toString(),
+            role: 'user',
+            content: optionLabel,
+            timestamp: new Date(),
+        };
+        setMessages(prev => [...prev, userMessage]);
+        setIsSending(true);
+
+        try {
+            const response = await tourPlanService.refinePlan({
+                threadId,
+                message: `User selected: ${optionLabel}`,
+                selectedLocations,
+                startDate,
+                endDate,
+                preferences,
+            });
+
+            handleApiResponse(response);
+        } catch (err: any) {
+            console.error('Clarification response failed:', err);
+            setMessages(prev => [...prev, {
+                id: (Date.now() + 1).toString(),
+                role: 'assistant',
+                content: `Couldn't process your selection. Please try again.`,
+                timestamp: new Date(),
+            }]);
+        } finally {
+            setIsSending(false);
+        }
+    }, [threadId, isSending, selectedLocations, startDate, endDate, preferences]);
+
+    const quickReplies = [
+        { text: 'More photo time', icon: 'camera' },
+        { text: 'Avoid crowds', icon: 'users' },
+        { text: 'Add food spots', icon: 'utensils' },
+        { text: 'Start later', icon: 'clock' },
+        { text: 'Add sunrise spot', icon: 'sun' },
+        { text: 'More relaxation', icon: 'spa' },
     ];
+
+    // Build location subtitle text
+    const locationNames = selectedLocations.slice(0, 2).map(l => l.name).join(', ');
+    const moreCount = selectedLocations.length > 2 ? ` +${selectedLocations.length - 2}` : '';
 
     return (
         <SafeAreaView style={styles.container} edges={['top']}>
             <StatusBar barStyle="light-content" backgroundColor={THEME.primary} />
 
-            {/* Header */}
+            {/* WhatsApp-style Header */}
             <LinearGradient
                 colors={[THEME.primary, THEME.primaryDark]}
                 style={styles.header}
@@ -611,104 +685,87 @@ export const TourPlanChatScreen: React.FC<TourPlanChatScreenProps> = ({
                     onPress={() => navigation.goBack()}
                     activeOpacity={0.7}
                 >
-                    <Ionicons name="chevron-back" size={24} color={THEME.white} />
+                    <Ionicons name="arrow-back" size={22} color={THEME.white} />
                 </TouchableOpacity>
 
-                <View style={styles.headerTitleContainer}>
-                    <View style={styles.headerIconBg}>
-                        <MaterialCommunityIcons name="map-marker-path" size={20} color={THEME.primary} />
-                    </View>
-                    <View style={styles.headerTextContainer}>
-                        <View style={styles.headerTitleRow}>
-                            <Text style={styles.headerTitle}>Tour Planner</Text>
-                            <View style={styles.onlineBadge}>
-                                <View style={styles.onlineDot} />
-                                <Text style={styles.onlineText}>AI Active</Text>
-                            </View>
-                        </View>
-                        <Text style={styles.headerSubtitle} numberOfLines={1}>
-                            {formatDateRange(startDate, endDate)} • {selectedLocations.length} locations
-                        </Text>
-                    </View>
+                {/* AI Avatar in header */}
+                <View style={styles.headerAvatar}>
+                    <MaterialCommunityIcons name="robot-happy-outline" size={20} color={THEME.white} />
                 </View>
 
-                <TouchableOpacity
-                    style={styles.menuButton}
-                    activeOpacity={0.7}
-                >
-                    <Ionicons name="ellipsis-vertical" size={20} color={THEME.white} />
+                <View style={styles.headerTextContainer}>
+                    <Text style={styles.headerTitle}>Tour Planner AI</Text>
+                    <Text style={styles.headerSubtitle} numberOfLines={1}>
+                        {locationNames}{moreCount} {'\u00B7'} {formatDateRange(startDate, endDate)}
+                    </Text>
+                </View>
+
+                <TouchableOpacity style={styles.headerBtn} activeOpacity={0.7}>
+                    <Ionicons name="ellipsis-vertical" size={18} color={THEME.white} />
                 </TouchableOpacity>
             </LinearGradient>
 
             {/* Chat Content */}
             <KeyboardAvoidingView
-                style={styles.keyboardAvoidingView}
+                style={styles.chatArea}
                 behavior={Platform.OS === 'ios' ? 'padding' : undefined}
                 keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 0}
             >
                 <ScrollView
                     ref={scrollViewRef}
-                    style={styles.messagesScrollView}
-                    contentContainerStyle={styles.messagesContainer}
+                    style={styles.messagesScroll}
+                    contentContainerStyle={styles.messagesContent}
                     showsVerticalScrollIndicator={false}
                     keyboardShouldPersistTaps="handled"
                 >
-                    {/* Trip Summary Header */}
-                    <View style={styles.tripSummaryCard}>
-                        <View style={styles.tripSummaryHeader}>
-                            <MaterialCommunityIcons name="map-legend" size={20} color={THEME.primary} />
-                            <Text style={styles.tripSummaryTitle}>Trip Planning Session</Text>
-                        </View>
-                        <View style={styles.tripSummaryLocations}>
-                            {selectedLocations.slice(0, 3).map((loc, index) => (
-                                <View key={index} style={styles.locationChip}>
-                                    <MaterialCommunityIcons name="map-marker" size={12} color={THEME.primary} />
-                                    <Text style={styles.locationChipText} numberOfLines={1}>{loc.name}</Text>
-                                </View>
-                            ))}
-                            {selectedLocations.length > 3 && (
-                                <View style={[styles.locationChip, styles.moreChip]}>
-                                    <Text style={styles.moreChipText}>+{selectedLocations.length - 3} more</Text>
-                                </View>
-                            )}
-                        </View>
-                    </View>
+                    {/* Date separator */}
+                    <DateSeparator date="Today" />
 
                     {/* Messages */}
-                    {messages.map((message) => (
-                        <MessageBubble
-                            key={message.id}
-                            message={message}
-                            onAcceptPlan={handleAcceptPlan}
-                            onModifyPlan={handleModifyPlan}
-                            isAccepting={isAccepting}
-                        />
-                    ))}
+                    {messages.map((message) => {
+                        if (message.role === 'event' && message.events) {
+                            return <EventBubble key={message.id} events={message.events} />;
+                        }
+                        if (message.role === 'clarification' && message.clarificationData) {
+                            return (
+                                <ClarificationBubble
+                                    key={message.id}
+                                    message={message}
+                                    onSelectOption={handleClarificationAnswer}
+                                    disabled={isSending}
+                                />
+                            );
+                        }
+                        return (
+                            <MessageBubble
+                                key={message.id}
+                                message={message}
+                                onAcceptPlan={handleAcceptPlan}
+                                onModifyPlan={handleModifyPlan}
+                                isAccepting={isAccepting}
+                            />
+                        );
+                    })}
 
-                    {/* Loading / Typing Indicator */}
-                    {(isLoading || isSending) && (
-                        <TypingIndicator
-                            message={isLoading ? 'AI is creating your plan...' : 'AI is refining your plan...'}
-                        />
-                    )}
-
-                    {/* Quick Suggestions (after plan is generated) */}
-                    {!isLoading && !isSending && currentPlan && (
-                        <View style={styles.suggestionsSection}>
-                            <Text style={styles.suggestionsLabel}>Quick modifications:</Text>
-                            <View style={styles.suggestionsGrid}>
-                                {suggestions.slice(0, 4).map((suggestion, index) => (
-                                    <SuggestionChip
-                                        key={index}
-                                        text={suggestion.text}
-                                        icon={suggestion.icon}
-                                        onPress={() => handleSuggestionPress(suggestion.text)}
-                                    />
-                                ))}
-                            </View>
-                        </View>
-                    )}
+                    {/* Typing indicator */}
+                    {(isLoading || isSending) && <TypingIndicator />}
                 </ScrollView>
+
+                {/* Quick replies (above input, after plan generated) */}
+                {!isLoading && !isSending && currentPlan && currentPlan.itinerary?.length > 0 && (
+                    <View style={styles.quickRepliesContainer}>
+                        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.quickRepliesScroll}>
+                            {quickReplies.map((qr, index) => (
+                                <QuickReply
+                                    key={index}
+                                    text={qr.text}
+                                    icon={qr.icon}
+                                    onPress={() => handleQuickReply(qr.text)}
+                                />
+                            ))}
+                        </ScrollView>
+                    </View>
+                )}
 
                 {/* Input Area */}
                 <View style={styles.inputContainer}>
@@ -716,7 +773,7 @@ export const TourPlanChatScreen: React.FC<TourPlanChatScreenProps> = ({
                         <TextInput
                             ref={inputRef}
                             style={styles.textInput}
-                            placeholder="Ask to modify your plan..."
+                            placeholder="Type a message..."
                             placeholderTextColor={THEME.gray[400]}
                             value={inputText}
                             onChangeText={setInputText}
@@ -726,35 +783,22 @@ export const TourPlanChatScreen: React.FC<TourPlanChatScreenProps> = ({
                             onSubmitEditing={handleSend}
                             blurOnSubmit={false}
                         />
-                        <TouchableOpacity
-                            style={[
-                                styles.sendButton,
-                                (!inputText.trim() || isSending || isLoading || !threadId) && styles.sendButtonDisabled,
-                            ]}
-                            onPress={handleSend}
-                            disabled={!inputText.trim() || isSending || isLoading || !threadId}
-                            activeOpacity={0.7}
-                        >
-                            {isSending ? (
-                                <ActivityIndicator size="small" color={THEME.white} />
-                            ) : (
-                                <LinearGradient
-                                    colors={inputText.trim() && threadId ? [THEME.primary, THEME.primaryDark] : [THEME.gray[300], THEME.gray[300]]}
-                                    style={styles.sendButtonGradient}
-                                    start={{ x: 0, y: 0 }}
-                                    end={{ x: 1, y: 1 }}
-                                >
-                                    <Ionicons name="send" size={18} color={THEME.white} />
-                                </LinearGradient>
-                            )}
-                        </TouchableOpacity>
                     </View>
-                    <View style={styles.inputFooter}>
-                        <MaterialCommunityIcons name="shield-check-outline" size={12} color={THEME.gray[400]} />
-                        <Text style={styles.inputHint}>
-                            Describe changes you'd like to make to your tour plan
-                        </Text>
-                    </View>
+                    <TouchableOpacity
+                        style={[
+                            styles.sendButton,
+                            (!inputText.trim() || isSending || isLoading || !threadId) && styles.sendButtonDisabled,
+                        ]}
+                        onPress={handleSend}
+                        disabled={!inputText.trim() || isSending || isLoading || !threadId}
+                        activeOpacity={0.7}
+                    >
+                        {isSending ? (
+                            <ActivityIndicator size="small" color={THEME.white} />
+                        ) : (
+                            <Ionicons name="send" size={18} color={THEME.white} />
+                        )}
+                    </TouchableOpacity>
                 </View>
             </KeyboardAvoidingView>
         </SafeAreaView>
@@ -764,384 +808,418 @@ export const TourPlanChatScreen: React.FC<TourPlanChatScreenProps> = ({
 const styles = StyleSheet.create({
     container: {
         flex: 1,
-        backgroundColor: THEME.gray[50],
+        backgroundColor: THEME.chatBg,
     },
 
-    // Header
+    // Header (WhatsApp style)
     header: {
         flexDirection: 'row',
         alignItems: 'center',
-        paddingHorizontal: 16,
-        paddingVertical: 14,
+        paddingHorizontal: 8,
+        paddingVertical: 10,
     },
     backButton: {
-        width: 42,
-        height: 42,
+        width: 36,
+        height: 36,
         alignItems: 'center',
         justifyContent: 'center',
-        borderRadius: 14,
-        backgroundColor: 'rgba(255,255,255,0.15)',
     },
-    headerTitleContainer: {
-        flex: 1,
-        flexDirection: 'row',
-        alignItems: 'center',
-        marginLeft: 12,
-    },
-    headerIconBg: {
-        width: 42,
-        height: 42,
-        borderRadius: 14,
-        backgroundColor: THEME.white,
+    headerAvatar: {
+        width: 38,
+        height: 38,
+        borderRadius: 19,
+        backgroundColor: 'rgba(255,255,255,0.2)',
         alignItems: 'center',
         justifyContent: 'center',
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.1,
-        shadowRadius: 4,
-        elevation: 3,
+        marginLeft: 4,
     },
     headerTextContainer: {
-        marginLeft: 12,
         flex: 1,
-    },
-    headerTitleRow: {
-        flexDirection: 'row',
-        alignItems: 'center',
+        marginLeft: 10,
     },
     headerTitle: {
-        fontSize: 17,
+        fontSize: 16,
         fontFamily: 'Gilroy-Bold',
-        color: THEME.white,
-    },
-    onlineBadge: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        backgroundColor: 'rgba(255,255,255,0.2)',
-        paddingHorizontal: 8,
-        paddingVertical: 3,
-        borderRadius: 10,
-        marginLeft: 8,
-    },
-    onlineDot: {
-        width: 6,
-        height: 6,
-        borderRadius: 3,
-        backgroundColor: '#34D399',
-        marginRight: 4,
-    },
-    onlineText: {
-        fontSize: 10,
-        fontFamily: 'Gilroy-SemiBold',
         color: THEME.white,
     },
     headerSubtitle: {
-        fontSize: 13,
+        fontSize: 12,
         fontFamily: 'Gilroy-Regular',
         color: 'rgba(255,255,255,0.8)',
-        marginTop: 2,
+        marginTop: 1,
     },
-    menuButton: {
-        width: 42,
-        height: 42,
+    headerBtn: {
+        width: 36,
+        height: 36,
         alignItems: 'center',
         justifyContent: 'center',
-        borderRadius: 14,
-        backgroundColor: 'rgba(255,255,255,0.15)',
     },
 
-    // Content
-    keyboardAvoidingView: {
+    // Chat area
+    chatArea: {
         flex: 1,
     },
-    messagesScrollView: {
+    messagesScroll: {
         flex: 1,
     },
-    messagesContainer: {
-        paddingVertical: 20,
-        paddingHorizontal: 16,
+    messagesContent: {
+        paddingVertical: 8,
+        paddingHorizontal: 12,
     },
 
-    // Trip Summary
-    tripSummaryCard: {
-        backgroundColor: THEME.white,
-        borderRadius: 16,
-        padding: 16,
-        marginBottom: 20,
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.06,
-        shadowRadius: 8,
-        elevation: 3,
-    },
-    tripSummaryHeader: {
-        flexDirection: 'row',
+    // Date separator
+    dateSeparator: {
         alignItems: 'center',
-        marginBottom: 12,
-        gap: 8,
+        marginVertical: 12,
     },
-    tripSummaryTitle: {
-        fontSize: 15,
-        fontFamily: 'Gilroy-Bold',
-        color: THEME.dark,
+    dateSeparatorPill: {
+        backgroundColor: 'rgba(225,218,208,0.9)',
+        paddingHorizontal: 14,
+        paddingVertical: 5,
+        borderRadius: 8,
     },
-    tripSummaryLocations: {
-        flexDirection: 'row',
-        flexWrap: 'wrap',
-        gap: 8,
-    },
-    locationChip: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        backgroundColor: THEME.primaryLight,
-        paddingHorizontal: 10,
-        paddingVertical: 6,
-        borderRadius: 16,
-        gap: 4,
-        maxWidth: '45%',
-    },
-    locationChipText: {
+    dateSeparatorText: {
         fontSize: 12,
         fontFamily: 'Gilroy-Medium',
-        color: THEME.primaryDark,
-        flex: 1,
-    },
-    moreChip: {
-        backgroundColor: THEME.gray[100],
-    },
-    moreChipText: {
-        fontSize: 12,
-        fontFamily: 'Gilroy-Medium',
-        color: THEME.gray[600],
+        color: THEME.gray[700],
     },
 
-    // Messages
-    planBubbleContainer: {
-        marginBottom: 16,
-    },
-    messageBubbleContainer: {
+    // Message rows
+    userBubbleRow: {
         flexDirection: 'row',
-        marginBottom: 16,
-        alignItems: 'flex-end',
-    },
-    userBubbleContainer: {
         justifyContent: 'flex-end',
+        marginBottom: 4,
     },
-    assistantBubbleContainer: {
+    aiBubbleRow: {
+        flexDirection: 'row',
         justifyContent: 'flex-start',
-    },
-    avatarContainer: {
-        marginRight: 10,
         marginBottom: 4,
     },
-    aiAvatar: {
-        width: 34,
-        height: 34,
-        borderRadius: 12,
-        alignItems: 'center',
-        justifyContent: 'center',
-    },
-    userAvatarContainer: {
-        marginLeft: 10,
-        marginBottom: 4,
-    },
-    userAvatar: {
-        width: 28,
-        height: 28,
-        borderRadius: 10,
-        backgroundColor: THEME.gray[300],
-        alignItems: 'center',
-        justifyContent: 'center',
-    },
+
+    // Message bubble
     messageBubble: {
-        maxWidth: width * 0.72,
-        borderRadius: 22,
-        overflow: 'hidden',
+        maxWidth: width * 0.78,
+        borderRadius: 8,
+        paddingHorizontal: 10,
+        paddingVertical: 7,
+        position: 'relative',
     },
     userBubble: {
-        marginLeft: 'auto',
-    },
-    userBubbleGradient: {
-        paddingHorizontal: 18,
-        paddingVertical: 14,
-        borderRadius: 22,
-        borderBottomRightRadius: 6,
+        backgroundColor: THEME.userBubble,
+        borderTopRightRadius: 2,
+        marginRight: 4,
     },
     assistantBubble: {
-        backgroundColor: THEME.white,
-        borderBottomLeftRadius: 6,
+        backgroundColor: THEME.aiBubble,
+        borderTopLeftRadius: 2,
+        marginLeft: 4,
         shadowColor: '#000',
-        shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.06,
-        shadowRadius: 8,
-        elevation: 3,
-    },
-    assistantBubbleContent: {
-        paddingHorizontal: 18,
-        paddingVertical: 14,
-    },
-    userMessageText: {
-        fontSize: 15,
-        fontFamily: 'Gilroy-Regular',
-        color: THEME.white,
-        lineHeight: 22,
-    },
-    userMessageTime: {
-        fontSize: 10,
-        fontFamily: 'Gilroy-Regular',
-        color: 'rgba(255,255,255,0.7)',
-        marginTop: 8,
-        textAlign: 'right',
-    },
-    assistantMessageFooter: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        marginTop: 10,
-        paddingTop: 10,
-        borderTopWidth: 1,
-        borderTopColor: THEME.gray[100],
-        gap: 6,
-    },
-    assistantMessageTime: {
-        fontSize: 10,
-        fontFamily: 'Gilroy-Regular',
-        color: THEME.gray[400],
+        shadowOffset: { width: 0, height: 1 },
+        shadowOpacity: 0.04,
+        shadowRadius: 2,
+        elevation: 1,
     },
 
-    // Typing Indicator
-    typingContainer: {
-        flexDirection: 'row',
-        alignItems: 'flex-end',
-        marginBottom: 12,
+    // Bubble tails
+    userBubbleTail: {
+        position: 'absolute',
+        top: 0,
+        right: -6,
+        width: 0,
+        height: 0,
+        borderLeftWidth: 6,
+        borderLeftColor: THEME.userBubble,
+        borderTopWidth: 8,
+        borderTopColor: 'transparent',
+        borderBottomWidth: 0,
+        borderBottomColor: 'transparent',
     },
+    aiBubbleTail: {
+        position: 'absolute',
+        top: 0,
+        left: -6,
+        width: 0,
+        height: 0,
+        borderRightWidth: 6,
+        borderRightColor: THEME.aiBubble,
+        borderTopWidth: 8,
+        borderTopColor: 'transparent',
+        borderBottomWidth: 0,
+        borderBottomColor: 'transparent',
+    },
+
+    // User message
+    userMessageText: {
+        fontSize: 14.5,
+        fontFamily: 'Gilroy-Regular',
+        color: THEME.dark,
+        lineHeight: 20,
+    },
+    userBubbleFooter: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'flex-end',
+        marginTop: 3,
+    },
+    bubbleTimeUser: {
+        fontSize: 11,
+        fontFamily: 'Gilroy-Regular',
+        color: THEME.gray[500],
+    },
+    bubbleTime: {
+        fontSize: 11,
+        fontFamily: 'Gilroy-Regular',
+        color: THEME.gray[400],
+        textAlign: 'right',
+        marginTop: 3,
+    },
+
+    // Typing
     typingBubble: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        backgroundColor: THEME.white,
-        paddingHorizontal: 18,
-        paddingVertical: 14,
-        borderRadius: 22,
-        borderBottomLeftRadius: 6,
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.06,
-        shadowRadius: 8,
-        elevation: 3,
+        paddingVertical: 12,
+        paddingHorizontal: 16,
     },
-    typingDotsContainer: {
+    typingDotsRow: {
         flexDirection: 'row',
         alignItems: 'center',
-        marginRight: 10,
     },
     typingDot: {
         width: 8,
         height: 8,
         borderRadius: 4,
-        backgroundColor: THEME.primary,
-        marginHorizontal: 2,
-    },
-    typingDotMiddle: {
-        marginHorizontal: 4,
-    },
-    typingText: {
-        fontSize: 13,
-        fontFamily: 'Gilroy-Medium',
-        color: THEME.gray[500],
+        backgroundColor: THEME.gray[400],
     },
 
-    // Suggestions
-    suggestionsSection: {
-        marginTop: 8,
-        marginBottom: 20,
+    // Plan
+    planBubbleContainer: {
+        marginVertical: 8,
     },
-    suggestionsLabel: {
-        fontSize: 12,
-        fontFamily: 'Gilroy-Medium',
-        color: THEME.gray[500],
-        marginBottom: 10,
-        marginLeft: 4,
+
+    // Events
+    eventContainer: {
+        marginVertical: 6,
     },
-    suggestionsGrid: {
+    eventBubble: {
+        backgroundColor: THEME.white,
+        borderRadius: 8,
+        padding: 12,
+        marginHorizontal: 4,
+        borderLeftWidth: 3,
+        borderLeftColor: THEME.poya,
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 1 },
+        shadowOpacity: 0.04,
+        shadowRadius: 2,
+        elevation: 1,
+    },
+    eventHeader: {
         flexDirection: 'row',
-        flexWrap: 'wrap',
+        alignItems: 'center',
+        gap: 6,
+        marginBottom: 10,
+    },
+    eventHeaderText: {
+        fontSize: 13,
+        fontFamily: 'Gilroy-Bold',
+        color: THEME.poya,
+        textTransform: 'uppercase',
+        letterSpacing: 0.3,
+    },
+    eventItem: {
+        flexDirection: 'row',
+        marginBottom: 8,
+    },
+    eventDot: {
+        width: 24,
+        height: 24,
+        borderRadius: 12,
+        alignItems: 'center',
+        justifyContent: 'center',
+        marginRight: 10,
+        marginTop: 2,
+    },
+    eventContent: {
+        flex: 1,
+    },
+    eventName: {
+        fontSize: 14,
+        fontFamily: 'Gilroy-Bold',
+        color: THEME.dark,
+    },
+    eventDate: {
+        fontSize: 12,
+        fontFamily: 'Gilroy-Regular',
+        color: THEME.gray[500],
+        marginTop: 1,
+    },
+    eventImpact: {
+        fontSize: 12,
+        fontFamily: 'Gilroy-Regular',
+        color: THEME.gray[600],
+        marginTop: 3,
+        lineHeight: 17,
+    },
+    eventWarnings: {
+        marginTop: 4,
+    },
+    eventWarningText: {
+        fontSize: 11,
+        fontFamily: 'Gilroy-Medium',
+        color: THEME.warning,
+        lineHeight: 16,
+    },
+
+    // Clarification
+    clarificationBubble: {
+        maxWidth: width * 0.85,
+        backgroundColor: THEME.white,
+        borderRadius: 8,
+        borderTopLeftRadius: 2,
+        padding: 12,
+        marginLeft: 4,
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 1 },
+        shadowOpacity: 0.04,
+        shadowRadius: 2,
+        elevation: 1,
+    },
+    clarificationHeader: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 6,
+        marginBottom: 8,
+    },
+    clarificationLabel: {
+        fontSize: 12,
+        fontFamily: 'Gilroy-Bold',
+        color: THEME.primary,
+        textTransform: 'uppercase',
+        letterSpacing: 0.3,
+    },
+    clarificationQuestion: {
+        fontSize: 14.5,
+        fontFamily: 'Gilroy-Bold',
+        color: THEME.dark,
+        lineHeight: 20,
+        marginBottom: 4,
+    },
+    clarificationContext: {
+        fontSize: 12,
+        fontFamily: 'Gilroy-Regular',
+        color: THEME.gray[500],
+        lineHeight: 17,
+        marginBottom: 10,
+    },
+    clarificationOptions: {
+        gap: 6,
+    },
+    clarificationOption: {
+        backgroundColor: THEME.gray[50],
+        borderRadius: 8,
+        padding: 10,
+        borderWidth: 1,
+        borderColor: THEME.gray[200],
+    },
+    clarificationOptionRecommended: {
+        backgroundColor: '#FFF7ED',
+        borderColor: THEME.primary,
+    },
+    clarificationOptionRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        marginBottom: 2,
+    },
+    clarificationOptionLabel: {
+        fontSize: 13,
+        fontFamily: 'Gilroy-Bold',
+        color: THEME.dark,
+    },
+    clarificationOptionLabelHighlight: {
+        color: THEME.primaryDark,
+    },
+    recommendedBadge: {
+        backgroundColor: THEME.primary,
+        paddingHorizontal: 6,
+        paddingVertical: 2,
+        borderRadius: 6,
+    },
+    recommendedBadgeText: {
+        fontSize: 9,
+        fontFamily: 'Gilroy-Bold',
+        color: THEME.white,
+    },
+    clarificationOptionDesc: {
+        fontSize: 12,
+        fontFamily: 'Gilroy-Regular',
+        color: THEME.gray[600],
+        lineHeight: 16,
+    },
+
+    // Quick replies
+    quickRepliesContainer: {
+        borderTopWidth: 1,
+        borderTopColor: 'rgba(0,0,0,0.06)',
+        backgroundColor: THEME.chatBg,
+        paddingVertical: 8,
+    },
+    quickRepliesScroll: {
+        paddingHorizontal: 12,
         gap: 8,
     },
-    suggestionChip: {
+    quickReply: {
         flexDirection: 'row',
         alignItems: 'center',
         backgroundColor: THEME.white,
         paddingHorizontal: 14,
-        paddingVertical: 10,
-        borderRadius: 20,
+        paddingVertical: 8,
+        borderRadius: 18,
         borderWidth: 1,
-        borderColor: THEME.gray[200],
-        gap: 8,
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 1 },
-        shadowOpacity: 0.04,
-        shadowRadius: 4,
-        elevation: 2,
+        borderColor: THEME.primary,
+        gap: 6,
     },
-    suggestionChipText: {
+    quickReplyText: {
         fontSize: 13,
         fontFamily: 'Gilroy-Medium',
-        color: THEME.gray[700],
+        color: THEME.primary,
     },
 
-    // Input Area
+    // Input area
     inputContainer: {
-        paddingHorizontal: 16,
-        paddingTop: 12,
-        paddingBottom: BOTTOM_PADDING,
-        backgroundColor: THEME.white,
-        borderTopWidth: 1,
-        borderTopColor: THEME.gray[100],
-    },
-    inputWrapper: {
         flexDirection: 'row',
         alignItems: 'flex-end',
-        backgroundColor: THEME.gray[50],
-        borderRadius: 28,
-        paddingHorizontal: 6,
-        paddingVertical: 6,
-        borderWidth: 1,
-        borderColor: THEME.gray[200],
+        paddingHorizontal: 8,
+        paddingTop: 6,
+        paddingBottom: BOTTOM_PADDING,
+        backgroundColor: THEME.chatBg,
+        gap: 6,
+    },
+    inputWrapper: {
+        flex: 1,
+        backgroundColor: THEME.white,
+        borderRadius: 24,
+        paddingHorizontal: 14,
+        paddingVertical: Platform.OS === 'ios' ? 8 : 2,
+        minHeight: 44,
+        justifyContent: 'center',
     },
     textInput: {
-        flex: 1,
         fontSize: 15,
         fontFamily: 'Gilroy-Regular',
         color: THEME.dark,
-        paddingHorizontal: 16,
-        paddingVertical: Platform.OS === 'ios' ? 12 : 8,
         maxHeight: 100,
+        paddingVertical: Platform.OS === 'ios' ? 4 : 6,
     },
     sendButton: {
         width: 44,
         height: 44,
         borderRadius: 22,
-        overflow: 'hidden',
+        backgroundColor: THEME.primary,
+        alignItems: 'center',
+        justifyContent: 'center',
     },
     sendButtonDisabled: {
-        opacity: 0.6,
-    },
-    sendButtonGradient: {
-        width: '100%',
-        height: '100%',
-        alignItems: 'center',
-        justifyContent: 'center',
-    },
-    inputFooter: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        justifyContent: 'center',
-        marginTop: 10,
-        gap: 6,
-    },
-    inputHint: {
-        fontSize: 11,
-        fontFamily: 'Gilroy-Regular',
-        color: THEME.gray[400],
+        backgroundColor: THEME.gray[300],
     },
 });
 
