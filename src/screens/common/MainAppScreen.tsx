@@ -1,11 +1,12 @@
 import React, { useState } from 'react';
 import { View } from 'react-native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
-import { HomeScreen, SafetyScreen, TransportScreen, GuideScreen } from '@screens';
+import { HomeScreen, SafetyScreen, TransportScreen } from '@screens';
 import { BottomTabBar, TabKey } from '@components/navigation/BottomTabBar';
-import { TravionBotButton } from '@components/common';
+import { TravionBotButton } from '@components/common/TravionBotButton';
 import type { MainStackParamList } from '../../navigation/MainNavigator';
-import RiskAnalyticsScreen from '../RiskAnalyticsScreen';
+import RecommendationsScreen from '@screens/agent/RecommendationsScreen';
+// import RiskAnalyticsScreen from '../RiskAnalyticsScreen';
 
 type Props = NativeStackScreenProps<MainStackParamList, 'MainApp'>;
 
@@ -27,11 +28,11 @@ export const MainAppScreen: React.FC<Props> = ({ route, navigation }) => {
       case 'transport':
         return <TransportScreen navigation={navigation} />;
       case 'guide':
-        return <GuideScreen />;
+        return <RecommendationsScreen />;
       case 'safety':
         return <SafetyScreen />;
-      case 'weather':
-        return <RiskAnalyticsScreen />;
+      // case 'weather':
+      // return <RiskAnalyticsScreen />;
       default:
         return (
           <HomeScreen
