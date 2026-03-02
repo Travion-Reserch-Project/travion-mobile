@@ -7,9 +7,9 @@ import {
   Platform,
   ActivityIndicator,
 } from 'react-native';
-import Geolocation from '@react-native-community/geolocation';
 import { SafetyAlerts, SafetyAlert } from './SafetyAlerts';
 import { useQuickSafetyAlerts } from '../../hooks/useSafetyAlerts';
+import { getCurrentPosition } from '@utils/geolocation';
 
 interface SafetyAlertsContainerProps {
   onViewFullMap?: () => void;
@@ -58,20 +58,14 @@ export const SafetyAlertsContainer: React.FC<SafetyAlertsContainerProps> = ({
           }
         }
 
-        // Get current position
-        Geolocation.getCurrentPosition(
-          position => {
-            const { latitude, longitude } = position.coords;
-            setUserLocation({ lat: latitude, lon: longitude });
-            setFetchingLocation(false);
-          },
-          error => {
-            console.log('Geolocation error:', error);
-            setLocationError('Failed to get location');
-            setFetchingLocation(false);
-          },
-          { enableHighAccuracy: true, timeout: 15000, maximumAge: 10000 },
-        );
+        const position = await getCurrentPosition({
+          timeout: 15000,
+          enableHighAccuracy: true,
+          retryAttempts: 2,
+        });
+        const { latitude, longitude } = position;
+        setUserLocation({ lat: latitude, lon: longitude });
+        setFetchingLocation(false);
       } catch (error) {
         console.error('Permission error:', error);
         setLocationError('Permission error');
@@ -130,19 +124,14 @@ export const SafetyAlertsContainer: React.FC<SafetyAlertsContainerProps> = ({
         }
       }
 
-      Geolocation.getCurrentPosition(
-        position => {
-          const { latitude, longitude } = position.coords;
-          setUserLocation({ lat: latitude, lon: longitude });
-          setFetchingLocation(false);
-        },
-        error => {
-          console.log('Geolocation error:', error);
-          setLocationError('Failed to get location');
-          setFetchingLocation(false);
-        },
-        { enableHighAccuracy: true, timeout: 15000, maximumAge: 10000 },
-      );
+      const position = await getCurrentPosition({
+        timeout: 15000,
+        enableHighAccuracy: true,
+        retryAttempts: 2,
+      });
+      const { latitude, longitude } = position;
+      setUserLocation({ lat: latitude, lon: longitude });
+      setFetchingLocation(false);
     } catch (error) {
       console.error('Permission error:', error);
       setLocationError('Permission error');

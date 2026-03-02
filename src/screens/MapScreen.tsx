@@ -9,11 +9,11 @@ import {
 } from 'react-native';
 import MapView, { Marker, Circle, PROVIDER_GOOGLE } from 'react-native-maps';
 import FontAwesome5 from 'react-native-vector-icons/FontAwesome5';
-import Geolocation from '@react-native-community/geolocation';
 import RNGeocoding from 'react-native-geocoding';
 import Config from 'react-native-config';
 import { useNavigation } from '@react-navigation/native';
 import type { SafetyAlert } from '../components/explore/SafetyAlerts';
+import { getCurrentPosition } from '@utils/geolocation';
 
 // Initialize geocoding with API key
 RNGeocoding.init(Config.GOOGLE_MAPS_API_KEY as string);
@@ -209,71 +209,67 @@ export const MapScreen: React.FC<MapScreenProps> = ({ route }) => {
           }
         }
 
-        Geolocation.getCurrentPosition(
-          async position => {
-            const { latitude, longitude } = position.coords;
-            const newLocation = { latitude, longitude };
-            setUserLocation(newLocation);
+        const position = await getCurrentPosition({
+          timeout: 15000,
+          enableHighAccuracy: true,
+          retryAttempts: 2,
+        });
+        const { latitude, longitude } = position;
+        const newLocation = { latitude, longitude };
+        setUserLocation(newLocation);
 
-            // Set map region to user location with appropriate zoom based on risk circle
-            const radius = getRiskRadius(displayRiskLevel);
-            const paddingFactor = 6.0;
-            const degreesPerMeter = 0.00001;
-            const delta = radius * degreesPerMeter * paddingFactor;
+        // Set map region to user location with appropriate zoom based on risk circle
+        const radius = getRiskRadius(displayRiskLevel);
+        const paddingFactor = 6.0;
+        const degreesPerMeter = 0.00001;
+        const delta = radius * degreesPerMeter * paddingFactor;
 
-            setMapRegion({
-              latitude,
-              longitude,
-              latitudeDelta: delta,
-              longitudeDelta: delta,
-            });
+        setMapRegion({
+          latitude,
+          longitude,
+          latitudeDelta: delta,
+          longitudeDelta: delta,
+        });
 
-            // Reverse geocode to get location name
-            try {
-              const results = await RNGeocoding.from(latitude, longitude);
-              if (results && results.results && results.results.length > 0) {
-                const address = results.results[0];
-                const locationString = address.formatted_address || 'Current Location';
-                // Extract location names, removing postal codes
-                const parts = locationString.split(',').map(p => p.trim());
-                // Filter and clean location parts
-                const locationParts = parts
-                  .map(p => {
-                    // Remove trailing digits and spaces (postal codes like "Galle 80000" -> "Galle")
-                    return p.replace(/\s*\d+\s*$/, '').trim();
-                  })
-                  .filter(p => {
-                    // Skip if part is only digits (pure postal code like "94102")
-                    if (/^\d+$/.test(p)) return false;
-                    // Skip if part is only 2 chars (state codes like "CA", "NY")
-                    if (/^[A-Z]{2}$/.test(p)) return false;
-                    // Skip empty strings
-                    if (p === '') return false;
-                    return true;
-                  });
+        // Reverse geocode to get location name
+        try {
+          const results = await RNGeocoding.from(latitude, longitude);
+          if (results && results.results && results.results.length > 0) {
+            const address = results.results[0];
+            const locationString = address.formatted_address || 'Current Location';
+            // Extract location names, removing postal codes
+            const parts = locationString.split(',').map(p => p.trim());
+            // Filter and clean location parts
+            const locationParts = parts
+              .map(p => {
+                // Remove trailing digits and spaces (postal codes like "Galle 80000" -> "Galle")
+                return p.replace(/\s*\d+\s*$/, '').trim();
+              })
+              .filter(p => {
+                // Skip if part is only digits (pure postal code like "94102")
+                if (/^\d+$/.test(p)) return false;
+                // Skip if part is only 2 chars (state codes like "CA", "NY")
+                if (/^[A-Z]{2}$/.test(p)) return false;
+                // Skip empty strings
+                if (p === '') return false;
+                return true;
+              });
 
-                // Get at least 2 location names
-                let displayName = 'Current Location';
-                if (locationParts.length >= 2) {
-                  displayName = `${locationParts[0]}, ${locationParts[1]}`;
-                } else if (locationParts.length === 1) {
-                  displayName = locationParts[0];
-                }
-
-                setLocationName(displayName);
-              }
-            } catch (err) {
-              console.error('Reverse geocoding error:', err);
+            // Get at least 2 location names
+            let displayName = 'Current Location';
+            if (locationParts.length >= 2) {
+              displayName = `${locationParts[0]}, ${locationParts[1]}`;
+            } else if (locationParts.length === 1) {
+              displayName = locationParts[0];
             }
 
-            setLocationLoading(false);
-          },
-          error => {
-            console.log('Geolocation error:', error);
-            setLocationLoading(false);
-          },
-          { enableHighAccuracy: true, timeout: 15000, maximumAge: 10000 },
-        );
+            setLocationName(displayName);
+          }
+        } catch (err) {
+          console.error('Reverse geocoding error:', err);
+        }
+
+        setLocationLoading(false);
       } catch (error) {
         console.error('Permission error:', error);
         setLocationLoading(false);

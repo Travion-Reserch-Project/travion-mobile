@@ -15,7 +15,6 @@ import {
   Image,
 } from 'react-native';
 import FontAwesome5 from 'react-native-vector-icons/FontAwesome5';
-import Geolocation from '@react-native-community/geolocation';
 import RNGeocoding from 'react-native-geocoding';
 import Config from 'react-native-config';
 import { launchImageLibrary } from 'react-native-image-picker';
@@ -25,6 +24,7 @@ import type { MainStackParamList } from '../navigation/MainNavigator';
 import colors from '../theme/colors';
 import typography from '../theme/typography';
 import { incidentReportService } from '@services/api';
+import { getCurrentPosition } from '@utils/geolocation';
 
 // Initialize geocoding
 RNGeocoding.init(Config.GOOGLE_MAPS_API_KEY as string);
@@ -107,34 +107,30 @@ export const ReportIncidentScreen: React.FC = () => {
         }
       }
 
-      Geolocation.getCurrentPosition(
-        async position => {
-          const { latitude, longitude } = position.coords;
+      const position = await getCurrentPosition({
+        timeout: 15000,
+        enableHighAccuracy: true,
+        retryAttempts: 2,
+      });
+      const { latitude, longitude } = position;
 
-          // Save coordinates
-          setLocationCoords({ latitude, longitude });
+      // Save coordinates
+      setLocationCoords({ latitude, longitude });
 
-          // Reverse geocode to get location name
-          try {
-            const results = await RNGeocoding.from(latitude, longitude);
-            if (results && results.results && results.results.length > 0) {
-              const address = results.results[0];
-              const locationString = address.formatted_address || 'Unknown Location';
-              setLocationName(locationString);
-              setEditingLocation(locationString);
-            }
-          } catch (err) {
-            console.error('Reverse geocoding error:', err);
-            setLocationName('Location obtained');
-            setEditingLocation('Location obtained');
-          }
-        },
-        error => {
-          console.log('Geolocation error:', error);
-          setLocationName('Unable to get location');
-        },
-        { enableHighAccuracy: true, timeout: 8000, maximumAge: 10000 },
-      );
+      // Reverse geocode to get location name
+      try {
+        const results = await RNGeocoding.from(latitude, longitude);
+        if (results && results.results && results.results.length > 0) {
+          const address = results.results[0];
+          const locationString = address.formatted_address || 'Unknown Location';
+          setLocationName(locationString);
+          setEditingLocation(locationString);
+        }
+      } catch (err) {
+        console.error('Reverse geocoding error:', err);
+        setLocationName('Location obtained');
+        setEditingLocation('Location obtained');
+      }
 
       // Do not block UI while location fetch happens; show form immediately
       setLoading(false);

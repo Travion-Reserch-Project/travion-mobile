@@ -10,9 +10,17 @@ import {
   Platform,
 } from 'react-native';
 import FontAwesome5 from 'react-native-vector-icons/FontAwesome5';
-import Geolocation from '@react-native-community/geolocation';
 import { AlertCard, FilterTabs, EmptyState, Alert } from '../components/alerts';
 import SafetyService, { SafetyAlert } from '@services/api/SafetyService';
+import { useRoute, RouteProp } from '@react-navigation/native';
+import { getCurrentPosition } from '@utils/geolocation';
+
+type AlertsScreenRouteParams = {
+  incidentId?: string;
+  refresh?: boolean;
+};
+
+type AlertsScreenRouteProp = RouteProp<{ params: AlertsScreenRouteParams }, 'params'>;
 
 /**
  * Calculate distance between two coordinates using Haversine formula
@@ -90,6 +98,7 @@ const transformSafetyAlertToAlert = (
 };
 
 export const AlertsScreen: React.FC = () => {
+  const route = useRoute<AlertsScreenRouteProp>();
   const [alerts, setAlerts] = useState<Alert[]>([]);
   const [filter, setFilter] = useState<'all' | 'unread' | 'critical'>('all');
   const [loading, setLoading] = useState(true);
@@ -98,6 +107,14 @@ export const AlertsScreen: React.FC = () => {
     latitude: number;
     longitude: number;
   } | null>(null);
+
+  // Watch for route params changes (from notifications)
+  useEffect(() => {
+    if (route.params?.refresh) {
+      console.log('[AlertsScreen] Refresh triggered by notification');
+      requestLocationAndFetchIncidents();
+    }
+  }, [route.params?.refresh]);
 
   /**
    * Request location permission and get current position
@@ -128,34 +145,29 @@ export const AlertsScreen: React.FC = () => {
         }
       }
 
-      // Get current position
-      Geolocation.getCurrentPosition(
-        async position => {
-          const { latitude, longitude } = position.coords;
-          setUserLocation({ latitude, longitude });
+      const position = await getCurrentPosition({
+        timeout: 15000,
+        enableHighAccuracy: true,
+        retryAttempts: 2,
+      });
 
-          console.log('[AlertsScreen] Fetching incidents for location:', latitude, longitude);
+      const { latitude, longitude } = position;
+      setUserLocation({ latitude, longitude });
 
-          // Fetch nearby incidents from backend
-          const incidents = await SafetyService.getNearbyIncidents(latitude, longitude, 10, 30);
+      console.log('[AlertsScreen] Fetching incidents for location:', latitude, longitude);
 
-          console.log('[AlertsScreen] Received incidents:', incidents.length);
+      // Fetch nearby incidents from backend
+      const incidents = await SafetyService.getNearbyIncidents(latitude, longitude, 10, 30);
 
-          // Transform to Alert format
-          const transformedAlerts = incidents.map(incident =>
-            transformSafetyAlertToAlert(incident, latitude, longitude),
-          );
+      console.log('[AlertsScreen] Received incidents:', incidents.length);
 
-          setAlerts(transformedAlerts);
-          setLoading(false);
-        },
-        locationError => {
-          console.error('[AlertsScreen] Geolocation error:', locationError);
-          setError('Failed to get your location. Please check your GPS settings.');
-          setLoading(false);
-        },
-        { enableHighAccuracy: true, timeout: 15000, maximumAge: 10000 },
+      // Transform to Alert format
+      const transformedAlerts = incidents.map(incident =>
+        transformSafetyAlertToAlert(incident, latitude, longitude),
       );
+
+      setAlerts(transformedAlerts);
+      setLoading(false);
     } catch (err) {
       console.error('[AlertsScreen] Error:', err);
       const errorMessage = (err as Error).message || 'Failed to fetch nearby incidents';

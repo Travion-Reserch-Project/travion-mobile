@@ -3,22 +3,19 @@ import {
   View,
   Text,
   TouchableOpacity,
-  PermissionsAndroid,
-  Platform,
   ActivityIndicator,
   Animated,
   useWindowDimensions,
 } from 'react-native';
 import FontAwesome5 from 'react-native-vector-icons/FontAwesome5';
 import MapView, { Marker, Circle, PROVIDER_GOOGLE } from 'react-native-maps';
-import Geolocation from '@react-native-community/geolocation';
 import RNGeocoding from 'react-native-geocoding';
+import { getCurrentPosition, LocationCoords } from '@utils/geolocation';
 import Config from 'react-native-config';
 import SafetyService from '@services/api/SafetyService';
 
 // Initialize geocoding with API key
 RNGeocoding.init(Config.GOOGLE_MAPS_API_KEY as string);
-
 export interface SafetyAlert {
   id: string;
   title: string;
@@ -43,10 +40,6 @@ interface SafetyAlertsProps {
   onViewAlerts?: () => void;
   onAlertSelected?: (alert: SafetyAlert) => void;
   onAlertsLoaded?: (alerts: SafetyAlert[]) => void;
-}
-interface LocationCoords {
-  latitude: number;
-  longitude: number;
 }
 
 const defaultAlerts: SafetyAlert[] = [
@@ -246,107 +239,91 @@ export const SafetyAlerts: React.FC<SafetyAlertsProps> = ({
 
   // Request location permissions and get current location
   useEffect(() => {
-    const requestLocationPermission = async () => {
+    const getLocationAndFetchAlerts = async () => {
       try {
-        if (Platform.OS === 'android') {
-          const granted = await PermissionsAndroid.request(
-            PermissionsAndroid.PERMISSIONS.ACCESS_FINE_LOCATION,
-            {
-              title: 'Location Permission',
-              message: 'Travion needs access to your location for safety alerts.',
-              buttonNeutral: 'Ask Me Later',
-              buttonNegative: 'Cancel',
-              buttonPositive: 'OK',
-            },
-          );
-          if (granted !== PermissionsAndroid.RESULTS.GRANTED) {
-            setLocationLoading(false);
-            return;
-          }
-        }
+        console.log('[SafetyAlerts] Getting current position...');
 
-        // Get current position
-        Geolocation.getCurrentPosition(
-          async position => {
-            const { latitude, longitude } = position.coords;
-            const newLocation = { latitude, longitude };
-            setUserLocation(newLocation);
+        // Get current position using the utility (handles permissions internally)
+        const position = await getCurrentPosition({
+          timeout: 15000,
+          enableHighAccuracy: true,
+          retryAttempts: 2,
+        });
 
-            // Calculate zoom level based on risk radius
-            const radius = getRiskRadius(currentRiskLevel);
-            const zoomLevel = getMapZoomLevel(radius);
+        const { latitude, longitude } = position;
+        const newLocation = { latitude, longitude };
+        setUserLocation(newLocation);
 
-            setMapRegion({
-              latitude,
-              longitude,
-              ...zoomLevel,
-            });
+        // Calculate zoom level based on risk radius
+        const radius = getRiskRadius(currentRiskLevel);
+        const zoomLevel = getMapZoomLevel(radius);
 
-            // Fetch safety predictions from backend (includes location name)
-            await fetchSafetyPredictions(latitude, longitude);
+        setMapRegion({
+          latitude,
+          longitude,
+          ...zoomLevel,
+        });
 
-            // Reverse geocode to get location name (fallback if backend doesn't provide)
-            try {
-              console.log('Starting reverse geocoding for:', latitude, longitude);
-              const results = await RNGeocoding.from(latitude, longitude);
-              console.log('Geocoding results:', results);
-              if (results && results.results && results.results.length > 0) {
-                const address = results.results[0];
-                const locationString = address.formatted_address || 'Current Location';
-                console.log('Formatted address:', locationString);
-                // Extract location names, removing postal codes
-                const parts = locationString.split(',').map(p => p.trim());
-                // Filter and clean location parts
-                const locationParts = parts
-                  .map(p => {
-                    // Remove trailing digits and spaces (postal codes like "Galle 80000" -> "Galle")
-                    return p.replace(/\s*\d+\s*$/, '').trim();
-                  })
-                  .filter(p => {
-                    // Skip if part is only digits (pure postal code like "94102")
-                    if (/^\d+$/.test(p)) return false;
-                    // Skip if part is only 2 chars (state codes like "CA", "NY")
-                    if (/^[A-Z]{2}$/.test(p)) return false;
-                    // Skip empty strings
-                    if (p === '') return false;
-                    return true;
-                  });
+        // Fetch safety predictions from backend (includes location name)
+        await fetchSafetyPredictions(latitude, longitude);
 
-                // Get at least 2 location names
-                let displayName = 'Current Location';
-                if (locationParts.length >= 2) {
-                  displayName = `${locationParts[0]}, ${locationParts[1]}`;
-                } else if (locationParts.length === 1) {
-                  displayName = locationParts[0];
-                }
+        // Reverse geocode to get location name (fallback if backend doesn't provide)
+        try {
+          console.log('Starting reverse geocoding for:', latitude, longitude);
+          const results = await RNGeocoding.from(latitude, longitude);
+          console.log('Geocoding results:', results);
+          if (results && results.results && results.results.length > 0) {
+            const address = results.results[0];
+            const locationString = address.formatted_address || 'Current Location';
+            console.log('Formatted address:', locationString);
+            // Extract location names, removing postal codes
+            const parts = locationString.split(',').map(p => p.trim());
+            // Filter and clean location parts
+            const locationParts = parts
+              .map(p => {
+                // Remove trailing digits and spaces (postal codes like "Galle 80000" -> "Galle")
+                return p.replace(/\s*\d+\s*$/, '').trim();
+              })
+              .filter(p => {
+                // Skip if part is only digits (pure postal code like "94102")
+                if (/^\d+$/.test(p)) return false;
+                // Skip if part is only 2 chars (state codes like "CA", "NY")
+                if (/^[A-Z]{2}$/.test(p)) return false;
+                // Skip empty strings
+                if (p === '') return false;
+                return true;
+              });
 
-                console.log('Extracted location name:', displayName);
-                setLocationName(displayName);
-              } else {
-                console.log('No results found from geocoding');
-                setLocationName(`Coordinates: ${latitude.toFixed(4)}, ${longitude.toFixed(4)}`);
-              }
-            } catch (err) {
-              console.error('Reverse geocoding error:', err);
-              // Fallback: show coordinates if geocoding fails
-              setLocationName(`Coordinates: ${latitude.toFixed(4)}, ${longitude.toFixed(4)}`);
+            // Get at least 2 location names
+            let displayName = 'Current Location';
+            if (locationParts.length >= 2) {
+              displayName = `${locationParts[0]}, ${locationParts[1]}`;
+            } else if (locationParts.length === 1) {
+              displayName = locationParts[0];
             }
 
-            setLocationLoading(false);
-          },
-          error => {
-            console.log('Geolocation error:', error);
-            setLocationLoading(false);
-          },
-          { enableHighAccuracy: true, timeout: 15000, maximumAge: 10000 },
-        );
-      } catch (error) {
-        console.error('Permission error:', error);
+            console.log('Extracted location name:', displayName);
+            setLocationName(displayName);
+          } else {
+            console.log('No results found from geocoding');
+            setLocationName(`Coordinates: ${latitude.toFixed(4)}, ${longitude.toFixed(4)}`);
+          }
+        } catch (err) {
+          console.error('Reverse geocoding error:', err);
+          // Fallback: show coordinates if geocoding fails
+          setLocationName(`Coordinates: ${latitude.toFixed(4)}, ${longitude.toFixed(4)}`);
+        }
+
+        setLocationLoading(false);
+      } catch (error: any) {
+        console.error('[SafetyAlerts] Location error:', error);
+        // Show error message to user
+        setLocationName(error.message || 'Unable to get location');
         setLocationLoading(false);
       }
     };
 
-    requestLocationPermission();
+    getLocationAndFetchAlerts();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []); // Run only once on mount
 

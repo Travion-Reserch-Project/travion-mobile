@@ -11,15 +11,12 @@ export abstract class BaseApiService {
 
   //Get authenticated headers for API requests
   protected async getAuthHeaders(): Promise<Record<string, string>> {
+    const headers: Record<string, string> = {};
     const tokens = await AuthUtils.getStoredTokens();
-    if (!tokens || !tokens.accessToken || tokens.accessToken === '') {
-      throw new Error('Authentication required');
+    if (tokens?.accessToken) {
+      headers.Authorization = `Bearer ${tokens.accessToken}`;
     }
-
-    return {
-      Authorization: `Bearer ${tokens.accessToken}`,
-      'Content-Type': 'application/json',
-    };
+    return headers;
   }
 
   //Handle API response with consistent error handling and data extraction

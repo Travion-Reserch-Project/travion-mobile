@@ -168,7 +168,7 @@ class ApiClient {
       // Make request
       const response = await fetch(`${this.baseURL}${endpoint}`, requestInit);
       clearTimeout(timeoutId);
-
+      console.log('Raw response:', response);
       // Apply response interceptors
       const finalResponse = await this.applyResponseInterceptors(response);
 

@@ -7,6 +7,7 @@ import { PoliceHelpScreen } from '@screens/PoliceHelpScreen';
 import { AlertsScreen } from '@screens/AlertsScreen';
 import { ProfileScreen } from '@screens/ProfileScreen';
 import { useAuthStore } from '@stores';
+import { useNotifications } from '@hooks/useNotifications';
 import { View, Text, StyleSheet } from 'react-native';
 import LottieView from 'lottie-react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -59,6 +60,9 @@ const WelcomeBackScreen: React.FC = () => {
 
 export const MainNavigator: React.FC = () => {
   const { user } = useAuthStore();
+
+  // Initialize notifications for authenticated users
+  useNotifications();
 
   // Simple logic: if user has profileStatus 'Complete', show welcome back, otherwise profile setup
   const hasCompleteProfile = user?.profileStatus === 'Complete';
