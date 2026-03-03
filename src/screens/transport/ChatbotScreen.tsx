@@ -12,7 +12,6 @@ import {
   Modal,
 } from 'react-native';
 import FontAwesome5 from 'react-native-vector-icons/FontAwesome5';
-import Geolocation from '@react-native-community/geolocation';
 import RNGeocoding from 'react-native-geocoding';
 import Config from 'react-native-config';
 import { useNavigation } from '@react-navigation/native';
@@ -21,6 +20,7 @@ import type { MainStackParamList } from '../../navigation/MainNavigator';
 import { API_CONFIG } from '@constants';
 import { useAuthStore } from '@stores';
 import { chatService } from '@services';
+import { getCurrentPosition } from '@utils';
 import { RouteMapModal, type ChatMapData } from '@components/transport/RouteMapModal';
 
 interface Timetable {
@@ -274,46 +274,46 @@ export const ChatbotScreen: React.FC = () => {
   const fetchCurrentLocation = async () => {
     try {
       setIsTyping(true);
-      Geolocation.getCurrentPosition(
-        async position => {
-          const { latitude, longitude } = position.coords;
-          try {
-            const results = await RNGeocoding.from(latitude, longitude);
-            const address =
-              results?.results?.[0]?.formatted_address ||
-              `${latitude.toFixed(3)}, ${longitude.toFixed(3)}`;
+      const position = await getCurrentPosition({
+        enableHighAccuracy: true,
+        timeout: 15000,
+        maximumAge: 10000,
+        retryAttempts: 1,
+      });
 
-            _setCurrentLocation({ latitude, longitude, address });
+      const { latitude, longitude } = position;
 
-            // Send location to chatbot
-            const message = `I'm currently at ${address}`;
-            await handleSendMessage(message);
-          } catch (err) {
-            console.error('Geocoding error:', err);
-            _setCurrentLocation({
-              latitude,
-              longitude,
-              address: `${latitude.toFixed(3)}, ${longitude.toFixed(3)}`,
-            });
-            const message = `I'm at ${latitude.toFixed(3)}, ${longitude.toFixed(3)}`;
-            await handleSendMessage(message);
-          }
-        },
-        _error => {
-          setIsTyping(false);
-          const errorMsg: Message = {
-            id: Date.now().toString(),
-            text: 'Unable to get your location. Please check your location settings.',
-            isUser: false,
-            timestamp: new Date(),
-          };
-          setMessages(prev => [...prev, errorMsg]);
-        },
-        { enableHighAccuracy: true, timeout: 15000, maximumAge: 10000 },
-      );
+      try {
+        const results = await RNGeocoding.from(latitude, longitude);
+        const address =
+          results?.results?.[0]?.formatted_address ||
+          `${latitude.toFixed(3)}, ${longitude.toFixed(3)}`;
+
+        _setCurrentLocation({ latitude, longitude, address });
+
+        // Send location to chatbot
+        const message = `I'm currently at ${address}`;
+        await handleSendMessage(message);
+      } catch (err) {
+        console.error('Geocoding error:', err);
+        _setCurrentLocation({
+          latitude,
+          longitude,
+          address: `${latitude.toFixed(3)}, ${longitude.toFixed(3)}`,
+        });
+        const message = `I'm at ${latitude.toFixed(3)}, ${longitude.toFixed(3)}`;
+        await handleSendMessage(message);
+      }
     } catch (error) {
       setIsTyping(false);
       console.error('Error fetching location:', error);
+      const errorMsg: Message = {
+        id: Date.now().toString(),
+        text: 'Unable to get your location. Please check your location settings.',
+        isUser: false,
+        timestamp: new Date(),
+      };
+      setMessages(prev => [...prev, errorMsg]);
     }
   };
 

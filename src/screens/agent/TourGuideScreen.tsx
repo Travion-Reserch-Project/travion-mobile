@@ -16,7 +16,6 @@ import {
   TextInput,
   Keyboard,
 } from 'react-native';
-import Geolocation from '@react-native-community/geolocation';
 import Geocoder from 'react-native-geocoding';
 import FontAwesome5 from 'react-native-vector-icons/FontAwesome5';
 import MaterialCommunityIcons from 'react-native-vector-icons/MaterialCommunityIcons';
@@ -31,7 +30,7 @@ import type {
   SimpleCrowdPredictionResponse,
 } from '@services/api/AIService';
 import type { LocationDetailsResponse } from '@services/api/LocationService';
-import { haversineDistance, calculateMatchScore } from '@utils';
+import { haversineDistance, calculateMatchScore, getCurrentPosition } from '@utils';
 
 // Initialize Google Maps Geocoding
 Geocoder.init(GOOGLE_MAPS_API_KEY, { language: 'en' });
@@ -519,39 +518,37 @@ export const TourGuideScreen: React.FC<TourGuideScreenProps> = ({ onChatbotPress
   };
 
   const getCurrentLocation = async () => {
-    Geolocation.getCurrentPosition(
-      async position => {
-        const { latitude, longitude } = position.coords;
-        console.log('Location obtained:', latitude, longitude);
-
-        // Get city name from coordinates
-        const cityName = await reverseGeocode(latitude, longitude);
-        console.log('City name:', cityName);
-
-        setUserLocation({ latitude, longitude, address: cityName });
-        fetchRecommendations(latitude, longitude);
-      },
-      async error => {
-        console.error('Location error:', error.message);
-        Alert.alert(
-          'Location Error',
-          'Unable to get your current location. Using default location (Colombo).',
-          [{ text: 'OK' }],
-        );
-
-        // Use default location (Colombo, Sri Lanka)
-        const defaultLat = 6.9271;
-        const defaultLng = 79.8612;
-        const cityName = await reverseGeocode(defaultLat, defaultLng);
-        setUserLocation({ latitude: defaultLat, longitude: defaultLng, address: cityName });
-        fetchRecommendations(defaultLat, defaultLng);
-      },
-      {
+    try {
+      const position = await getCurrentPosition({
         enableHighAccuracy: true,
         timeout: 20000,
         maximumAge: 10000,
-      },
-    );
+        retryAttempts: 1,
+      });
+      const { latitude, longitude } = position;
+      console.log('Location obtained:', latitude, longitude);
+
+      // Get city name from coordinates
+      const cityName = await reverseGeocode(latitude, longitude);
+      console.log('City name:', cityName);
+
+      setUserLocation({ latitude, longitude, address: cityName });
+      fetchRecommendations(latitude, longitude);
+    } catch (locationError: any) {
+      console.error('Location error:', locationError?.message || locationError);
+      Alert.alert(
+        'Location Error',
+        'Unable to get your current location. Using default location (Colombo).',
+        [{ text: 'OK' }],
+      );
+
+      // Use default location (Colombo, Sri Lanka)
+      const defaultLat = 6.9271;
+      const defaultLng = 79.8612;
+      const cityName = await reverseGeocode(defaultLat, defaultLng);
+      setUserLocation({ latitude: defaultLat, longitude: defaultLng, address: cityName });
+      fetchRecommendations(defaultLat, defaultLng);
+    }
   };
 
   const fetchRecommendations = async (

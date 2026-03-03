@@ -6,13 +6,12 @@ import { useAuthStore } from '@stores';
 import { initializeFirebaseMessaging, NotificationPayload } from '@services';
 import Geolocation from '@react-native-community/geolocation';
 
-// Configure geolocation to use Google Play Services (Fused Location Provider)
-// instead of the default Android LocationManager which often fails with
-// "No location provider available"
+// Configure geolocation to use Android LocationManager on Android.
+// This avoids crashes seen in Play Services listener cleanup on some devices/emulators.
 Geolocation.setRNConfiguration({
   skipPermissionRequests: false,
   authorizationLevel: 'whenInUse',
-  locationProvider: 'playServices',
+  locationProvider: 'android',
 });
 
 function AppContent() {

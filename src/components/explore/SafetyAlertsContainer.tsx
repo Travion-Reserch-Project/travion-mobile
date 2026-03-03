@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   View,
   Text,
@@ -36,45 +36,45 @@ export const SafetyAlertsContainer: React.FC<SafetyAlertsContainerProps> = ({
     userLocation?.lon || 0,
   );
 
+  const requestLocationPermission = useCallback(async () => {
+    try {
+      if (Platform.OS === 'android') {
+        const granted = await PermissionsAndroid.request(
+          PermissionsAndroid.PERMISSIONS.ACCESS_FINE_LOCATION,
+          {
+            title: 'Location Permission',
+            message: 'Travion needs access to your location for safety alerts.',
+            buttonNeutral: 'Ask Me Later',
+            buttonNegative: 'Cancel',
+            buttonPositive: 'OK',
+          },
+        );
+        if (granted !== PermissionsAndroid.RESULTS.GRANTED) {
+          setLocationError('Location permission denied');
+          setFetchingLocation(false);
+          return;
+        }
+      }
+
+      const position = await getCurrentPosition({
+        timeout: 15000,
+        enableHighAccuracy: false,
+        retryAttempts: 1,
+      });
+      const { latitude, longitude } = position;
+      setUserLocation({ lat: latitude, lon: longitude });
+      setFetchingLocation(false);
+    } catch (error) {
+      console.error('Permission error:', error);
+      setLocationError('Permission error');
+      setFetchingLocation(false);
+    }
+  }, []);
+
   // Request location permissions and get current location
   useEffect(() => {
-    const requestLocationPermission = async () => {
-      try {
-        if (Platform.OS === 'android') {
-          const granted = await PermissionsAndroid.request(
-            PermissionsAndroid.PERMISSIONS.ACCESS_FINE_LOCATION,
-            {
-              title: 'Location Permission',
-              message: 'Travion needs access to your location for safety alerts.',
-              buttonNeutral: 'Ask Me Later',
-              buttonNegative: 'Cancel',
-              buttonPositive: 'OK',
-            },
-          );
-          if (granted !== PermissionsAndroid.RESULTS.GRANTED) {
-            setLocationError('Location permission denied');
-            setFetchingLocation(false);
-            return;
-          }
-        }
-
-        const position = await getCurrentPosition({
-          timeout: 15000,
-          enableHighAccuracy: true,
-          retryAttempts: 2,
-        });
-        const { latitude, longitude } = position;
-        setUserLocation({ lat: latitude, lon: longitude });
-        setFetchingLocation(false);
-      } catch (error) {
-        console.error('Permission error:', error);
-        setLocationError('Permission error');
-        setFetchingLocation(false);
-      }
-    };
-
     requestLocationPermission();
-  }, []);
+  }, [requestLocationPermission]);
 
   // Show loading state while fetching location or alerts
   if (fetchingLocation || (loading && !alerts.length)) {
@@ -110,34 +110,6 @@ export const SafetyAlertsContainer: React.FC<SafetyAlertsContainerProps> = ({
       </View>
     );
   }
-
-  const requestLocationPermission = async () => {
-    try {
-      if (Platform.OS === 'android') {
-        const granted = await PermissionsAndroid.request(
-          PermissionsAndroid.PERMISSIONS.ACCESS_FINE_LOCATION,
-        );
-        if (granted !== PermissionsAndroid.RESULTS.GRANTED) {
-          setLocationError('Location permission denied');
-          setFetchingLocation(false);
-          return;
-        }
-      }
-
-      const position = await getCurrentPosition({
-        timeout: 15000,
-        enableHighAccuracy: true,
-        retryAttempts: 2,
-      });
-      const { latitude, longitude } = position;
-      setUserLocation({ lat: latitude, lon: longitude });
-      setFetchingLocation(false);
-    } catch (error) {
-      console.error('Permission error:', error);
-      setLocationError('Permission error');
-      setFetchingLocation(false);
-    }
-  };
 
   return (
     <>

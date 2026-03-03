@@ -8,15 +8,13 @@ import {
   TouchableOpacity,
   StatusBar,
   ScrollView,
-  PermissionsAndroid,
-  Platform,
   ActivityIndicator,
 } from 'react-native';
 import FontAwesome5 from 'react-native-vector-icons/FontAwesome5';
-import Geolocation from '@react-native-community/geolocation';
 import RNGeocoding from 'react-native-geocoding';
 import Config from 'react-native-config';
 import { weatherService } from '../../services/api/WeatherService';
+import { getCurrentPosition } from '@utils/geolocation';
 
 type NavigationProp = NativeStackNavigationProp<MainStackParamList>;
 
@@ -39,6 +37,7 @@ export const WeatherScreen: React.FC = () => {
   const resolveLocationName = async (latitude: number, longitude: number) => {
     try {
       const results = await RNGeocoding.from(latitude, longitude);
+      if (!isMountedRef.current) return;
       if (results && results.results && results.results.length > 0) {
         const address = results.results[0];
         const parts = address.formatted_address.split(',').map((p: string) => p.trim());
@@ -50,7 +49,9 @@ export const WeatherScreen: React.FC = () => {
       }
     } catch (err) {
       console.error('Reverse geocoding error:', err);
-      setLocationName('Unknown Location');
+      if (isMountedRef.current) {
+        setLocationName('Unknown Location');
+      }
     }
   };
 
@@ -112,7 +113,9 @@ export const WeatherScreen: React.FC = () => {
   // Fallback: use default coordinates when geolocation completely fails
   const fetchWeatherWithDefaults = async () => {
     console.log('Using default location (Colombo, Sri Lanka)');
-    setLocationName('Colombo, Sri Lanka (Default)');
+    if (isMountedRef.current) {
+      setLocationName('Colombo, Sri Lanka (Default)');
+    }
     await fetchWeatherForCoords(DEFAULT_COORDS.latitude, DEFAULT_COORDS.longitude);
   };
 
@@ -133,63 +136,19 @@ export const WeatherScreen: React.FC = () => {
         if (!isMountedRef.current) return;
         setLoading(true);
 
-        // Request Location Permission
-        if (Platform.OS === 'android') {
-          const granted = await PermissionsAndroid.request(
-            PermissionsAndroid.PERMISSIONS.ACCESS_FINE_LOCATION,
-            {
-              title: 'Location Permission',
-              message: 'Travion needs access to your location to fetch weather data.',
-              buttonNeutral: 'Ask Me Later',
-              buttonNegative: 'Cancel',
-              buttonPositive: 'OK',
-            },
-          );
-          if (granted !== PermissionsAndroid.RESULTS.GRANTED) {
-            if (isMountedRef.current) setLocationName('Permission denied');
-            // Still fetch weather with default coordinates
-            await fetchWeatherWithDefaults();
-            return;
-          }
-        }
+        // Shared utility handles permission + high->low accuracy retry
+        const position = await getCurrentPosition({
+          timeout: 12000,
+          maximumAge: 0,
+          enableHighAccuracy: true,
+          retryAttempts: 1,
+          retryDelay: 1000,
+        });
 
-        // Attempt 1: High accuracy (GPS via FusedLocationProvider)
-        Geolocation.getCurrentPosition(
-          async position => {
-            if (!isMountedRef.current) return;
-            const { latitude, longitude } = position.coords;
-            await resolveLocationName(latitude, longitude);
-            await fetchWeatherForCoords(latitude, longitude);
-          },
-          _highAccuracyError => {
-            if (!isMountedRef.current) return;
-            console.warn(
-              'High accuracy geolocation failed, retrying with low accuracy...',
-              _highAccuracyError,
-            );
-
-            // Attempt 2: Low accuracy (network-based location)
-            Geolocation.getCurrentPosition(
-              async position => {
-                if (!isMountedRef.current) return;
-                const { latitude, longitude } = position.coords;
-                await resolveLocationName(latitude, longitude);
-                await fetchWeatherForCoords(latitude, longitude);
-              },
-              async _lowAccuracyError => {
-                if (!isMountedRef.current) return;
-                console.warn(
-                  'Low accuracy geolocation also failed, using default location.',
-                  _lowAccuracyError,
-                );
-                // Attempt 3: Fallback to default coordinates
-                await fetchWeatherWithDefaults();
-              },
-              { enableHighAccuracy: false, timeout: 15000, maximumAge: 60000 },
-            );
-          },
-          { enableHighAccuracy: true, timeout: 10000, maximumAge: 10000 },
-        );
+        if (!isMountedRef.current) return;
+        const { latitude, longitude } = position;
+        await resolveLocationName(latitude, longitude);
+        await fetchWeatherForCoords(latitude, longitude);
       } catch (err) {
         console.error('Setup error:', err);
         if (isMountedRef.current) {
@@ -204,7 +163,8 @@ export const WeatherScreen: React.FC = () => {
     return () => {
       isMountedRef.current = false;
     };
-  });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // Helper to format conditions from data
   const getConditionValue = (type: string, defaultValue: string) => {
