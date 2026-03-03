@@ -2,6 +2,10 @@ import React from 'react';
 import { View, Text, ScrollView, TouchableOpacity } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import FontAwesome from 'react-native-vector-icons/FontAwesome';
+import { useNavigation, useRoute, type RouteProp } from '@react-navigation/native';
+import type { MainStackParamList } from '@navigation';
+import SafetyChecklist from '../../components/weather/SafetyChecklist';
+import { normalizeRiskLevel, riskAccentColors } from '../../data/safetyChecklistData';
 
 type ForecastItem = {
   time: string;
@@ -20,12 +24,32 @@ const forecastData: ForecastItem[] = [
   { time: '4 PM', label: 'Low', color: '#4CD964' },
 ];
 
+/** Human-readable labels per risk level */
+const riskLabels: Record<string, string> = {
+  low: 'Low Risk • Enjoy Your Day',
+  moderate: 'Moderate Risk • Stay Cautious',
+  high: 'High Risk • Protection Needed',
+  'very high': 'Very High Risk • Protection Essential',
+  extreme: 'Extreme Risk • Avoid Sun Exposure',
+};
+
 const SafetyAdvisorScreen: React.FC = () => {
+  const navigation = useNavigation();
+  const route = useRoute<RouteProp<MainStackParamList, 'SafetyAdvisor'>>();
+
+  // Read from route params with sensible defaults
+  const riskLevel = (route.params as any)?.riskLevel ?? 'Very High';
+  const uvIndex = (route.params as any)?.uvIndex ?? 8;
+  const locationName = (route.params as any)?.locationName ?? 'MIRISSA, SRI LANKA';
+
+  const level = normalizeRiskLevel(riskLevel);
+  const accent = riskAccentColors[level];
+
   return (
     <SafeAreaView className="flex-1">
       {/* Header */}
       <View className="flex-row items-center justify-between px-5 py-3">
-        <TouchableOpacity>
+        <TouchableOpacity onPress={() => navigation.goBack()}>
           <FontAwesome name="arrow-left" size={20} color="#111" />
         </TouchableOpacity>
 
@@ -39,10 +63,16 @@ const SafetyAdvisorScreen: React.FC = () => {
       <ScrollView showsVerticalScrollIndicator={false}>
         {/* Location */}
         <View className="items-center mt-2">
-          <View className="flex-row items-center bg-[#FFE2CC] px-4 py-1 rounded-full">
-            <FontAwesome name="map-marker" size={14} color="#FF8C1A" />
-            <Text className="ml-2 text-[#FF8C1A] font-semibold text-xs tracking-wide">
-              MIRISSA, SRI LANKA
+          <View
+            className="flex-row items-center px-4 py-1 rounded-full"
+            style={{ backgroundColor: accent.bg }}
+          >
+            <FontAwesome name="map-marker" size={14} color={accent.tint} />
+            <Text
+              className="ml-2 font-semibold text-xs tracking-wide"
+              style={{ color: accent.tint }}
+            >
+              {locationName.toUpperCase()}
             </Text>
           </View>
         </View>
@@ -50,9 +80,11 @@ const SafetyAdvisorScreen: React.FC = () => {
         {/* UV Index */}
         <View className="items-center mt-5">
           <Text className="text-4xl font-extrabold text-black">
-            UV Index <Text className="text-[#FF8C1A]">8</Text>
+            UV Index <Text style={{ color: accent.tint }}>{uvIndex}</Text>
           </Text>
-          <Text className="text-[#8C7B6A] mt-2">Very High Risk • Protection Essential</Text>
+          <Text className="text-[#8C7B6A] mt-2">
+            {riskLabels[level] ?? 'Protection Recommended'}
+          </Text>
         </View>
 
         {/* Daily Forecast */}
@@ -71,14 +103,13 @@ const SafetyAdvisorScreen: React.FC = () => {
                 </Text>
 
                 <View
-                  className={`
-    w-10 h-16 rounded-2xl
-    ${item.active ? 'border-2 border-[#FF8C1A]' : ''}
-  `}
+                  className={`w-10 h-16 rounded-2xl ${
+                    item.active ? 'border-2 border-[#FF8C1A]' : ''
+                  }`}
                   style={{ backgroundColor: item.color }}
                 />
 
-                <Text className={`text-xs mt-2 font-semibold`} style={{ color: item.color }}>
+                <Text className="text-xs mt-2 font-semibold" style={{ color: item.color }}>
                   {item.label}
                 </Text>
               </View>
@@ -86,73 +117,8 @@ const SafetyAdvisorScreen: React.FC = () => {
           </View>
         </View>
 
-        {/* Safety Checklist */}
-        <View className="mt-10 px-5">
-          <Text className="text-xl font-bold text-black">Safety Checklist</Text>
-          <Text className="text-[#8C7B6A] mt-1 mb-4">
-            Follow these guidelines to minimize sun exposure risks today.
-          </Text>
-
-          {/* Card 1 */}
-          <View className="bg-white rounded-2xl p-4 mb-4 shadow-sm">
-            <View className="flex-row items-start">
-              <View className="bg-[#FFE2CC] p-3 rounded-full">
-                <FontAwesome name="sun-o" size={18} color="#FF8C1A" />
-              </View>
-              <View className="ml-4 flex-1">
-                <Text className="font-bold text-black">Sunscreen SPF 50+</Text>
-                <Text className="text-[#8C7B6A] mt-1">
-                  Apply liberally every 2 hours, especially after swimming.
-                </Text>
-              </View>
-            </View>
-          </View>
-
-          {/* Card 2 */}
-          <View className="bg-white rounded-2xl p-4 mb-4 shadow-sm">
-            <View className="flex-row items-start">
-              <View className="bg-[#FFE2CC] p-3 rounded-full">
-                <FontAwesome name="user" size={18} color="#FF8C1A" />
-              </View>
-              <View className="ml-4 flex-1">
-                <Text className="font-bold text-black">Protective Gear</Text>
-                <Text className="text-[#8C7B6A] mt-1">
-                  Wear a wide-brimmed hat and UV-blocking sunglasses.
-                </Text>
-              </View>
-            </View>
-          </View>
-
-          {/* Card 3 */}
-          <View className="bg-white rounded-2xl p-4 mb-4 shadow-sm">
-            <View className="flex-row items-start">
-              <View className="bg-[#FFE2CC] p-3 rounded-full">
-                <FontAwesome name="clock-o" size={18} color="#FF8C1A" />
-              </View>
-              <View className="ml-4 flex-1">
-                <Text className="font-bold text-black">Seek Shade</Text>
-                <Text className="text-[#8C7B6A] mt-1">
-                  Avoid direct sun between 11 AM and 3 PM.
-                </Text>
-              </View>
-            </View>
-          </View>
-
-          {/* Card 4 */}
-          <View className="bg-white rounded-2xl p-4 mb-24 shadow-sm">
-            <View className="flex-row items-start">
-              <View className="bg-[#FFE2CC] p-3 rounded-full">
-                <FontAwesome name="tint" size={18} color="#FF8C1A" />
-              </View>
-              <View className="ml-4 flex-1">
-                <Text className="font-bold text-black">Stay Hydrated</Text>
-                <Text className="text-[#8C7B6A] mt-1">
-                  Heat index is high. Drink water regularly.
-                </Text>
-              </View>
-            </View>
-          </View>
-        </View>
+        {/* ═══════ Dynamic Safety Checklist ═══════ */}
+        <SafetyChecklist riskLevel={riskLevel} />
       </ScrollView>
 
       {/* Enable Alerts Button */}
@@ -162,24 +128,6 @@ const SafetyAdvisorScreen: React.FC = () => {
           <Text className="text-white font-bold ml-3 text-base">Enable High UV Alerts</Text>
         </TouchableOpacity>
       </View>
-
-      {/* Bottom Navigation */}
-      {/* <View className="flex-row justify-around items-center h-14 bg-white border-t border-gray-200">
-        <View className="items-center">
-          <FontAwesome name="home" size={20} color="#FF8C1A" />
-          <Text className="text-xs text-[#FF8C1A] mt-1">Home</Text>
-        </View>
-
-        <View className="items-center">
-          <FontAwesome name="sun-o" size={20} color="#9CA3AF" />
-          <Text className="text-xs text-gray-400 mt-1">Forecast</Text>
-        </View>
-
-        <View className="items-center">
-          <FontAwesome name="user" size={20} color="#9CA3AF" />
-          <Text className="text-xs text-gray-400 mt-1">Profile</Text>
-        </View>
-      </View> */}
     </SafeAreaView>
   );
 };

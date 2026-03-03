@@ -16,6 +16,7 @@ import FontAwesome from 'react-native-vector-icons/FontAwesome';
 import Geolocation from '@react-native-community/geolocation';
 import RNGeocoding from 'react-native-geocoding';
 import { weatherService } from '../../services/api/WeatherService';
+import SafetyChecklist from '../../components/weather/SafetyChecklist';
 
 type NavigationProp = NativeStackNavigationProp<MainStackParamList>;
 
@@ -324,40 +325,21 @@ const SunProtectionScreen: React.FC = () => {
           </View>
         </View>
 
-        {/* ================= ACTIONS ================= */}
-        <View className="px-6">
-          <Text className="text-lg font-bold mb-4">Recommended Actions</Text>
-
-          {[
-            riskLevel.toLowerCase() === 'low'
-              ? 'No special precautions needed'
-              : 'Apply broad-spectrum sunscreen SPF 50+',
-            riskLevel.toLowerCase() === 'moderate' ||
-            riskLevel.toLowerCase() === 'high' ||
-            riskLevel.toLowerCase() === 'very high'
-              ? 'Wear protective clothing & sunglasses'
-              : 'Stay hydrated throughout the day',
-            'Seek shade if staying outdoors for long',
-          ].map((item, index) => (
-            <View key={index} className="flex-row items-center mb-4">
-              <View
-                className={`bg-${
-                  riskLevel.toLowerCase() === 'low' ? 'green' : 'orange'
-                }-500 p-2 rounded-full mr-4`}
-              >
-                <FontAwesome name="check" size={12} color="#fff" />
-              </View>
-              <Text className="text-gray-700 text-base">{item}</Text>
-            </View>
-          ))}
-        </View>
+        {/* ================= SAFETY CHECKLIST ================= */}
+        <SafetyChecklist riskLevel={riskLevel} />
       </ScrollView>
 
       {/* ================= CTA (FIXED) ================= */}
       <View className="absolute bottom-0 left-0 right-0 bg-white px-6 pb-6 pt-3 border-t border-gray-100">
         <TouchableOpacity
           className="bg-primary py-4 rounded-2xl flex-row justify-center items-center"
-          onPress={() => navigation.navigate('SafetyAdvisor')}
+          onPress={() =>
+            navigation.navigate('SafetyAdvisor', {
+              riskLevel,
+              uvIndex,
+              locationName,
+            } as any)
+          }
         >
           <Text className="text-white font-bold text-lg mr-2">Get More Details</Text>
           <FontAwesome name="arrow-right" size={16} color="#fff" />
