@@ -538,7 +538,7 @@ export const MapScreen: React.FC<MapScreenProps> = ({ route }) => {
                     >
                       {/* Incident name */}
                       <Text className="text-sm font-gilroy-medium text-gray-800 flex-1">
-                        {alert.incidentType || alert.title}
+                        {alert.incidentType}
                       </Text>
 
                       {/* Risk level badge */}
