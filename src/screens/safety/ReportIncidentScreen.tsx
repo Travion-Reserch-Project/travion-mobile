@@ -26,9 +26,6 @@ import typography from '../../theme/typography';
 import { incidentReportService } from '@services/api';
 import { getCurrentPosition } from '@utils/geolocation';
 
-// Initialize geocoding
-RNGeocoding.init(Config.GOOGLE_MAPS_API_KEY as string);
-
 type NavigationProp = NativeStackNavigationProp<MainStackParamList>;
 
 const INCIDENT_TYPES = [
@@ -90,6 +87,15 @@ export const ReportIncidentScreen: React.FC = () => {
 
   const requestLocationPermission = async () => {
     try {
+      // Initialize geocoding with proper error handling
+      if (Config.GOOGLE_MAPS_API_KEY && Config.GOOGLE_MAPS_API_KEY !== 'YOUR_API_KEY') {
+        try {
+          RNGeocoding.init(Config.GOOGLE_MAPS_API_KEY as string);
+        } catch (error) {
+          console.warn('Failed to initialize RNGeocoding:', error);
+        }
+      }
+
       if (Platform.OS === 'android') {
         const granted = await PermissionsAndroid.request(
           PermissionsAndroid.PERMISSIONS.ACCESS_FINE_LOCATION,

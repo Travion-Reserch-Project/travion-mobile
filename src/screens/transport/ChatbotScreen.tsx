@@ -21,6 +21,7 @@ import type { MainStackParamList } from '../../navigation/MainNavigator';
 import { API_CONFIG } from '@constants';
 import { useAuthStore } from '@stores';
 import { chatService } from '@services';
+import { RouteMapModal, type ChatMapData } from '@components/transport/RouteMapModal';
 
 interface Timetable {
   departure_time: string;
@@ -42,6 +43,162 @@ interface TransportRecommendation {
   is_recommended: boolean;
 }
 
+interface RouteDetails {
+  route_id: string;
+  transport_type: string;
+  operator_name: string;
+  score: number;
+  duration_min: number;
+  distance_km: number;
+  fare_lkr: number;
+  congestion?: string;
+  weather_conditions?: string;
+  navigation_steps?: Array<{
+    instruction: string;
+    distance: number;
+    duration: number;
+    travel_mode: string;
+  }>;
+}
+
+// Enhanced Route Card Component
+const RouteCard: React.FC<{ route: RouteDetails; index: number }> = ({ route, index }) => {
+  const [expanded, setExpanded] = useState(false);
+
+  const getMedalEmoji = (idx: number) => {
+    if (idx === 0) return '🥇';
+    if (idx === 1) return '🥈';
+    if (idx === 2) return '🥉';
+    return '📍';
+  };
+
+  const formatDuration = (mins: number) => {
+    const hours = Math.floor(mins / 60);
+    const minutes = mins % 60;
+    if (hours > 0) {
+      return `${hours}h ${minutes}m`;
+    }
+    return `${minutes} min`;
+  };
+
+  return (
+    <View className="mb-3 mx-3">
+      <TouchableOpacity
+        onPress={() => setExpanded(!expanded)}
+        className={`bg-white rounded-xl border-2 overflow-hidden shadow-sm ${
+          index === 0 ? 'border-green-500' : 'border-gray-200'
+        }`}
+      >
+        {/* Header */}
+        <View className={`p-4 ${index === 0 ? 'bg-green-50' : 'bg-white'}`}>
+          <View className="flex-row items-center justify-between mb-2">
+            <View className="flex-row items-center flex-1">
+              <Text className="text-2xl mr-2">{getMedalEmoji(index)}</Text>
+              <View className="flex-1">
+                <Text className="text-base font-gilroy-bold text-gray-900" numberOfLines={1}>
+                  {route.operator_name}
+                </Text>
+                <Text className="text-xs font-gilroy-medium text-gray-600 capitalize">
+                  {route.transport_type}
+                </Text>
+              </View>
+            </View>
+            <View className="bg-blue-100 px-3 py-1 rounded-full">
+              <Text className="text-sm font-gilroy-bold text-blue-700">{route.score}/100</Text>
+            </View>
+          </View>
+
+          {/* Key Metrics */}
+          <View className="flex-row items-center justify-between mt-3 pt-3 border-t border-gray-200">
+            <View className="flex-1 items-center">
+              <FontAwesome5 name="clock" size={14} color="#6B7280" />
+              <Text className="text-xs font-gilroy-bold text-gray-900 mt-1">
+                {formatDuration(route.duration_min)}
+              </Text>
+              <Text className="text-xs font-gilroy-regular text-gray-500">Duration</Text>
+            </View>
+            <View className="flex-1 items-center">
+              <FontAwesome5 name="road" size={14} color="#6B7280" />
+              <Text className="text-xs font-gilroy-bold text-gray-900 mt-1">
+                {route.distance_km.toFixed(1)} km
+              </Text>
+              <Text className="text-xs font-gilroy-regular text-gray-500">Distance</Text>
+            </View>
+            <View className="flex-1 items-center">
+              <FontAwesome5 name="money-bill-wave" size={14} color="#6B7280" />
+              <Text className="text-xs font-gilroy-bold text-gray-900 mt-1">
+                LKR {route.fare_lkr}
+              </Text>
+              <Text className="text-xs font-gilroy-regular text-gray-500">Fare</Text>
+            </View>
+          </View>
+
+          {/* Status Badges */}
+          <View className="flex-row items-center mt-3 gap-2">
+            {route.weather_conditions && (
+              <View className="bg-green-100 px-2 py-1 rounded-full">
+                <Text className="text-xs font-gilroy-medium text-green-700">
+                  ✅ {route.weather_conditions}
+                </Text>
+              </View>
+            )}
+            {route.congestion && (
+              <View className="bg-green-100 px-2 py-1 rounded-full">
+                <Text className="text-xs font-gilroy-medium text-green-700">
+                  🟢 {route.congestion} traffic
+                </Text>
+              </View>
+            )}
+          </View>
+
+          {/* Expand/Collapse Indicator */}
+          <View className="flex-row items-center justify-center mt-3 pt-2 border-t border-gray-200">
+            <Text className="text-xs font-gilroy-medium text-gray-500 mr-1">
+              {expanded ? 'Hide' : 'View'} turn-by-turn directions
+            </Text>
+            <FontAwesome5
+              name={expanded ? 'chevron-up' : 'chevron-down'}
+              size={10}
+              color="#6B7280"
+            />
+          </View>
+        </View>
+
+        {/* Expandable Directions */}
+        {expanded && route.navigation_steps && route.navigation_steps.length > 0 && (
+          <View className="px-4 pb-4 bg-gray-50 border-t border-gray-200">
+            <Text className="text-sm font-gilroy-bold text-gray-900 mb-3 mt-3">
+              🗺️ Turn-by-Turn Directions
+            </Text>
+            {route.navigation_steps.map((step, idx) => (
+              <View key={idx} className="flex-row mb-3">
+                <View className="w-6 h-6 rounded-full bg-primary items-center justify-center mr-3 mt-1">
+                  <Text className="text-xs font-gilroy-bold text-white">{idx + 1}</Text>
+                </View>
+                <View className="flex-1">
+                  <Text className="text-xs font-gilroy-regular text-gray-800">
+                    {step.instruction.split('\n')[0]}
+                  </Text>
+                  <View className="flex-row items-center mt-1">
+                    <Text className="text-xs font-gilroy-medium text-gray-500">
+                      {(step.distance / 1000).toFixed(1)} km • {Math.round(step.duration / 60)} min
+                    </Text>
+                    <View className="ml-2 bg-gray-200 px-2 py-0.5 rounded">
+                      <Text className="text-xs font-gilroy-medium text-gray-700 capitalize">
+                        {step.travel_mode.toLowerCase()}
+                      </Text>
+                    </View>
+                  </View>
+                </View>
+              </View>
+            ))}
+          </View>
+        )}
+      </TouchableOpacity>
+    </View>
+  );
+};
+
 interface Message {
   id: string;
   text: string;
@@ -54,6 +211,13 @@ interface Message {
     departureDate?: string;
     departureTime?: string;
   };
+  routeSummary?: {
+    departureTime?: string;
+    distance?: string;
+    reasoning?: string;
+  };
+  routeDetails?: RouteDetails[];
+  mapData?: ChatMapData;
 }
 
 export const ChatbotScreen: React.FC = () => {
@@ -72,6 +236,9 @@ export const ChatbotScreen: React.FC = () => {
   const [timetables, setTimetables] = useState<Timetable[]>([]);
   const [timetableLoading, setTimetableLoading] = useState(false);
   const [selectedService, setSelectedService] = useState<TransportRecommendation | null>(null);
+  const [routeMapVisible, setRouteMapVisible] = useState(false);
+  const [activeMapData, setActiveMapData] = useState<ChatMapData | null>(null);
+  const [selectedMapRouteId, setSelectedMapRouteId] = useState<string | null>(null);
   const scrollViewRef = useRef<ScrollView>(null);
   const { tokens } = useAuthStore();
   const [_conversationId, _setConversationId] = useState<string | null>(null);
@@ -180,11 +347,80 @@ export const ChatbotScreen: React.FC = () => {
         const botData = response.data;
         _setConversationId(botData.conversation_id);
 
+        // Extract route summary from message
+        const fullMessageText = botData.message;
+        const summaryMatch = fullMessageText.match(
+          /\*\*Route Summary:\*\*([\s\S]*?)\*\*Detailed Route Options:\*\*/,
+        );
+        let routeSummary;
+
+        if (summaryMatch) {
+          const summaryText = summaryMatch[1];
+          const departureTimeMatch = summaryText.match(/Departure time considered: ([^\n]+)/);
+          const distanceMatch = summaryText.match(/Estimated trip distance: ([^\n]+)/);
+          const reasoningMatch = summaryText.match(/Reasoning: ([^\n]+)/);
+
+          routeSummary = {
+            departureTime: departureTimeMatch?.[1]?.trim(),
+            distance: distanceMatch?.[1]?.trim(),
+            reasoning: reasoningMatch?.[1]?.trim(),
+          };
+        }
+
+        // Extract simplified message (just the intro)
+        const simplifiedMessage =
+          fullMessageText.split('**Route Summary:**')[0]?.trim() || fullMessageText;
+
         const botMessage: Message = {
           id: (Date.now() + 1).toString(),
-          text: botData.message,
+          text: simplifiedMessage,
           isUser: false,
           timestamp: new Date(),
+          routeSummary,
+          routeDetails: botData.metadata?.transport_recommendations?.ranked_routes?.map(
+            (route: any) => ({
+              route_id: route.route_id,
+              transport_type: route.transport_type,
+              operator_name: route.operator_name,
+              score: Math.round((route.score || 0) * 100),
+              duration_min:
+                route.dynamic?.duration_min || route.static?.estimated_duration_min || 0,
+              distance_km: route.dynamic?.distance_km || route.static?.distance_km || 0,
+              fare_lkr: route.static?.base_fare_lkr || 0,
+              congestion: route.dynamic?.congestion,
+              weather_conditions:
+                route.dynamic?.weather_risk < 0.2 ? 'Good weather' : 'Check weather',
+              navigation_steps: route.static?.navigation_steps,
+            }),
+          ),
+          mapData: (() => {
+            const mapData = botData.metadata?.map_data;
+            if (!mapData?.origin || !mapData?.destination || !Array.isArray(mapData.routes)) {
+              return undefined;
+            }
+
+            return {
+              origin: {
+                lat: mapData.origin.lat,
+                lng: mapData.origin.lng,
+              },
+              destination: {
+                lat: mapData.destination.lat,
+                lng: mapData.destination.lng,
+              },
+              routes: mapData.routes
+                .filter(
+                  (route: any) => typeof route?.polyline === 'string' && route.polyline.length > 0,
+                )
+                .map((route: any, index: number) => ({
+                  route_id: route.route_id,
+                  transport_type: route.transport_type,
+                  polyline: route.polyline,
+                  color: route.color || ['#3B82F6', '#F97316', '#10B981'][index % 3],
+                  navigation_steps: route.navigation_steps || [],
+                })),
+            } as ChatMapData;
+          })(),
           recommendations: botData.metadata?.transport_recommendations?.ranked_routes?.map(
             (route: any) => ({
               service_id: route.route_id,
@@ -237,6 +473,12 @@ export const ChatbotScreen: React.FC = () => {
 
   const handleQuickSuggestion = (suggestion: string) => {
     setInputText(suggestion);
+  };
+
+  const openRouteMap = (mapData: ChatMapData, routeId?: string) => {
+    setActiveMapData(mapData);
+    setSelectedMapRouteId(routeId || mapData.routes?.[0]?.route_id || null);
+    setRouteMapVisible(true);
   };
 
   const fetchTimetables = async (service: TransportRecommendation, recommendationData: any) => {
@@ -372,8 +614,71 @@ export const ChatbotScreen: React.FC = () => {
         )}
       </View>
 
-      {/* Render recommendations if available */}
-      {message.recommendations && message.recommendations.length > 0 && (
+      {/* Render Route Summary if available */}
+      {!message.isUser && message.routeSummary && (
+        <View className="mb-3">
+          <View className="bg-blue-50 rounded-xl p-4 border border-blue-200">
+            <View className="flex-row items-center mb-2">
+              <FontAwesome5 name="info-circle" size={16} color="#2563EB" />
+              <Text className="ml-2 text-sm font-gilroy-bold text-blue-900">Trip Summary</Text>
+            </View>
+            {message.routeSummary.departureTime && (
+              <View className="flex-row items-center mb-1">
+                <FontAwesome5 name="clock" size={12} color="#6B7280" />
+                <Text className="ml-2 text-sm font-gilroy-regular text-gray-700">
+                  {message.routeSummary.departureTime}
+                </Text>
+              </View>
+            )}
+            {message.routeSummary.distance && (
+              <View className="flex-row items-center mb-1">
+                <FontAwesome5 name="route" size={12} color="#6B7280" />
+                <Text className="ml-2 text-sm font-gilroy-regular text-gray-700">
+                  {message.routeSummary.distance}
+                </Text>
+              </View>
+            )}
+            {message.routeSummary.reasoning && (
+              <View className="mt-2 p-3 bg-blue-100 rounded-lg">
+                <Text className="text-xs font-gilroy-medium text-blue-900">
+                  💡 {message.routeSummary.reasoning}
+                </Text>
+              </View>
+            )}
+          </View>
+        </View>
+      )}
+
+      {/* Render Enhanced Route Cards */}
+      {!message.isUser && message.routeDetails && message.routeDetails.length > 0 && (
+        <View className="mb-4">
+          {message.routeDetails.slice(0, 3).map((route, index) => {
+            const hasMapRoute = Boolean(
+              message.mapData?.routes?.some(mapRoute => mapRoute.route_id === route.route_id),
+            );
+
+            return (
+              <View key={route.route_id}>
+                <RouteCard route={route} index={index} />
+                {hasMapRoute && (
+                  <TouchableOpacity
+                    className="mx-3 -mt-1 mb-3 bg-blue-600 rounded-lg py-2.5 px-4"
+                    onPress={() => openRouteMap(message.mapData as ChatMapData, route.route_id)}
+                  >
+                    <View className="flex-row items-center justify-center">
+                      <FontAwesome5 name="map-marked-alt" size={14} color="white" />
+                      <Text className="text-white font-gilroy-bold ml-2">Display on Map</Text>
+                    </View>
+                  </TouchableOpacity>
+                )}
+              </View>
+            );
+          })}
+        </View>
+      )}
+
+      {/* Render recommendations if available (fallback for old format) */}
+      {message.recommendations && message.recommendations.length > 0 && !message.routeDetails && (
         <View className="mb-4 px-3">
           {message.recommendations.map(rec =>
             renderRecommendationCard(rec, message.recommendationData),
@@ -617,6 +922,14 @@ export const ChatbotScreen: React.FC = () => {
           </View>
         </View>
       </Modal>
+
+      <RouteMapModal
+        visible={routeMapVisible}
+        mapData={activeMapData}
+        selectedRouteId={selectedMapRouteId}
+        onSelectRoute={setSelectedMapRouteId}
+        onClose={() => setRouteMapVisible(false)}
+      />
     </View>
   );
 };

@@ -18,11 +18,6 @@ import RNGeocoding from 'react-native-geocoding';
 import Config from 'react-native-config';
 import { weatherService } from '../../services/api/WeatherService';
 
-// Initialize geocoding with API key
-if (Config.GOOGLE_MAPS_API_KEY) {
-  RNGeocoding.init(Config.GOOGLE_MAPS_API_KEY);
-}
-
 type NavigationProp = NativeStackNavigationProp<MainStackParamList>;
 
 export const WeatherScreen: React.FC = () => {
@@ -126,6 +121,15 @@ export const WeatherScreen: React.FC = () => {
 
     const fetchWeather = async () => {
       try {
+        // Initialize geocoding with proper error handling
+        if (Config.GOOGLE_MAPS_API_KEY && Config.GOOGLE_MAPS_API_KEY !== 'YOUR_API_KEY') {
+          try {
+            RNGeocoding.init(Config.GOOGLE_MAPS_API_KEY);
+          } catch (error) {
+            console.warn('Failed to initialize RNGeocoding:', error);
+          }
+        }
+
         if (!isMountedRef.current) return;
         setLoading(true);
 

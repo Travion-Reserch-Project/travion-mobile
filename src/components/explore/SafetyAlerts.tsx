@@ -7,6 +7,7 @@ import {
   Animated,
   useWindowDimensions,
   ScrollView,
+  Platform,
 } from 'react-native';
 import FontAwesome5 from 'react-native-vector-icons/FontAwesome5';
 import MapView, { Marker, Circle, PROVIDER_GOOGLE } from 'react-native-maps';
@@ -15,8 +16,6 @@ import { getCurrentPosition, LocationCoords } from '@utils/geolocation';
 import Config from 'react-native-config';
 import SafetyService from '@services/api/SafetyService';
 
-// Initialize geocoding with API key
-RNGeocoding.init(Config.GOOGLE_MAPS_API_KEY as string);
 export interface SafetyAlert {
   id: string;
   title: string;
@@ -242,6 +241,15 @@ export const SafetyAlerts: React.FC<SafetyAlertsProps> = ({
   useEffect(() => {
     const getLocationAndFetchAlerts = async () => {
       try {
+        // Initialize geocoding with proper error handling
+        if (Config.GOOGLE_MAPS_API_KEY && Config.GOOGLE_MAPS_API_KEY !== 'YOUR_API_KEY') {
+          try {
+            RNGeocoding.init(Config.GOOGLE_MAPS_API_KEY as string);
+          } catch (error) {
+            console.warn('Failed to initialize RNGeocoding:', error);
+          }
+        }
+
         console.log('[SafetyAlerts] Getting current position...');
 
         // Get current position using the utility (handles permissions internally)

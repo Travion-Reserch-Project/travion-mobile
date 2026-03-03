@@ -124,10 +124,25 @@ export interface TransportRecommendations {
   ranked_routes: RankedRoute[];
 }
 
+export interface MapDataRoute {
+  route_id: string;
+  transport_type: string;
+  polyline: string;
+  color?: string;
+  navigation_steps?: NavigationStep[];
+}
+
+export interface MapData {
+  origin: { lat: number; lng: number };
+  destination: { lat: number; lng: number };
+  routes: MapDataRoute[];
+}
+
 export interface ChatbotMetadata {
   intent: string;
   locations_identified: LocationIdentified[];
   transport_recommendations: TransportRecommendations;
+  map_data?: MapData;
   processing_time_ms: number;
 }
 
