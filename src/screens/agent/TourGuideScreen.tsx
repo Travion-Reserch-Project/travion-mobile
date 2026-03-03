@@ -890,9 +890,8 @@ export const TourGuideScreen: React.FC<TourGuideScreenProps> = ({ onChatbotPress
               {LOCATION_TYPE_OPTIONS.map(option => (
                 <TouchableOpacity
                   key={option.key}
-                  className={`flex-1 flex-row items-center justify-center py-2.5 rounded-lg ${
-                    selectedLocationType === option.key ? 'bg-white shadow-sm' : ''
-                  }`}
+                  className={`flex-1 flex-row items-center justify-center py-2.5 rounded-lg ${selectedLocationType === option.key ? 'bg-white shadow-sm' : ''
+                    }`}
                   onPress={() => {
                     setSelectedLocationType(option.key);
                     if (userLocation) {
@@ -911,9 +910,8 @@ export const TourGuideScreen: React.FC<TourGuideScreenProps> = ({ onChatbotPress
                     color={selectedLocationType === option.key ? '#F5840E' : '#9CA3AF'}
                   />
                   <Text
-                    className={`ml-1.5 text-sm font-gilroy-medium ${
-                      selectedLocationType === option.key ? 'text-primary' : 'text-gray-500'
-                    }`}
+                    className={`ml-1.5 text-sm font-gilroy-medium ${selectedLocationType === option.key ? 'text-primary' : 'text-gray-500'
+                      }`}
                   >
                     {option.label}
                   </Text>
@@ -932,9 +930,8 @@ export const TourGuideScreen: React.FC<TourGuideScreenProps> = ({ onChatbotPress
               {DISTANCE_OPTIONS.map(distance => (
                 <TouchableOpacity
                   key={distance}
-                  className={`px-4 py-2.5 rounded-xl ${
-                    selectedDistance === distance ? 'bg-primary' : 'bg-gray-100'
-                  }`}
+                  className={`px-4 py-2.5 rounded-xl ${selectedDistance === distance ? 'bg-primary' : 'bg-gray-100'
+                    }`}
                   onPress={() => {
                     setSelectedDistance(distance);
                     if (userLocation) {
@@ -943,9 +940,8 @@ export const TourGuideScreen: React.FC<TourGuideScreenProps> = ({ onChatbotPress
                   }}
                 >
                   <Text
-                    className={`text-sm font-gilroy-medium ${
-                      selectedDistance === distance ? 'text-white' : 'text-gray-600'
-                    }`}
+                    className={`text-sm font-gilroy-medium ${selectedDistance === distance ? 'text-white' : 'text-gray-600'
+                      }`}
                   >
                     {distance} km
                   </Text>
@@ -962,9 +958,8 @@ export const TourGuideScreen: React.FC<TourGuideScreenProps> = ({ onChatbotPress
             </View>
             <ScrollView horizontal showsHorizontalScrollIndicator={false}>
               <TouchableOpacity
-                className={`mr-2 px-4 py-2.5 rounded-xl flex-row items-center ${
-                  selectedCategory === null ? 'bg-primary' : 'bg-gray-100'
-                }`}
+                className={`mr-2 px-4 py-2.5 rounded-xl flex-row items-center ${selectedCategory === null ? 'bg-primary' : 'bg-gray-100'
+                  }`}
                 onPress={() => setSelectedCategory(null)}
               >
                 <Ionicons
@@ -973,9 +968,8 @@ export const TourGuideScreen: React.FC<TourGuideScreenProps> = ({ onChatbotPress
                   color={selectedCategory === null ? 'white' : '#6B7280'}
                 />
                 <Text
-                  className={`ml-1.5 text-sm font-gilroy-medium ${
-                    selectedCategory === null ? 'text-white' : 'text-gray-600'
-                  }`}
+                  className={`ml-1.5 text-sm font-gilroy-medium ${selectedCategory === null ? 'text-white' : 'text-gray-600'
+                    }`}
                 >
                   All
                 </Text>
@@ -1020,9 +1014,8 @@ export const TourGuideScreen: React.FC<TourGuideScreenProps> = ({ onChatbotPress
       >
         {/* AI Recommended Chip */}
         <TouchableOpacity
-          className={`mr-2 px-4 py-2.5 rounded-full flex-row items-center ${
-            selectedCategory === null ? 'bg-primary' : 'bg-white border border-gray-200'
-          }`}
+          className={`mr-2 px-4 py-2.5 rounded-full flex-row items-center ${selectedCategory === null ? 'bg-primary' : 'bg-white border border-gray-200'
+            }`}
           onPress={() => setSelectedCategory(null)}
         >
           <FontAwesome5
@@ -1031,9 +1024,8 @@ export const TourGuideScreen: React.FC<TourGuideScreenProps> = ({ onChatbotPress
             color={selectedCategory === null ? 'white' : '#F5840E'}
           />
           <Text
-            className={`ml-2 text-sm font-gilroy-medium ${
-              selectedCategory === null ? 'text-white' : 'text-primary'
-            }`}
+            className={`ml-2 text-sm font-gilroy-medium ${selectedCategory === null ? 'text-white' : 'text-primary'
+              }`}
           >
             AI Picks
           </Text>
@@ -1043,9 +1035,8 @@ export const TourGuideScreen: React.FC<TourGuideScreenProps> = ({ onChatbotPress
         {Object.entries(CATEGORY_CONFIG).map(([key, config]) => (
           <TouchableOpacity
             key={key}
-            className={`mr-2 px-4 py-2.5 rounded-full flex-row items-center ${
-              selectedCategory === key ? '' : 'bg-white border border-gray-200'
-            }`}
+            className={`mr-2 px-4 py-2.5 rounded-full flex-row items-center ${selectedCategory === key ? '' : 'bg-white border border-gray-200'
+              }`}
             style={selectedCategory === key ? { backgroundColor: config.color } : undefined}
             onPress={() => setSelectedCategory(selectedCategory === key ? null : key)}
           >
@@ -1055,9 +1046,8 @@ export const TourGuideScreen: React.FC<TourGuideScreenProps> = ({ onChatbotPress
               color={selectedCategory === key ? 'white' : config.color}
             />
             <Text
-              className={`ml-2 text-sm font-gilroy-medium capitalize ${
-                selectedCategory === key ? 'text-white' : ''
-              }`}
+              className={`ml-2 text-sm font-gilroy-medium capitalize ${selectedCategory === key ? 'text-white' : ''
+                }`}
               style={selectedCategory !== key ? { color: config.color } : undefined}
             >
               {key}
@@ -1258,15 +1248,15 @@ export const TourGuideScreen: React.FC<TourGuideScreenProps> = ({ onChatbotPress
           {/* Recommendations List */}
           {filteredRecommendations.length > 0
             ? filteredRecommendations.map((location, index) => (
-                <LocationCard
-                  key={location.name}
-                  location={location}
-                  index={index}
-                  onPress={() => handleLocationPress(location)}
-                  onChatPress={() => onChatbotPress?.()}
-                  preferences={preferences}
-                />
-              ))
+              <LocationCard
+                key={location.name}
+                location={location}
+                index={index}
+                onPress={() => handleLocationPress(location)}
+                onChatPress={() => onChatbotPress?.()}
+                preferences={preferences}
+              />
+            ))
             : renderEmptyState()}
 
           {/* Bottom Spacing */}
