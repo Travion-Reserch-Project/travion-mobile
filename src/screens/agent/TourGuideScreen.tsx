@@ -122,6 +122,7 @@ const LocationCard: React.FC<LocationCardProps> = ({
 }) => {
   const [crowdData, setCrowdData] = useState<SimpleCrowdPredictionResponse | null>(null);
   const [isLoadingCrowd, setIsLoadingCrowd] = useState(false);
+  const [imageError, setImageError] = useState(false);
   const animatedValue = useRef(new Animated.Value(0)).current;
 
   // Determine primary category based on highest preference score match
@@ -190,9 +191,10 @@ const LocationCard: React.FC<LocationCardProps> = ({
           {/* Image Header */}
           <View className="h-48 relative">
             <Image
-              source={{ uri: location.imageUrl || PLACEHOLDER_IMAGE }}
+              source={{ uri: (!imageError && location.imageUrl) ? location.imageUrl : PLACEHOLDER_IMAGE }}
               className="w-full h-full"
               resizeMode="cover"
+              onError={() => setImageError(true)}
             />
             {/* Gradient Overlay */}
             <View className="absolute inset-0 bg-black/30" />

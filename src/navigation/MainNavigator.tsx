@@ -23,6 +23,9 @@ import SkinAnalysisResultScreen from '@screens/weather/SkinAnalysisResultScreen'
 import SunburnHistoryScreen from '@screens/weather/SunburnHistoryScreen';
 import SkinHelthProfileScreen from '@screens/weather/SkinHelthProfileScreen';
 import FaceCaptureScreen from '@screens/weather/FaceCaptureScreen';
+import { LocationDetailsScreen } from '@screens/agent/LocationDetailsScreen';
+import { LocationChatScreen } from '@screens/agent/LocationChatScreen';
+import { TourPlanChatScreen } from '@screens/agent/TourPlanChatScreen';
 
 const welcomeBackAnimation = require('@assets/animations/success.json');
 
@@ -57,6 +60,28 @@ export type MainStackParamList = {
     isExistingProfile?: boolean;
   };
   FaceCapture: undefined;
+  LocationDetails: {
+    locationName: string;
+    distance?: number;
+    matchScore?: number;
+    userLatitude?: number;
+    userLongitude?: number;
+  };
+  LocationChat: {
+    locationName: string;
+  };
+  TourPlanChat: {
+    selectedLocations: {
+      name: string;
+      latitude: number;
+      longitude: number;
+      imageUrl?: string;
+      distance_km?: number;
+    }[];
+    startDate: string;
+    endDate: string;
+    preferences?: string[];
+  };
 };
 
 const Stack = createNativeStackNavigator<MainStackParamList>();
@@ -143,6 +168,9 @@ export const MainNavigator: React.FC = () => {
       <Stack.Screen name="SunburnHistory" component={SunburnHistoryScreen} />
       <Stack.Screen name="SkinHelthProfile" component={SkinHelthProfileScreen} />
       <Stack.Screen name="FaceCapture" component={FaceCaptureScreen} />
+      <Stack.Screen name="LocationDetails" component={LocationDetailsScreen} />
+      <Stack.Screen name="LocationChat" component={LocationChatScreen} />
+      <Stack.Screen name="TourPlanChat" component={TourPlanChatScreen} />
     </Stack.Navigator>
   );
 };
