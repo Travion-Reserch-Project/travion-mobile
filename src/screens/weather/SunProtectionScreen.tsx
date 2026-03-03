@@ -1,4 +1,4 @@
-import { MainStackParamList } from '@navigation';
+import { MainStackParamList } from '@navigation/MainNavigator';
 import { useNavigation } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import React, { useEffect, useState } from 'react';

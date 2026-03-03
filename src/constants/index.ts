@@ -4,14 +4,12 @@ export const APP_NAME = 'Travion';
 export const APP_VERSION = '1.0.0';
 
 // API Configuration
+// Use your PC's local network IP for physical devices
+const DEV_HOST = '10.45.2.70';
 export const API_CONFIG = {
-  BASE_URL: __DEV__
-    ? Platform.OS === 'android'
-      ? 'http://10.0.2.2:3001'
-      : 'http://localhost:3001'
-    : 'https://api.travion.online',
+  BASE_URL: __DEV__ ? `http://${DEV_HOST}:3001` : 'https://api.travion.online',
   API_VERSION: '/api/v1',
-  TIMEOUT: 60000,
+  TIMEOUT: 30000,
   USE_COOKIES: true,
   RETRY_ATTEMPTS: 3,
   RETRY_DELAY: 1000,
