@@ -46,9 +46,8 @@ const SunProtectionScreen: React.FC = () => {
                 const addressParts = results.results[0].formatted_address.split(',');
                 setLocationName(
                   addressParts.length > 2
-                    ? `${addressParts[addressParts.length - 3]}, ${
-                        addressParts[addressParts.length - 1]
-                      }`
+                    ? `${addressParts[addressParts.length - 3]}, ${addressParts[addressParts.length - 1]
+                    }`
                     : results.results[0].formatted_address,
                 );
               }
@@ -333,17 +332,16 @@ const SunProtectionScreen: React.FC = () => {
               ? 'No special precautions needed'
               : 'Apply broad-spectrum sunscreen SPF 50+',
             riskLevel.toLowerCase() === 'moderate' ||
-            riskLevel.toLowerCase() === 'high' ||
-            riskLevel.toLowerCase() === 'very high'
+              riskLevel.toLowerCase() === 'high' ||
+              riskLevel.toLowerCase() === 'very high'
               ? 'Wear protective clothing & sunglasses'
               : 'Stay hydrated throughout the day',
             'Seek shade if staying outdoors for long',
           ].map((item, index) => (
             <View key={index} className="flex-row items-center mb-4">
               <View
-                className={`bg-${
-                  riskLevel.toLowerCase() === 'low' ? 'green' : 'orange'
-                }-500 p-2 rounded-full mr-4`}
+                className={`bg-${riskLevel.toLowerCase() === 'low' ? 'green' : 'orange'
+                  }-500 p-2 rounded-full mr-4`}
               >
                 <FontAwesome name="check" size={12} color="#fff" />
               </View>
