@@ -148,11 +148,15 @@ export const PreferencesOnboardingScreen: React.FC = () => {
       console.log('Submitting preferences:', preferences);
       await userService.updateTravelPreferences(preferences);
 
-      // Update local user state
+      // Mark profile as complete on backend
+      await userService.updateProfile({ profileStatus: 'Complete' });
+
+      // Update local user state with both flags
       if (user) {
         await updateUser({
           ...user,
           hasSetPreferences: true,
+          profileStatus: 'Complete',
         });
       }
 
@@ -179,17 +183,25 @@ export const PreferencesOnboardingScreen: React.FC = () => {
   const handleSkip = () => {
     Alert.alert(
       'Skip Preferences?',
-      "You can always set your preferences later in settings. We'll use default preferences for now.",
+      "You can always set your preferences later in your profile. We'll use default preferences for now.",
       [
         { text: 'Cancel', style: 'cancel' },
         {
           text: 'Skip',
           onPress: async () => {
-            if (user) {
-              await updateUser({
-                ...user,
-                hasSetPreferences: true,
-              });
+            try {
+              // Mark profile as complete even when skipping preferences
+              await userService.updateProfile({ profileStatus: 'Complete' });
+
+              if (user) {
+                await updateUser({
+                  ...user,
+                  hasSetPreferences: true,
+                  profileStatus: 'Complete',
+                });
+              }
+            } catch (error) {
+              console.error('Failed to update profile status:', error);
             }
             navigation.reset({
               index: 0,

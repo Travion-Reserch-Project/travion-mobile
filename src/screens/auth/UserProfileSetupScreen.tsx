@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -8,6 +8,7 @@ import {
   Alert,
   Dimensions,
   StyleSheet,
+  TouchableOpacity,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import LottieView from 'lottie-react-native';
@@ -48,40 +49,41 @@ export const UserProfileSetupScreen: React.FC<UserProfileSetupProps> = () => {
     }
   };
 
-  const updateProfileStatusToComplete = useCallback(async () => {
-    try {
-      const { user } = useAuthStore.getState();
-      if (user) {
-        const updatedUser = { ...user, profileStatus: 'Complete' as const };
-        updateUser(updatedUser);
-        await userService.updateProfile({ profileStatus: 'Complete' });
-      }
-    } catch (error) {
-      console.error('Failed to update profile status:', error);
-    }
-  }, [updateUser]);
-
   useEffect(() => {
     if (showCompletion) {
       const timer = setTimeout(() => {
-        updateProfileStatusToComplete();
-        navigation.navigate('MainApp' as never);
+        navigation.navigate('PreferencesOnboarding' as never);
       }, 4000);
       return () => clearTimeout(timer);
     }
-  }, [showCompletion, navigation, updateProfileStatusToComplete]);
+  }, [showCompletion, navigation]);
 
-  const handleGetStarted = async () => {
-    await updateProfileStatusToComplete();
-    navigation.navigate('MainApp' as never);
+  const handleGetStarted = () => {
+    navigation.navigate('PreferencesOnboarding' as never);
+  };
+
+  const handleSkipProfile = () => {
+    Alert.alert(
+      'Skip Profile Setup?',
+      'You can always complete your profile later from the Profile section.',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Skip',
+          onPress: () => {
+            navigation.navigate('PreferencesOnboarding' as never);
+          },
+        },
+      ],
+    );
   };
 
   if (showCompletion) {
-    const title = 'All Set Up!';
+    const title = 'Profile Complete!';
     const description =
-      'Your profile has been created successfully.\nGet ready to explore amazing travel destinations and plan your perfect vacation!';
-    const buttonText = "Let's Start Exploring!";
-    const footerText = 'Welcome to your travel companion';
+      "Great job! Now let's personalize your travel experience by setting your preferences.";
+    const buttonText = 'Set Travel Preferences';
+    const footerText = 'One more step to get started';
 
     console.log('UserProfileSetupScreen - New profile completion screen');
 
@@ -139,8 +141,15 @@ export const UserProfileSetupScreen: React.FC<UserProfileSetupProps> = () => {
     <SafeAreaView className="flex-1 bg-white">
       <StatusBar barStyle="dark-content" backgroundColor="#FFFFFF" />
 
+      {/* Skip button */}
+      <View className="flex-row justify-end px-6 pt-4">
+        <TouchableOpacity onPress={handleSkipProfile}>
+          <Text className="text-sm font-gilroy-medium text-gray-400">Skip</Text>
+        </TouchableOpacity>
+      </View>
+
       <ScrollView className="flex-1 px-6" showsVerticalScrollIndicator={true} bounces={false}>
-        <View className="pt-8 mt-5 pb-32">
+        <View className="pt-4 pb-32">
           <View className="mb-8">
             <Text className="text-3xl font-gilroy-bold text-gray-900 mb-2">
               Complete Your Profile

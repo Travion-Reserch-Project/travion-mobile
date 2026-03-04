@@ -99,14 +99,17 @@ class LocationServiceClass extends BaseApiService {
   async getLocationImages(locationName: string): Promise<LocationImagesResponse> {
     try {
       const encodedName = encodeURIComponent(locationName);
-      const response = await this.publicGet<LocationImagesResponse>(`/${encodedName}/images`);
+      const response = await this.publicGet<any>(`/${encodedName}/images`);
       const result = this.handleApiResponse(response);
+
+      // Backend wraps response in { success, message, data }, extract the inner data
+      const imageData: LocationImagesResponse = result.data || result;
 
       // Proxy Wikimedia URLs through backend to avoid 403 errors
       return {
-        ...result,
-        imageUrls: proxyImageUrls(result.imageUrls),
-        primaryImage: result.primaryImage ? toProxyUrl(result.primaryImage) : null,
+        ...imageData,
+        imageUrls: proxyImageUrls(imageData.imageUrls || []),
+        primaryImage: imageData.primaryImage ? toProxyUrl(imageData.primaryImage) : null,
       };
     } catch (error) {
       console.error('Get location images failed:', error);
@@ -126,19 +129,24 @@ class LocationServiceClass extends BaseApiService {
    */
   async getBulkLocationImages(locationNames: string[]): Promise<BulkLocationImagesResponse> {
     try {
-      const response = await this.publicPost<BulkLocationImagesResponse>('/images/bulk', {
+      const response = await this.publicPost<any>('/images/bulk', {
         location_names: locationNames,
       });
       const result = this.handleApiResponse(response);
 
+      // Backend wraps response in { success, message, data }, extract the inner data
+      const locationsMap: BulkLocationImagesResponse = result.data || result;
+
       // Proxy all Wikimedia image URLs through backend
       const proxiedResult: BulkLocationImagesResponse = {};
-      for (const [key, value] of Object.entries(result)) {
-        proxiedResult[key] = {
-          ...value,
-          imageUrls: proxyImageUrls(value.imageUrls),
-          primaryImage: value.primaryImage ? toProxyUrl(value.primaryImage) : null,
-        };
+      for (const [key, value] of Object.entries(locationsMap)) {
+        if (value && typeof value === 'object' && 'imageUrls' in value) {
+          proxiedResult[key] = {
+            ...value,
+            imageUrls: proxyImageUrls(value.imageUrls || []),
+            primaryImage: value.primaryImage ? toProxyUrl(value.primaryImage) : null,
+          };
+        }
       }
       return proxiedResult;
     } catch (error) {
@@ -164,13 +172,16 @@ class LocationServiceClass extends BaseApiService {
   async getLocationDetails(locationName: string): Promise<LocationDetailsResponse | null> {
     try {
       const encodedName = encodeURIComponent(locationName);
-      const response = await this.publicGet<LocationDetailsResponse>(`/${encodedName}`);
+      const response = await this.publicGet<any>(`/${encodedName}`);
       const result = this.handleApiResponse(response);
+
+      // Backend wraps response in { success, message, data }, extract the inner data
+      const locationData: LocationDetailsResponse = result.data || result;
 
       // Proxy Wikimedia image URLs through backend
       return {
-        ...result,
-        imageUrls: proxyImageUrls(result.imageUrls),
+        ...locationData,
+        imageUrls: proxyImageUrls(locationData.imageUrls || []),
       };
     } catch (error) {
       console.error('Get location details failed:', error);

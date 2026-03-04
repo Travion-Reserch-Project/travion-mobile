@@ -113,6 +113,12 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
             {[
               { icon: 'edit', title: 'Edit Profile', subtitle: 'Update your personal information' },
               {
+                icon: 'compass',
+                title: 'Travel Preferences',
+                subtitle: 'Set or edit your travel interests',
+                href: 'PreferencesOnboarding',
+              },
+              {
                 icon: 'heartbeat',
                 title: healthProfile ? 'Health Profile' : 'Set Up Health Profile',
                 subtitle: healthProfile

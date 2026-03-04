@@ -18,7 +18,7 @@ import FontAwesome5 from 'react-native-vector-icons/FontAwesome5';
 import MaterialCommunityIcons from 'react-native-vector-icons/MaterialCommunityIcons';
 import Ionicons from 'react-native-vector-icons/Ionicons';
 import LinearGradient from 'react-native-linear-gradient';
-import type { ItinerarySlot, TourPlanMetadata, ConstraintViolation, CulturalTip } from '@services/api';
+import type { ItinerarySlot, TourPlanMetadata, ConstraintViolation, CulturalTip, FinalItinerary, ContextualNote } from '@services/api';
 
 const { width } = Dimensions.get('window');
 
@@ -72,6 +72,8 @@ interface TourPlanCardProps {
     warnings?: string[];
     tips?: string[];
     culturalTips?: CulturalTip[];
+    finalItinerary?: FinalItinerary;
+    weatherData?: Record<string, any>;
     onAccept: () => void;
     onModify: () => void;
     isLoading?: boolean;
@@ -101,12 +103,42 @@ const getActivityIcon = (iconName?: string, activity?: string): string => {
     return ACTIVITY_ICONS.default;
 };
 
+// Helper to get weather icon name
+const getWeatherIcon = (summary: string): string => {
+    const lower = summary.toLowerCase();
+    if (lower.includes('rain') || lower.includes('shower')) return 'weather-rainy';
+    if (lower.includes('thunder') || lower.includes('storm')) return 'weather-lightning-rainy';
+    if (lower.includes('cloud') || lower.includes('overcast')) return 'weather-cloudy';
+    if (lower.includes('sun') || lower.includes('clear')) return 'weather-sunny';
+    if (lower.includes('wind')) return 'weather-windy';
+    if (lower.includes('fog') || lower.includes('mist')) return 'weather-fog';
+    return 'weather-partly-cloudy';
+};
+
+// Helper to get contextual note icon and color
+const getNoteStyle = (noteType: string, severity: string) => {
+    const styles: Record<string, { icon: string; color: string; bg: string }> = {
+        poya_warning: { icon: 'moon-waning-crescent', color: '#7C3AED', bg: '#EDE9FE' },
+        weather_alert: { icon: 'weather-lightning', color: '#D97706', bg: '#FEF3C7' },
+        safety_alert: { icon: 'shield-alert', color: THEME.error, bg: '#FEE2E2' },
+        crowd_warning: { icon: 'account-group', color: '#D97706', bg: '#FEF3C7' },
+    };
+    const defaultStyle = severity === 'critical'
+        ? { icon: 'alert-circle', color: THEME.error, bg: '#FEE2E2' }
+        : severity === 'warning'
+            ? { icon: 'alert', color: '#D97706', bg: '#FEF3C7' }
+            : { icon: 'information', color: '#3B82F6', bg: '#EFF6FF' };
+    return styles[noteType] || defaultStyle;
+};
+
 // Timeline item component
 const TimelineItem: React.FC<{
     slot: ItinerarySlot;
     isFirst: boolean;
     isLast: boolean;
-}> = ({ slot, isFirst, isLast }) => {
+    weatherSummary?: string;
+    contextualNotes?: ContextualNote[];
+}> = ({ slot, isFirst, isLast, weatherSummary, contextualNotes }) => {
     const fadeAnim = useRef(new Animated.Value(0)).current;
     const slideAnim = useRef(new Animated.Value(10)).current;
 
@@ -238,6 +270,29 @@ const TimelineItem: React.FC<{
                     )}
                 </View>
 
+                {/* Weather Summary */}
+                {weatherSummary && (
+                    <View style={styles.weatherSummaryContainer}>
+                        <MaterialCommunityIcons
+                            name={getWeatherIcon(weatherSummary)}
+                            size={14}
+                            color="#0284C7"
+                        />
+                        <Text style={styles.weatherSummaryText}>{weatherSummary}</Text>
+                    </View>
+                )}
+
+                {/* Contextual Notes (weather alerts, Poya warnings, etc.) */}
+                {contextualNotes && contextualNotes.length > 0 && contextualNotes.map((note, idx) => {
+                    const noteStyle = getNoteStyle(note.note_type, note.severity);
+                    return (
+                        <View key={idx} style={[styles.contextualNoteBadge, { backgroundColor: noteStyle.bg }]}>
+                            <MaterialCommunityIcons name={noteStyle.icon} size={12} color={noteStyle.color} />
+                            <Text style={[styles.contextualNoteText, { color: noteStyle.color }]}>{note.message}</Text>
+                        </View>
+                    );
+                })}
+
                 {/* Golden Hour Badge */}
                 {slot.lighting_quality === 'golden' && (
                     <View style={styles.goldenHourBadge}>
@@ -320,6 +375,8 @@ export const TourPlanCard: React.FC<TourPlanCardProps> = ({
     warnings,
     tips,
     culturalTips,
+    finalItinerary,
+    weatherData,
     onAccept,
     onModify,
     isLoading = false,
@@ -437,14 +494,29 @@ export const TourPlanCard: React.FC<TourPlanCardProps> = ({
                 {sortedDays.map((day) => (
                     <View key={day}>
                         <DayHeader day={day} totalActivities={itineraryByDay[day].length} />
-                        {itineraryByDay[day].map((slot, index) => (
-                            <TimelineItem
-                                key={`${day}-${index}`}
-                                slot={slot}
-                                isFirst={index === 0}
-                                isLast={index === itineraryByDay[day].length - 1}
-                            />
-                        ))}
+                        {itineraryByDay[day].map((slot, index) => {
+                            // Match weather summary from finalItinerary stops
+                            const matchingStop = finalItinerary?.stops?.find(
+                                (s) => s.location === slot.location && s.day === (slot.day || 1) && s.time === slot.time
+                            );
+                            const weatherSummary = matchingStop?.weather_summary;
+
+                            // Match contextual notes for this stop
+                            const notes = matchingStop && finalItinerary?.contextual_notes?.filter(
+                                (n) => n.location_name === slot.location
+                            );
+
+                            return (
+                                <TimelineItem
+                                    key={`${day}-${index}`}
+                                    slot={slot}
+                                    isFirst={index === 0}
+                                    isLast={index === itineraryByDay[day].length - 1}
+                                    weatherSummary={weatherSummary}
+                                    contextualNotes={notes}
+                                />
+                            );
+                        })}
                     </View>
                 ))}
             </View>
@@ -514,6 +586,19 @@ export const TourPlanCard: React.FC<TourPlanCardProps> = ({
                 <View style={styles.preferenceMatchContainer}>
                     <MaterialCommunityIcons name="target" size={14} color={THEME.success} />
                     <Text style={styles.preferenceMatchText}>{metadata.preference_match_explanation}</Text>
+                </View>
+            )}
+
+            {/* Route Distance Summary */}
+            {finalItinerary && finalItinerary.total_distance_km > 0 && (
+                <View style={styles.routeSummaryContainer}>
+                    <MaterialCommunityIcons name="map-marker-distance" size={16} color={THEME.primary} />
+                    <Text style={styles.routeSummaryText}>
+                        Total route: {finalItinerary.total_distance_km.toFixed(1)} km
+                    </Text>
+                    {finalItinerary.summary && (
+                        <Text style={styles.routeSummaryDetail}>{finalItinerary.summary}</Text>
+                    )}
                 </View>
             )}
 
@@ -999,6 +1084,61 @@ const styles = StyleSheet.create({
         color: THEME.gray[700],
         flex: 1,
         lineHeight: 18,
+    },
+    // Weather Summary (per-activity)
+    weatherSummaryContainer: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        backgroundColor: '#EFF6FF',
+        padding: 6,
+        borderRadius: 8,
+        marginTop: 6,
+        gap: 6,
+    },
+    weatherSummaryText: {
+        fontSize: 11,
+        fontFamily: 'Gilroy-Medium',
+        color: '#0284C7',
+        flex: 1,
+    },
+    // Contextual Note Badge
+    contextualNoteBadge: {
+        flexDirection: 'row',
+        alignItems: 'flex-start',
+        padding: 6,
+        borderRadius: 8,
+        marginTop: 4,
+        gap: 6,
+    },
+    contextualNoteText: {
+        fontSize: 10,
+        fontFamily: 'Gilroy-SemiBold',
+        flex: 1,
+        lineHeight: 14,
+    },
+    // Route Summary
+    routeSummaryContainer: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        flexWrap: 'wrap',
+        backgroundColor: THEME.primaryLight,
+        padding: 12,
+        borderRadius: 12,
+        marginTop: 12,
+        gap: 8,
+    },
+    routeSummaryText: {
+        fontSize: 13,
+        fontFamily: 'Gilroy-Bold',
+        color: THEME.primary,
+    },
+    routeSummaryDetail: {
+        fontSize: 11,
+        fontFamily: 'Gilroy-Medium',
+        color: THEME.gray[600],
+        width: '100%',
+        marginTop: 4,
+        lineHeight: 16,
     },
     actionButtons: {
         flexDirection: 'row',
