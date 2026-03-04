@@ -1,4 +1,6 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { userService } from '@services/api/UserService';
 import { View, Text, ScrollView, TouchableOpacity } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import FontAwesome from 'react-native-vector-icons/FontAwesome';
@@ -133,6 +135,43 @@ const SafetyAdvisorScreen: React.FC = () => {
   const route = useRoute<any>();
   const navigation = useNavigation<SafetyAdvisorScreenNavigationProp>();
 
+  const [isAlertsEnabled, setIsAlertsEnabled] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
+
+  useEffect(() => {
+    const checkAlertsStatus = async () => {
+      try {
+        const storedValue = await AsyncStorage.getItem('HIGH_UV_ALERTS_ENABLED');
+        if (storedValue !== null) {
+          setIsAlertsEnabled(storedValue === 'true');
+        }
+      } catch (error) {
+        console.error('Failed to load high UV alerts preference:', error);
+      }
+    };
+    checkAlertsStatus();
+  }, []);
+
+  const toggleAlerts = async () => {
+    try {
+      setIsLoading(true);
+      const newValue = !isAlertsEnabled;
+
+      // Update local storage
+      await AsyncStorage.setItem('HIGH_UV_ALERTS_ENABLED', String(newValue));
+      setIsAlertsEnabled(newValue);
+
+      // Update backend preferences
+      await userService.updatePreferences({ highUVAlerts: newValue } as any);
+    } catch (error) {
+      console.error('Failed to toggle high UV alerts:', error);
+      // Optional: Revert local state on backend failure
+      // setIsAlertsEnabled(!newValue);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   // Get params or use defaults
   const uvIndex = route.params?.uvIndex ?? 8;
   const initialRiskLevel = route.params?.riskLevel;
@@ -253,11 +292,23 @@ const SafetyAdvisorScreen: React.FC = () => {
         </View>
       </ScrollView>
 
-      {/* Enable Alerts Button */}
+      {/* Enable/Disable Alerts Button */}
       <View className="absolute bottom-10 left-5 right-5">
-        <TouchableOpacity className="bg-[#FF8C1A] py-4 rounded-full flex-row justify-center items-center shadow-lg">
-          <FontAwesome name="bell" size={18} color="#fff" />
-          <Text className="text-white font-bold ml-3 text-base">Enable High UV Alerts</Text>
+        <TouchableOpacity
+          onPress={toggleAlerts}
+          disabled={isLoading}
+          className={`py-4 rounded-full flex-row justify-center items-center shadow-lg ${
+            isAlertsEnabled ? 'bg-[#FF4D4D]' : 'bg-[#FF8C1A]'
+          } ${isLoading ? 'opacity-70' : ''}`}
+        >
+          <FontAwesome name={isAlertsEnabled ? 'bell-slash' : 'bell'} size={18} color="#fff" />
+          <Text className="text-white font-bold ml-3 text-base">
+            {isLoading
+              ? 'Updating...'
+              : isAlertsEnabled
+              ? 'Disable High UV Alerts'
+              : 'Enable High UV Alerts'}
+          </Text>
         </TouchableOpacity>
       </View>
     </SafeAreaView>
