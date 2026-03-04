@@ -25,6 +25,7 @@ import colors from '../../theme/colors';
 import typography from '../../theme/typography';
 import { incidentReportService } from '@services/api';
 import { getCurrentPosition } from '@utils/geolocation';
+import { NotificationService } from '@services/NotificationService';
 
 type NavigationProp = NativeStackNavigationProp<MainStackParamList>;
 
@@ -252,6 +253,17 @@ export const ReportIncidentScreen: React.FC = () => {
       };
 
       console.log('[ReportIncident] Submitting report:', reportData);
+
+      // Update device token location to match incident location before submitting
+      // This ensures the geospatial push notification query can find nearby devices
+      if (locationCoords?.latitude && locationCoords?.longitude) {
+        await NotificationService.updateLocation(
+          locationCoords.latitude,
+          locationCoords.longitude,
+        ).catch(err =>
+          console.warn('[ReportIncident] Failed to update device location:', err),
+        );
+      }
 
       // Submit to backend
       const result = await incidentReportService.createReport(reportData);
