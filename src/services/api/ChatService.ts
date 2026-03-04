@@ -49,12 +49,6 @@ export interface ChatResponseData {
   temporal_context?: any;
 }
 
-interface ChatResponse {
-  success: boolean;
-  data?: ChatResponseData;
-  error?: string;
-}
-
 // ============= NEW CHATBOT ENDPOINT TYPES =============
 export interface LocationIdentified {
   name: string;
@@ -124,10 +118,25 @@ export interface TransportRecommendations {
   ranked_routes: RankedRoute[];
 }
 
+export interface MapDataRoute {
+  route_id: string;
+  transport_type: string;
+  polyline: string;
+  color?: string;
+  navigation_steps?: NavigationStep[];
+}
+
+export interface MapData {
+  origin: { lat: number; lng: number };
+  destination: { lat: number; lng: number };
+  routes: MapDataRoute[];
+}
+
 export interface ChatbotMetadata {
   intent: string;
   locations_identified: LocationIdentified[];
   transport_recommendations: TransportRecommendations;
+  map_data?: MapData;
   processing_time_ms: number;
 }
 
@@ -144,9 +153,52 @@ export interface ChatbotResponse {
   data: ChatbotResponseData;
 }
 
-export const chatService = {
-  // Old endpoint - /chat/recommend
-  async sendMessage(message: string): Promise<ChatResponse> {
+// Conversation/Trip Management Types
+export interface Conversation {
+  conversation_id: string;
+  user_id: number;
+  title: string;
+  created_at: string;
+  updated_at: string;
+  message_count: number;
+  last_message?: string;
+}
+
+export interface ConversationListResponse {
+  success: boolean;
+  data: {
+    conversations: Conversation[];
+  };
+}
+
+export interface ConversationMessagesResponse {
+  success: boolean;
+  data: {
+    conversation_id: string;
+    messages: Array<{
+      message_id: number;
+      sender: 'user' | 'bot';
+      message: string;
+      created_at: string;
+      metadata?: ChatbotMetadata;
+    }>;
+  };
+}
+
+export interface NewTripResponse {
+  success: boolean;
+  data: {
+    conversation_id: string;
+    title: string;
+    message: string;
+  };
+}
+
+const chatService = {
+  // Create new trip/conversation
+  async createNewTrip(
+    title?: string,
+  ): Promise<NewTripResponse | { success: false; error: string }> {
     try {
       const tokens = await AuthUtils.getStoredTokens();
       const accessToken = tokens?.accessToken;
@@ -158,24 +210,100 @@ export const chatService = {
         };
       }
 
-      const response = await axios.post<ChatResponse>(
-        `${CHAT_API_BASE_URL}/chat/recommend`,
-        { message },
+      const payload = title ? { title } : {};
+
+      const response = await axios.post<NewTripResponse>(
+        `${CHAT_API_BASE_URL}/chatbot/conversations/new-trip`,
+        payload,
         {
-          timeout: 30000,
+          timeout: 15000,
           headers: {
             'Content-Type': 'application/json',
             Authorization: `Bearer ${accessToken}`,
           },
         },
       );
-      console.log('Chat API Response:', response.data);
+      console.log('New Trip Response:', response.data);
       return response.data;
     } catch (error: any) {
-      console.error('Chat API Error:', error.message);
+      console.error('New Trip Error:', error.message);
+      const errorMessage =
+        error.response?.data?.message || error.message || 'Failed to create new trip';
       return {
         success: false,
-        error: error.message || 'Failed to send message',
+        error: errorMessage,
+      };
+    }
+  },
+
+  // Get conversation history
+  async getConversations(): Promise<ConversationListResponse | { success: false; error: string }> {
+    try {
+      const tokens = await AuthUtils.getStoredTokens();
+      const accessToken = tokens?.accessToken;
+
+      if (!accessToken) {
+        return {
+          success: false,
+          error: 'Not authenticated. Please log in.',
+        };
+      }
+
+      const response = await axios.get<ConversationListResponse>(
+        `${CHAT_API_BASE_URL}/chatbot/conversations`,
+        {
+          timeout: 15000,
+          headers: {
+            Authorization: `Bearer ${accessToken}`,
+          },
+        },
+      );
+      console.log('Conversations Response:', response.data);
+      return response.data;
+    } catch (error: any) {
+      console.error('Get Conversations Error:', error.message);
+      const errorMessage =
+        error.response?.data?.message || error.message || 'Failed to fetch conversations';
+      return {
+        success: false,
+        error: errorMessage,
+      };
+    }
+  },
+
+  // Get messages from a specific conversation
+  async getConversationMessages(
+    conversationId: string,
+  ): Promise<ConversationMessagesResponse | { success: false; error: string }> {
+    try {
+      const tokens = await AuthUtils.getStoredTokens();
+      const accessToken = tokens?.accessToken;
+
+      if (!accessToken) {
+        return {
+          success: false,
+          error: 'Not authenticated. Please log in.',
+        };
+      }
+
+      const response = await axios.get<ConversationMessagesResponse>(
+        `${CHAT_API_BASE_URL}/chatbot/conversations/${conversationId}`,
+        {
+          timeout: 15000,
+          headers: {
+            Authorization: `Bearer ${accessToken}`,
+          },
+        },
+      );
+      console.log('Conversation Messages Response:', response.data);
+      return response.data;
+    } catch (error: any) {
+      console.error('Get Conversation Messages Error:', error.message);
+      const errorMessage =
+        error.response?.data?.message || error.message || 'Failed to fetch conversation messages';
+      return {
+        success: false,
+        error: errorMessage,
       };
     }
   },
@@ -183,6 +311,7 @@ export const chatService = {
   // New endpoint - /chatbot/message
   async sendChatbotMessage(
     message: string,
+    conversationId?: string,
   ): Promise<ChatbotResponse | { success: false; error: string }> {
     try {
       const tokens = await AuthUtils.getStoredTokens();
@@ -195,9 +324,14 @@ export const chatService = {
         };
       }
 
+      const payload: { message: string; conversation_id?: string } = { message };
+      if (conversationId) {
+        payload.conversation_id = conversationId;
+      }
+
       const response = await axios.post<ChatbotResponse>(
         `${CHAT_API_BASE_URL}/chatbot/message`,
-        { message },
+        payload,
         {
           timeout: 30000,
           headers: {
@@ -219,3 +353,5 @@ export const chatService = {
     }
   },
 };
+
+export { chatService };
