@@ -123,20 +123,12 @@ class NotificationServiceClass extends BaseApiService {
       // Create Android notification channel
       await createNotificationChannel();
 
-      // Attempt to get FCM token but don't block initialization
-      // Token will be fetched lazily when needed via getToken()
-      try {
-        const token = await getToken(messagingInstance);
-        if (token) {
-          this.fcmToken = token;
-          console.log('[NotificationService] FCM token obtained');
-        }
-      } catch (tokenError) {
-        console.warn(
-          '[NotificationService] FCM token retrieval failed during init (will retry on demand):',
-          tokenError,
-        );
-        // Continue with initialization - token can be obtained later
+      // Get FCM token (same as firebaseMessaging.ts)
+      const token = await getToken(messagingInstance);
+      if (token) {
+        this.fcmToken = token;
+        console.log('[NotificationService] FCM token:', token);
+        await AsyncStorage.setItem(DEVICE_TOKEN_KEY, token);
       }
 
       // Setup foreground message handler
@@ -259,7 +251,7 @@ class NotificationServiceClass extends BaseApiService {
   }
 
   /**
-   * Get FCM token with retry logic
+   * Get FCM token (simplified - matches firebaseMessaging.ts pattern)
    */
   async getToken(): Promise<string | null> {
     try {
@@ -274,53 +266,12 @@ class NotificationServiceClass extends BaseApiService {
       }
 
       const messagingInstance = getMessaging(getApp());
-      let token: string | null = null;
-      let retries = 2;
-      let delayMs = 500;
+      const token = await getToken(messagingInstance);
 
-      while (!token && retries > 0) {
-        try {
-          token = await getToken(messagingInstance);
-          if (token) {
-            this.fcmToken = token;
-            await AsyncStorage.setItem(DEVICE_TOKEN_KEY, token);
-            console.log('[NotificationService] Token retrieved successfully');
-          }
-        } catch (error: any) {
-          retries--;
-          const errorMessage = error?.code || error?.message || String(error);
-          const attemptNumber = 3 - retries;
-
-          // Check for FIS_AUTH_ERROR specifically
-          if (errorMessage.includes('FIS_AUTH_ERROR')) {
-            console.warn(
-              `[NotificationService] FIS Authentication error (attempt ${attemptNumber}/3). ` +
-                'Firebase Installation Service unavailable. Try: 1) Restart emulator, 2) Check device time sync, 3) Use real device',
-            );
-            if (retries > 0) {
-              await new Promise(resolve => setTimeout(resolve, delayMs));
-              delayMs = Math.min(delayMs * 2, 5000);
-            } else {
-              // FIS errors persist - don't keep retrying
-              console.error(
-                '[NotificationService] FIS auth failed after retries. ' +
-                  'Push notifications unavailable. Continuing without token.',
-              );
-              return null;
-            }
-          } else if (retries > 0) {
-            console.warn(
-              `[NotificationService] Token retrieval failed (attempt ${attemptNumber}/3), retrying...`,
-            );
-            await new Promise(resolve => setTimeout(resolve, delayMs));
-            delayMs = Math.min(delayMs * 2, 5000);
-          } else {
-            console.error(
-              '[NotificationService] Failed to get token after all retries. Continuing without push notifications.',
-              error,
-            );
-          }
-        }
+      if (token) {
+        this.fcmToken = token;
+        await AsyncStorage.setItem(DEVICE_TOKEN_KEY, token);
+        console.log('[NotificationService] Token retrieved successfully');
       }
 
       return token || null;
@@ -337,10 +288,7 @@ class NotificationServiceClass extends BaseApiService {
     try {
       const token = this.fcmToken || (await this.getToken());
       if (!token) {
-        console.warn(
-          '[NotificationService] No token available. Push notifications disabled. ' +
-            "App will work normally but you won't receive push notifications.",
-        );
+        console.warn('[NotificationService] No token to register');
         return false;
       }
 
