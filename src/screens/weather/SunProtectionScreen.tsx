@@ -357,7 +357,7 @@ const SunProtectionScreen: React.FC = () => {
       <View className="absolute bottom-0 left-0 right-0 bg-white px-6 pb-6 pt-3 border-t border-gray-100">
         <TouchableOpacity
           className="bg-primary py-4 rounded-2xl flex-row justify-center items-center"
-          onPress={() => navigation.navigate('SafetyAdvisor')}
+          onPress={() => navigation.navigate('SafetyAdvisor', { uvIndex, riskLevel })}
         >
           <Text className="text-white font-bold text-lg mr-2">Get More Details</Text>
           <FontAwesome name="arrow-right" size={16} color="#fff" />

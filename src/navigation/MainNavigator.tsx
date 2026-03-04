@@ -40,7 +40,7 @@ export type MainStackParamList = {
   ProfileScreen: { userName?: string; userEmail?: string };
   ChatbotScreen: undefined;
   SunProtection: undefined;
-  SafetyAdvisor: undefined;
+  SafetyAdvisor: { uvIndex?: number; riskLevel?: string };
   HealthProfileSetup: { imageUrl?: string };
   HealthProfileLanding: undefined;
   SkinAnalysis: { imageUrl?: string; age?: number };
