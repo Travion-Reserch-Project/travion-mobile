@@ -9,3 +9,4 @@ export { initializeFirebaseMessaging, registerBackgroundMessageHandler } from '.
 export type { AuthTokens, User } from '@types';
 export type { SafetyAlert, SafetyPredictionResponse } from './api/SafetyService';
 export type { NotificationPayload } from './firebaseMessaging';
+export type { Conversation } from './api/ChatService';

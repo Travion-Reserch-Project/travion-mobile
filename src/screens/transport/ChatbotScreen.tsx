@@ -19,7 +19,7 @@ import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import type { MainStackParamList } from '../../navigation/MainNavigator';
 import { API_CONFIG } from '@constants';
 import { useAuthStore } from '@stores';
-import { chatService } from '@services';
+import { chatService, type Conversation } from '@services';
 import { getCurrentPosition } from '@utils';
 import { RouteMapModal, type ChatMapData } from '@components/transport/RouteMapModal';
 
@@ -241,7 +241,11 @@ export const ChatbotScreen: React.FC = () => {
   const [selectedMapRouteId, setSelectedMapRouteId] = useState<string | null>(null);
   const scrollViewRef = useRef<ScrollView>(null);
   const { tokens } = useAuthStore();
-  const [_conversationId, _setConversationId] = useState<string | null>(null);
+  const [conversationId, setConversationId] = useState<string | null>(null);
+  const [currentTripTitle, setCurrentTripTitle] = useState<string>('New Trip');
+  const [conversations, setConversations] = useState<Conversation[]>([]);
+  const [showConversationsModal, setShowConversationsModal] = useState(false);
+  const [loadingConversations, setLoadingConversations] = useState(false);
   const [_currentLocation, _setCurrentLocation] = useState<{
     latitude: number;
     longitude: number;
@@ -264,11 +268,165 @@ export const ChatbotScreen: React.FC = () => {
 
   // Auto-scroll to bottom when new messages are added
   useEffect(() => {
-    // Auto-scroll to bottom when new messages are added
     setTimeout(() => {
       scrollViewRef.current?.scrollToEnd({ animated: true });
     }, 100);
   }, [messages]);
+
+  // Create new trip/conversation
+  const handleNewTrip = async () => {
+    try {
+      setIsTyping(true);
+      const response = await chatService.createNewTrip();
+
+      if (response.success && 'data' in response) {
+        setConversationId(response.data.conversation_id);
+        setCurrentTripTitle(response.data.title);
+        setMessages([
+          {
+            id: '1',
+            text:
+              response.data.message || "👋 Hi! I'm your travel assistant. Where do you want to go?",
+            isUser: false,
+            timestamp: new Date(),
+          },
+        ]);
+      } else {
+        console.error(
+          'Failed to create new trip:',
+          'error' in response ? response.error : 'Unknown error',
+        );
+      }
+    } catch (error) {
+      console.error('Error creating new trip:', error);
+    } finally {
+      setIsTyping(false);
+    }
+  };
+
+  // Load conversation history
+  const loadConversations = async () => {
+    try {
+      setLoadingConversations(true);
+      const response = await chatService.getConversations();
+
+      if (response.success && 'data' in response) {
+        setConversations(response.data.conversations);
+      } else {
+        console.error(
+          'Failed to load conversations:',
+          'error' in response ? response.error : 'Unknown error',
+        );
+      }
+    } catch (error) {
+      console.error('Error loading conversations:', error);
+    } finally {
+      setLoadingConversations(false);
+    }
+  };
+
+  // Load messages from a specific conversation
+  const loadConversation = async (conversation: Conversation) => {
+    try {
+      setIsTyping(true);
+      setShowConversationsModal(false);
+      const response = await chatService.getConversationMessages(conversation.conversation_id);
+
+      if (response.success && 'data' in response) {
+        setConversationId(conversation.conversation_id);
+        setCurrentTripTitle(conversation.title);
+
+        // Convert backend messages to UI message format
+        const loadedMessages: Message[] = response.data.messages.map((msg: any, idx: number) => ({
+          id: `${msg.message_id}-${idx}`,
+          text: msg.message,
+          isUser: msg.sender === 'user',
+          timestamp: new Date(msg.created_at),
+          // Add metadata if available for bot messages
+          ...(msg.sender === 'bot' && msg.metadata
+            ? {
+                routeSummary: extractRouteSummary(msg.message),
+                routeDetails: msg.metadata.transport_recommendations?.ranked_routes?.map(
+                  (route: any) => ({
+                    route_id: route.route_id,
+                    transport_type: route.transport_type,
+                    operator_name: route.operator_name,
+                    score: Math.round((route.score || 0) * 100),
+                    duration_min:
+                      route.dynamic?.duration_min || route.static?.estimated_duration_min || 0,
+                    distance_km: route.dynamic?.distance_km || route.static?.distance_km || 0,
+                    fare_lkr: route.static?.base_fare_lkr || 0,
+                    congestion: route.dynamic?.congestion,
+                    weather_conditions:
+                      route.dynamic?.weather_risk < 0.2 ? 'Good weather' : 'Check weather',
+                    navigation_steps: route.static?.navigation_steps,
+                  }),
+                ),
+                mapData: extractMapData(msg.metadata),
+              }
+            : {}),
+        }));
+
+        setMessages(loadedMessages);
+      } else {
+        console.error(
+          'Failed to load conversation messages:',
+          'error' in response ? response.error : 'Unknown error',
+        );
+      }
+    } catch (error) {
+      console.error('Error loading conversation:', error);
+    } finally {
+      setIsTyping(false);
+    }
+  };
+
+  // Helper function to extract route summary
+  const extractRouteSummary = (messageText: string) => {
+    const summaryMatch = messageText.match(
+      /\*\*Route Summary:\*\*([\s\S]*?)\*\*Detailed Route Options:\*\*/,
+    );
+    if (!summaryMatch) return undefined;
+
+    const summaryText = summaryMatch[1];
+    const departureTimeMatch = summaryText.match(/Departure time considered: ([^\n]+)/);
+    const distanceMatch = summaryText.match(/Estimated trip distance: ([^\n]+)/);
+    const reasoningMatch = summaryText.match(/Reasoning: ([^\n]+)/);
+
+    return {
+      departureTime: departureTimeMatch?.[1]?.trim(),
+      distance: distanceMatch?.[1]?.trim(),
+      reasoning: reasoningMatch?.[1]?.trim(),
+    };
+  };
+
+  // Helper function to extract map data
+  const extractMapData = (metadata: any): ChatMapData | undefined => {
+    const mapData = metadata?.map_data;
+    if (!mapData?.origin || !mapData?.destination || !Array.isArray(mapData.routes)) {
+      return undefined;
+    }
+
+    return {
+      origin: {
+        lat: mapData.origin.lat,
+        lng: mapData.origin.lng,
+      },
+      destination: {
+        lat: mapData.destination.lat,
+        lng: mapData.destination.lng,
+      },
+      routes: mapData.routes
+        .filter((route: any) => typeof route?.polyline === 'string' && route.polyline.length > 0)
+        .map((route: any, index: number) => ({
+          route_id: route.route_id,
+          transport_type: route.transport_type,
+          polyline: route.polyline,
+          color: route.color || ['#3B82F6', '#F97316', '#10B981'][index % 3],
+          navigation_steps: route.navigation_steps || [],
+        })),
+    };
+  };
 
   // Fetch current location and send it to chatbot
   const fetchCurrentLocation = async () => {
@@ -345,7 +503,7 @@ export const ChatbotScreen: React.FC = () => {
 
       if (response.success && 'data' in response && response.data) {
         const botData = response.data;
-        _setConversationId(botData.conversation_id);
+        setConversationId(botData.conversation_id);
 
         // Extract route summary from message
         const fullMessageText = botData.message;
@@ -721,17 +879,45 @@ export const ChatbotScreen: React.FC = () => {
 
       {/* Header */}
       <View className="bg-white px-6 py-4 border-b border-gray-200">
-        <View className="flex-row items-center">
-          <View className="w-12 h-12 bg-primary rounded-full items-center justify-center mr-4">
-            <FontAwesome5 name="robot" size={20} color="white" />
-          </View>
-          <View className="flex-1">
-            <Text className="text-lg font-gilroy-bold text-gray-900">Travel Assistant</Text>
-            <View className="flex-row items-center">
-              <View className="w-2 h-2 bg-green-500 rounded-full mr-2" />
-              <Text className="text-sm font-gilroy-regular text-gray-600">Online</Text>
+        <View className="flex-row items-center justify-between mb-3">
+          <View className="flex-row items-center flex-1">
+            <View className="w-12 h-12 bg-primary rounded-full items-center justify-center mr-4">
+              <FontAwesome5 name="robot" size={20} color="white" />
+            </View>
+            <View className="flex-1">
+              <Text className="text-lg font-gilroy-bold text-gray-900">{currentTripTitle}</Text>
+              <View className="flex-row items-center">
+                <View className="w-2 h-2 bg-green-500 rounded-full mr-2" />
+                <Text className="text-sm font-gilroy-regular text-gray-600">
+                  {conversationId ? 'Active Trip' : 'Ready to plan'}
+                </Text>
+              </View>
             </View>
           </View>
+          <TouchableOpacity
+            className="ml-2"
+            onPress={() => {
+              loadConversations();
+              setShowConversationsModal(true);
+            }}
+          >
+            <View className="w-10 h-10 bg-gray-100 rounded-full items-center justify-center">
+              <FontAwesome5 name="history" size={18} color="#6B7280" />
+            </View>
+          </TouchableOpacity>
+        </View>
+
+        {/* Action Buttons */}
+        <View className="flex-row gap-2">
+          <TouchableOpacity
+            className="flex-1 bg-primary rounded-lg py-2.5 px-3"
+            onPress={handleNewTrip}
+          >
+            <View className="flex-row items-center justify-center">
+              <FontAwesome5 name="plus-circle" size={14} color="white" />
+              <Text className="text-white font-gilroy-bold ml-2">New Trip</Text>
+            </View>
+          </TouchableOpacity>
         </View>
       </View>
 
@@ -915,6 +1101,102 @@ export const ChatbotScreen: React.FC = () => {
               <TouchableOpacity
                 className="bg-primary rounded-lg py-3"
                 onPress={() => setTimetableModalVisible(false)}
+              >
+                <Text className="text-white font-gilroy-bold text-center">Close</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
+      {/* Conversations Modal */}
+      <Modal visible={showConversationsModal} animationType="slide" transparent={true}>
+        <View className="flex-1 bg-black/50">
+          <View className="flex-1 bg-white rounded-t-3xl mt-16">
+            {/* Modal Header */}
+            <View className="flex-row items-center justify-between px-6 py-4 border-b border-gray-200">
+              <Text className="text-lg font-gilroy-bold text-gray-900">My Trips</Text>
+              <TouchableOpacity onPress={() => setShowConversationsModal(false)}>
+                <FontAwesome5 name="times" size={20} color="#666" />
+              </TouchableOpacity>
+            </View>
+
+            {/* Conversations List */}
+            {loadingConversations ? (
+              <View className="flex-1 items-center justify-center">
+                <ActivityIndicator size="large" color="#F5840E" />
+                <Text className="text-gray-600 mt-3 font-gilroy-regular">Loading trips...</Text>
+              </View>
+            ) : conversations.length > 0 ? (
+              <ScrollView className="flex-1 px-6 py-4" showsVerticalScrollIndicator={false}>
+                {conversations.map(conversation => (
+                  <TouchableOpacity
+                    key={conversation.conversation_id}
+                    className={`bg-gray-50 rounded-xl p-4 mb-3 border ${
+                      conversationId === conversation.conversation_id
+                        ? 'border-primary'
+                        : 'border-gray-200'
+                    }`}
+                    onPress={() => {
+                      loadConversation(conversation);
+                      setShowConversationsModal(false);
+                    }}
+                  >
+                    <View className="flex-row items-start justify-between mb-2">
+                      <Text className="text-base font-gilroy-bold text-gray-900 flex-1">
+                        {conversation.title}
+                      </Text>
+                      {conversationId === conversation.conversation_id && (
+                        <View className="bg-primary rounded-full px-2 py-1">
+                          <Text className="text-xs font-gilroy-bold text-white">Active</Text>
+                        </View>
+                      )}
+                    </View>
+
+                    {conversation.last_message && (
+                      <Text
+                        className="text-sm font-gilroy-regular text-gray-600 mb-2"
+                        numberOfLines={2}
+                      >
+                        {conversation.last_message}
+                      </Text>
+                    )}
+
+                    <View className="flex-row items-center justify-between pt-2 border-t border-gray-300">
+                      <View className="flex-row items-center">
+                        <FontAwesome5 name="comments" size={12} color="#666" />
+                        <Text className="text-xs font-gilroy-regular text-gray-600 ml-2">
+                          {conversation.message_count} messages
+                        </Text>
+                      </View>
+                      <Text className="text-xs font-gilroy-regular text-gray-500">
+                        {new Date(conversation.updated_at).toLocaleDateString('en-US', {
+                          month: 'short',
+                          day: 'numeric',
+                          year: 'numeric',
+                        })}
+                      </Text>
+                    </View>
+                  </TouchableOpacity>
+                ))}
+              </ScrollView>
+            ) : (
+              <View className="flex-1 items-center justify-center px-6">
+                <FontAwesome5 name="map-marked-alt" size={48} color="#ccc" />
+                <Text className="text-center text-gray-600 mt-4 font-gilroy-bold">
+                  No trips yet
+                </Text>
+                <Text className="text-center text-gray-500 mt-2 font-gilroy-regular">
+                  Start planning your first trip by tapping "New Trip"
+                </Text>
+              </View>
+            )}
+
+            {/* Close Button */}
+            <View className="px-6 py-4 border-t border-gray-200">
+              <TouchableOpacity
+                className="bg-primary rounded-lg py-3"
+                onPress={() => setShowConversationsModal(false)}
               >
                 <Text className="text-white font-gilroy-bold text-center">Close</Text>
               </TouchableOpacity>
