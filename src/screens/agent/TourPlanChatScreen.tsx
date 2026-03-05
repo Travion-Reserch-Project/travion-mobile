@@ -25,7 +25,10 @@ import MaterialCommunityIcons from 'react-native-vector-icons/MaterialCommunityI
 import FontAwesome5 from 'react-native-vector-icons/FontAwesome5';
 import LinearGradient from 'react-native-linear-gradient';
 import Markdown from 'react-native-markdown-display';
-import { TourPlanCard } from '../../components/chat/TourPlanCard';
+import SelectionCardList from '../../components/chat/SelectionCardList';
+import WeatherDecisionModal from '../../components/chat/WeatherDecisionModal';
+import TimelineItinerary from '../../components/chat/TimelineItinerary';
+import { useInterruptResume } from '../../hooks/useInterruptResume';
 import { ApiError } from '../../services/api/client';
 import {
   tourPlanService,
@@ -38,6 +41,8 @@ import {
   type EventInfo,
   type FinalItinerary,
   type HotelSearchResult,
+  type SelectionCard,
+  type WeatherPromptOption,
 } from '../../services/api';
 
 const { width } = Dimensions.get('window');
@@ -89,7 +94,7 @@ interface TourPlanChatScreenProps {
 
 interface ChatMessage {
   id: string;
-  role: 'user' | 'assistant' | 'plan' | 'clarification' | 'event' | 'weather_alert' | 'hotel_results';
+  role: 'user' | 'assistant' | 'plan' | 'clarification' | 'event' | 'weather_alert' | 'hotel_results' | 'selection_cards' | 'weather_decision';
   content: string;
   timestamp: Date;
   planData?: {
@@ -105,6 +110,11 @@ interface ChatMessage {
   events?: EventInfo[];
   interruptReason?: string;
   hotelResults?: HotelSearchResult[];
+  // HITL selection & weather interrupt data
+  selectionCards?: SelectionCard[];
+  weatherPromptMessage?: string;
+  weatherPromptOptions?: WeatherPromptOption[];
+  threadId?: string;
 }
 
 // Format timestamp like WhatsApp (HH:MM)
@@ -288,7 +298,7 @@ const HotelSearchCard: React.FC<{ message: ChatMessage }> = ({ message }) => {
           <MaterialCommunityIcons name="magnify" size={16} color={THEME.primary} />
           <Text style={styles.hotelSearchTitle}>
             {message.hotelResults[0]?.type === 'restaurant' ? 'Restaurants' :
-             message.hotelResults[0]?.type === 'bar' ? 'Nightlife' : 'Hotels'} Found
+              message.hotelResults[0]?.type === 'bar' ? 'Nightlife' : 'Hotels'} Found
           </Text>
         </View>
         {message.hotelResults.map((result, index) => (
@@ -389,10 +399,7 @@ const ClarificationBubble: React.FC<{
 // WhatsApp-style message bubble
 const MessageBubble: React.FC<{
   message: ChatMessage;
-  onAcceptPlan: () => void;
-  onModifyPlan: () => void;
-  isAccepting: boolean;
-}> = ({ message, onAcceptPlan, onModifyPlan, isAccepting }) => {
+}> = ({ message }) => {
   const isUser = message.role === 'user';
   const isPlan = message.role === 'plan';
   const fadeAnim = useRef(new Animated.Value(0)).current;
@@ -428,18 +435,15 @@ const MessageBubble: React.FC<{
   if (isPlan && message.planData) {
     return (
       <Animated.View style={[styles.planBubbleContainer, { opacity: fadeAnim }]}>
-        <TourPlanCard
-          itinerary={message.planData.itinerary}
-          metadata={message.planData.metadata}
-          warnings={message.planData.warnings}
-          tips={message.planData.tips}
-          culturalTips={message.planData.culturalTips}
-          finalItinerary={message.planData.finalItinerary}
-          weatherData={message.planData.weatherData}
-          onAccept={onAcceptPlan}
-          onModify={onModifyPlan}
-          isLoading={isAccepting}
-        />
+        {/* Minimalist timeline itinerary */}
+        {message.planData.finalItinerary ? (
+          <TimelineItinerary itinerary={message.planData.finalItinerary} />
+        ) : (
+          /* Fallback: show plan summary as markdown when finalItinerary is missing */
+          <View style={styles.assistantBubble}>
+            <Markdown style={markdownStyles}>{message.content}</Markdown>
+          </View>
+        )}
       </Animated.View>
     );
   }
@@ -530,6 +534,16 @@ export const TourPlanChatScreen: React.FC<TourPlanChatScreenProps> = ({ route, n
   const scrollViewRef = useRef<ScrollView>(null);
   const inputRef = useRef<TextInput>(null);
 
+  // HITL interrupt/resume hook
+  const {
+    interruptState,
+    isResuming,
+    detectInterrupt,
+    clearInterrupt,
+    resumeSelection,
+    resumeWeather,
+  } = useInterruptResume(threadId);
+
   // Initial plan generation - runs once on mount
   useEffect(() => {
     generateInitialPlan();
@@ -571,10 +585,10 @@ export const TourPlanChatScreen: React.FC<TourPlanChatScreenProps> = ({ route, n
       const alertText = response.interruptReason.includes('rain')
         ? 'Heavy rain is predicted for some locations. The AI has flagged this for your review.'
         : response.interruptReason.includes('heat')
-        ? 'Extreme heat conditions detected. Consider adjusting outdoor activities.'
-        : response.interruptReason.includes('poya')
-        ? 'A Poya day falls within your trip dates. Some restrictions may apply.'
-        : 'A weather or safety constraint has been detected for your trip.';
+          ? 'Extreme heat conditions detected. Consider adjusting outdoor activities.'
+          : response.interruptReason.includes('poya')
+            ? 'A Poya day falls within your trip dates. Some restrictions may apply.'
+            : 'A weather or safety constraint has been detected for your trip.';
 
       newMessages.push({
         id: (Date.now() + 0.5).toString(),
@@ -593,6 +607,27 @@ export const TourPlanChatScreen: React.FC<TourPlanChatScreenProps> = ({ route, n
         content: response.clarificationQuestion.question,
         timestamp: new Date(),
         clarificationData: response.clarificationQuestion,
+      });
+    } else if (response.pendingUserSelection && response.selectionCards && response.selectionCards.length > 0) {
+      // HITL: Agent paused for hotel/restaurant selection
+      newMessages.push({
+        id: (Date.now() + 2).toString(),
+        role: 'selection_cards',
+        content: response.response || 'Please choose one of the options below:',
+        timestamp: new Date(),
+        selectionCards: response.selectionCards,
+        threadId: response.threadId,
+      });
+    } else if (response.weatherInterrupt && response.weatherPromptOptions && response.weatherPromptOptions.length > 0) {
+      // HITL: Agent paused for weather decision
+      newMessages.push({
+        id: (Date.now() + 2).toString(),
+        role: 'weather_decision',
+        content: response.weatherPromptMessage || 'Weather conditions have changed. How would you like to proceed?',
+        timestamp: new Date(),
+        weatherPromptMessage: response.weatherPromptMessage,
+        weatherPromptOptions: response.weatherPromptOptions,
+        threadId: response.threadId,
       });
     } else if (response.itinerary && response.itinerary.length > 0) {
       // Add plan message
@@ -631,12 +666,11 @@ export const TourPlanChatScreen: React.FC<TourPlanChatScreenProps> = ({ route, n
     const welcomeMessage: ChatMessage = {
       id: Date.now().toString(),
       role: 'assistant',
-      content: `Creating your personalized tour plan for **${
-        selectedLocations.length
-      } locations** (${formatDateRange(
-        startDate,
-        endDate,
-      )}).\n\nOptimizing for golden hour, crowd levels, and local events...`,
+      content: `Creating your personalized tour plan for **${selectedLocations.length
+        } locations** (${formatDateRange(
+          startDate,
+          endDate,
+        )}).\n\nOptimizing for golden hour, crowd levels, and local events...`,
       timestamp: new Date(),
     };
     setMessages([welcomeMessage]);
@@ -886,6 +920,100 @@ export const TourPlanChatScreen: React.FC<TourPlanChatScreenProps> = ({ route, n
     [isSending, selectedLocations],
   );
 
+  // HITL: Handle user selecting a hotel/restaurant card
+  const handleSelectionChoice = useCallback(
+    async (cardId: string) => {
+      if (!threadId || isSending) return;
+      setIsSending(true);
+
+      // Show user's selection as a message
+      const userMessage: ChatMessage = {
+        id: Date.now().toString(),
+        role: 'user',
+        content: `Selected option: ${cardId}`,
+        timestamp: new Date(),
+      };
+      setMessages(prev => [...prev, userMessage]);
+
+      try {
+        const response = await tourPlanService.resumeSelection({
+          threadId,
+          selectedCandidateId: cardId,
+        });
+
+        setThreadId(response.threadId);
+        handleApiResponse(response);
+      } catch (err: any) {
+        console.error('Selection resume failed:', err);
+        setMessages(prev => [
+          ...prev,
+          {
+            id: (Date.now() + 1).toString(),
+            role: 'assistant',
+            content: `Couldn't process your selection. Please try again.`,
+            timestamp: new Date(),
+          },
+        ]);
+      } finally {
+        setIsSending(false);
+      }
+    },
+    [threadId, isSending],
+  );
+
+  // HITL: Handle user skipping restaurant selection
+  const handleSkipSelection = useCallback(async () => {
+    if (!threadId || isSending) return;
+    // Use a sentinel ID that the backend recognises as "skip"
+    handleSelectionChoice('__SKIP__');
+  }, [threadId, isSending, handleSelectionChoice]);
+
+  // HITL: Handle user's weather decision
+  const handleWeatherChoice = useCallback(
+    async (optionId: string) => {
+      if (!threadId || isSending) return;
+      setIsSending(true);
+
+      const labelMap: Record<string, string> = {
+        switch_indoor: 'Switch to indoor alternatives',
+        reschedule: 'Reschedule affected activities',
+        keep: 'Keep the original plan',
+      };
+
+      const userMessage: ChatMessage = {
+        id: Date.now().toString(),
+        role: 'user',
+        content: labelMap[optionId] || optionId,
+        timestamp: new Date(),
+      };
+      setMessages(prev => [...prev, userMessage]);
+
+      try {
+        const response = await tourPlanService.resumeWeather({
+          threadId,
+          userWeatherChoice: optionId,
+        });
+
+        setThreadId(response.threadId);
+        handleApiResponse(response);
+      } catch (err: any) {
+        console.error('Weather resume failed:', err);
+        setMessages(prev => [
+          ...prev,
+          {
+            id: (Date.now() + 1).toString(),
+            role: 'assistant',
+            content: `Couldn't process your weather choice. Please try again.`,
+            timestamp: new Date(),
+          },
+        ]);
+      } finally {
+        setIsSending(false);
+      }
+    },
+    [threadId, isSending],
+  );
+
   const quickReplies = [
     { text: 'More photo time', icon: 'camera' },
     { text: 'Avoid crowds', icon: 'users' },
@@ -968,6 +1096,41 @@ export const TourPlanChatScreen: React.FC<TourPlanChatScreenProps> = ({ route, n
             if (message.role === 'hotel_results') {
               return <HotelSearchCard key={message.id} message={message} />;
             }
+            if (message.role === 'selection_cards' && message.selectionCards) {
+              return (
+                <View key={message.id} style={styles.aiBubbleRow}>
+                  <View style={{ flex: 1 }}>
+                    <View style={[styles.messageBubble, styles.assistantBubble, { marginBottom: 8 }]}>
+                      <View style={styles.aiBubbleTail} />
+                      <Text style={{ fontSize: 14, color: THEME.dark, fontFamily: 'Gilroy-Medium' }}>
+                        {message.content}
+                      </Text>
+                      <Text style={styles.bubbleTime}>{formatTime(message.timestamp)}</Text>
+                    </View>
+                    <SelectionCardList
+                      cards={message.selectionCards}
+                      onSelect={handleSelectionChoice}
+                      onSkip={handleSkipSelection}
+                      disabled={isSending}
+                      loading={isSending}
+                    />
+                  </View>
+                </View>
+              );
+            }
+            if (message.role === 'weather_decision' && message.weatherPromptOptions) {
+              return (
+                <View key={message.id} style={styles.aiBubbleRow}>
+                  <WeatherDecisionModal
+                    message={message.weatherPromptMessage || message.content}
+                    options={message.weatherPromptOptions}
+                    onSelect={handleWeatherChoice}
+                    disabled={isSending}
+                    loading={isSending}
+                  />
+                </View>
+              );
+            }
             if (message.role === 'clarification' && message.clarificationData) {
               return (
                 <ClarificationBubble
@@ -982,9 +1145,6 @@ export const TourPlanChatScreen: React.FC<TourPlanChatScreenProps> = ({ route, n
               <MessageBubble
                 key={message.id}
                 message={message}
-                onAcceptPlan={handleAcceptPlan}
-                onModifyPlan={handleModifyPlan}
-                isAccepting={isAccepting}
               />
             );
           })}
@@ -1034,7 +1194,7 @@ export const TourPlanChatScreen: React.FC<TourPlanChatScreenProps> = ({ route, n
             style={[
               styles.sendButton,
               (!inputText.trim() || isSending || isLoading || !threadId) &&
-                styles.sendButtonDisabled,
+              styles.sendButtonDisabled,
             ]}
             onPress={handleSend}
             disabled={!inputText.trim() || isSending || isLoading || !threadId}
