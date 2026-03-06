@@ -926,11 +926,24 @@ export const TourPlanChatScreen: React.FC<TourPlanChatScreenProps> = ({ route, n
       if (!threadId || isSending) return;
       setIsSending(true);
 
+      // Map known card IDs to friendly labels
+      const knownLabels: Record<string, string> = {
+        pref_dining: '🍽️ Dining Only',
+        pref_accommodation: '🏨 Stays Only',
+        pref_both: '🍽️🏨 Both — Restaurants & Accommodations',
+        pref_none: '⏩ Activities Only',
+        budget_low: '💰 Budget Friendly',
+        budget_medium: '💎 Mid-Range',
+        budget_high: '👑 Premium',
+        __SKIP__: 'Skipped this step',
+      };
+      const selectionLabel = knownLabels[cardId] || `Selected: ${cardId}`;
+
       // Show user's selection as a message
       const userMessage: ChatMessage = {
         id: Date.now().toString(),
         role: 'user',
-        content: `Selected option: ${cardId}`,
+        content: selectionLabel,
         timestamp: new Date(),
       };
       setMessages(prev => [...prev, userMessage]);

@@ -229,7 +229,7 @@ const SelectionCardList: React.FC<SelectionCardListProps> = ({
         </View>
       )}
 
-      {/* Skip restaurant selection */}
+      {/* Skip current selection step */}
       {onSkip && !selectedId && (
         <TouchableOpacity
           style={s.skipButton}
@@ -238,7 +238,7 @@ const SelectionCardList: React.FC<SelectionCardListProps> = ({
           activeOpacity={0.7}
         >
           <Ionicons name="play-skip-forward-outline" size={15} color={P.slate500} />
-          <Text style={s.skipText}>Skip &amp; continue without dining</Text>
+          <Text style={s.skipText}>Skip this step</Text>
         </TouchableOpacity>
       )}
     </Animated.View>
