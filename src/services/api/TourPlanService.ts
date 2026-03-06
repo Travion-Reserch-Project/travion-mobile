@@ -253,6 +253,7 @@ export interface TourPlanResponse {
   // ── HITL Interrupt Fields ──
   pendingUserSelection?: boolean;
   selectionCards?: SelectionCard[];
+  promptText?: string;
   searchCandidates?: SearchCandidate[];
   mcpSearchMetadata?: Record<string, any>;
   weatherInterrupt?: boolean;
