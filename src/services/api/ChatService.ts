@@ -64,53 +64,53 @@ export interface NavigationStep {
   travel_mode: string;
 }
 
-export interface RouteStatic {
-  route_id: string;
-  origin_city_id: number;
-  destination_city_id: number;
-  transport_type: string;
-  distance_km: number;
-  estimated_duration_min: number;
-  base_fare_lkr: number;
-  has_transfer: boolean;
-  scenic_score: number;
-  comfort_score: number;
-  operator_name: string;
-  navigation_steps: NavigationStep[];
-}
-
-export interface RouteDynamic {
-  distance_km: number;
-  duration_min: number;
-  traffic_delay_min: number;
-  weather_risk: number;
-  congestion: string;
-  accident_risk: number;
-}
-
-export interface ScoreBreakdown {
-  speed_score: number;
-  budget_score: number;
-  comfort_score: number;
-  scenic_score: number;
-  safety_score: number;
-  weather_penalty: number;
-  traffic_penalty: number;
-  accident_penalty: number;
-  ml_boost: number;
-  final_score: number;
-}
-
+// Cleaned route structure (no more static/dynamic nesting)
 export interface RankedRoute {
   route_id: string;
   transport_type: string;
-  operator_name: string;
-  static: RouteStatic;
-  dynamic: RouteDynamic;
   score: number;
   ml_confidence: number;
-  ml_prediction: string;
-  scoreBreakdown: ScoreBreakdown;
+  recommendation_reason: string;
+}
+
+export interface StationData {
+  origin: {
+    requested_name: string;
+    matched_city_id: number;
+    matched_city_name: string;
+    matched_by: string;
+    has_railway_access: boolean;
+    has_bus_access: boolean;
+    nearest_railway_station?: {
+      station_id: string;
+      station_name: string;
+      distance_km: number;
+      latitude?: number;
+      longitude?: number;
+    };
+  };
+  destination: {
+    requested_name: string;
+    matched_city_id: number;
+    matched_city_name: string;
+    matched_by: string;
+    has_railway_access: boolean;
+    has_bus_access: boolean;
+    nearest_railway_station?: {
+      station_id: string;
+      station_name: string;
+      distance_km: number;
+      latitude?: number;
+      longitude?: number;
+    };
+  };
+}
+
+export interface RoadIncidents {
+  active_incidents: any[];
+  incident_count: number;
+  critical_incidents: number;
+  high_incidents: number;
 }
 
 export interface TransportRecommendations {
@@ -135,14 +135,17 @@ export interface MapData {
 export interface ChatbotMetadata {
   intent: string;
   locations_identified: LocationIdentified[];
-  transport_recommendations: TransportRecommendations;
+  transport_recommendations?: TransportRecommendations;
   map_data?: MapData;
+  road_incidents?: RoadIncidents;
+  station_data?: StationData;
   processing_time_ms: number;
 }
 
 export interface ChatbotResponseData {
   conversation_id: string;
   message: string;
+  html_content?: string;
   message_type: string;
   metadata: ChatbotMetadata;
   suggestions: string[];
@@ -341,6 +344,11 @@ const chatService = {
         },
       );
       console.log('Chatbot API Response:', response.data);
+      console.log('Response data type:', typeof response.data);
+      console.log(
+        'Response data keys:',
+        response.data ? Object.keys(response.data) : 'null/undefined',
+      );
       return response.data;
     } catch (error: any) {
       console.error('Chatbot API Error:', error.message);

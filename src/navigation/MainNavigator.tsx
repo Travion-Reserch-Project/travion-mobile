@@ -3,6 +3,8 @@ import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { UserProfileSetupScreen, MainAppScreen } from '@screens';
 import { MapScreen } from '@screens/MapScreen';
 import { ReportIncidentScreen } from '@screens/safety/ReportIncidentScreen';
+import { ReportRoadIssueScreen } from '@screens/transport/ReportRoadIssueScreen';
+import { IncidentMapScreen } from '../screens/safety/IncidentMapScreen';
 import { PoliceHelpScreen } from '@screens/safety/PoliceHelpScreen';
 import { AlertsScreen } from '@screens/safety/AlertsScreen';
 import { ProfileScreen } from '@screens/auth/ProfileScreen';
@@ -35,6 +37,13 @@ export type MainStackParamList = {
     selectedAlert?: SafetyAlert;
   };
   ReportIncidentScreen: undefined;
+  ReportRoadIssueScreen: undefined;
+  IncidentMapScreen:
+    | {
+        origin?: { latitude: number; longitude: number };
+        destination?: { latitude: number; longitude: number };
+      }
+    | undefined;
   PoliceHelpScreen: undefined;
   AlertsScreen: undefined;
   ProfileScreen: { userName?: string; userEmail?: string };
@@ -67,6 +76,10 @@ const ScreenWithSafeArea: React.FC<{ children: React.ReactNode }> = ({ children 
       {children}
     </SafeAreaView>
   );
+};
+
+const renderWithSafeArea = ({ children }: { children: React.ReactNode }) => {
+  return <ScreenWithSafeArea>{children}</ScreenWithSafeArea>;
 };
 
 // Simple Welcome Back component
@@ -110,7 +123,7 @@ export const MainNavigator: React.FC = () => {
         headerShown: false,
         contentStyle: { flex: 1 },
       }}
-      screenLayout={({ children }) => <ScreenWithSafeArea>{children}</ScreenWithSafeArea>}
+      screenLayout={renderWithSafeArea}
     >
       {hasCompleteProfile ? (
         <>
@@ -118,6 +131,8 @@ export const MainNavigator: React.FC = () => {
           <Stack.Screen name="MainApp" component={MainAppScreen} />
           <Stack.Screen name="MapScreen" component={MapScreen} />
           <Stack.Screen name="ReportIncidentScreen" component={ReportIncidentScreen} />
+          <Stack.Screen name="ReportRoadIssueScreen" component={ReportRoadIssueScreen} />
+          <Stack.Screen name="IncidentMapScreen" component={IncidentMapScreen} />
           <Stack.Screen name="PoliceHelpScreen" component={PoliceHelpScreen} />
           <Stack.Screen name="AlertsScreen" component={AlertsScreen} />
           <Stack.Screen name="ProfileScreen" component={ProfileScreen} />
@@ -138,6 +153,8 @@ export const MainNavigator: React.FC = () => {
           <Stack.Screen name="MainApp" component={MainAppScreen} />
           <Stack.Screen name="MapScreen" component={MapScreen} />
           <Stack.Screen name="ReportIncidentScreen" component={ReportIncidentScreen} />
+          <Stack.Screen name="ReportRoadIssueScreen" component={ReportRoadIssueScreen} />
+          <Stack.Screen name="IncidentMapScreen" component={IncidentMapScreen} />
           <Stack.Screen name="PoliceHelpScreen" component={PoliceHelpScreen} />
           <Stack.Screen name="AlertsScreen" component={AlertsScreen} />
           <Stack.Screen name="ProfileScreen" component={ProfileScreen} />

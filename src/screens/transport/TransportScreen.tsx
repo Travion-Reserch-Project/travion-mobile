@@ -207,7 +207,7 @@ export const TransportScreen: React.FC<TransportScreenProps> = ({ navigation }) 
             <TouchableOpacity
               className="rounded-xl p-4 flex-row items-center justify-between"
               activeOpacity={0.8}
-              onPress={() => console.log('Road issue report coming soon')}
+              onPress={() => navigation && navigation.navigate('ReportRoadIssueScreen')}
               style={styles.reportCard}
             >
               <View className="flex-row items-center flex-1">
@@ -229,7 +229,7 @@ export const TransportScreen: React.FC<TransportScreenProps> = ({ navigation }) 
             <TouchableOpacity
               className="rounded-xl p-4 flex-row items-center justify-between"
               activeOpacity={0.8}
-              onPress={() => navigation && navigation.navigate('MapScreen', {})}
+              onPress={() => navigation && navigation.navigate('IncidentMapScreen')}
               style={styles.toolCard}
             >
               <View className="flex-row items-center flex-1">
