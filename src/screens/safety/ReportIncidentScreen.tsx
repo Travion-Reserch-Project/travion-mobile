@@ -230,6 +230,9 @@ export const ReportIncidentScreen: React.FC = () => {
         throw new Error('Invalid incident type selected');
       }
 
+      // Get the device's FCM token to exclude self from push notifications
+      const deviceToken = await NotificationService.getToken();
+
       // Prepare the report data
       const reportData = {
         incidentType: incidentTypeLabel as
@@ -250,6 +253,7 @@ export const ReportIncidentScreen: React.FC = () => {
         description: description.trim(),
         photoUrl: photoUri || undefined,
         isAnonymous: true, // Reports are anonymous by default
+        reporterDeviceToken: deviceToken || undefined, // Exclude this device from push notifications
       };
 
       console.log('[ReportIncident] Submitting report:', reportData);
@@ -260,9 +264,7 @@ export const ReportIncidentScreen: React.FC = () => {
         await NotificationService.updateLocation(
           locationCoords.latitude,
           locationCoords.longitude,
-        ).catch(err =>
-          console.warn('[ReportIncident] Failed to update device location:', err),
-        );
+        ).catch(err => console.warn('[ReportIncident] Failed to update device location:', err));
       }
 
       // Submit to backend
