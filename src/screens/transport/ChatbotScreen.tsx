@@ -48,9 +48,7 @@ interface RouteDetails {
   transport_type: string;
   operator_name: string;
   score: number;
-  duration_min: number;
-  distance_km: number;
-  fare_lkr: number;
+  ml_confidence: number;
   congestion?: string;
   weather_conditions?: string;
   navigation_steps?: Array<{
@@ -61,10 +59,17 @@ interface RouteDetails {
   }>;
 }
 
+interface StationInfo {
+  requested_name: string;
+  matched_city_id: number;
+  matched_city_name: string;
+  matched_by: string;
+  has_railway_access: boolean;
+  has_bus_access: boolean;
+}
+
 // Enhanced Route Card Component
 const RouteCard: React.FC<{ route: RouteDetails; index: number }> = ({ route, index }) => {
-  const [expanded, setExpanded] = useState(false);
-
   const getMedalEmoji = (idx: number) => {
     if (idx === 0) return '🥇';
     if (idx === 1) return '🥈';
@@ -72,28 +77,33 @@ const RouteCard: React.FC<{ route: RouteDetails; index: number }> = ({ route, in
     return '📍';
   };
 
-  const formatDuration = (mins: number) => {
-    const hours = Math.floor(mins / 60);
-    const minutes = mins % 60;
-    if (hours > 0) {
-      return `${hours}h ${minutes}m`;
+  const getTransportIcon = (type: string) => {
+    switch (type.toLowerCase()) {
+      case 'bus':
+        return '🚌';
+      case 'train':
+        return '🚂';
+      case 'car':
+        return '🚗';
+      case 'taxi':
+        return '🚕';
+      default:
+        return '🚕';
     }
-    return `${minutes} min`;
   };
 
   return (
     <View className="mb-3 mx-3">
-      <TouchableOpacity
-        onPress={() => setExpanded(!expanded)}
+      <View
         className={`bg-white rounded-xl border-2 overflow-hidden shadow-sm ${
           index === 0 ? 'border-green-500' : 'border-gray-200'
         }`}
       >
         {/* Header */}
         <View className={`p-4 ${index === 0 ? 'bg-green-50' : 'bg-white'}`}>
-          <View className="flex-row items-center justify-between mb-2">
+          <View className="flex-row items-center justify-between mb-3">
             <View className="flex-row items-center flex-1">
-              <Text className="text-2xl mr-2">{getMedalEmoji(index)}</Text>
+              <Text className="text-3xl mr-2">{getTransportIcon(route.transport_type)}</Text>
               <View className="flex-1">
                 <Text className="text-base font-gilroy-bold text-gray-900" numberOfLines={1}>
                   {route.operator_name}
@@ -103,69 +113,36 @@ const RouteCard: React.FC<{ route: RouteDetails; index: number }> = ({ route, in
                 </Text>
               </View>
             </View>
-            <View className="bg-blue-100 px-3 py-1 rounded-full">
+          </View>
+
+          {/* Score and Confidence */}
+          <View className="flex-row items-center gap-2">
+            <View className="bg-blue-100 px-3 py-1.5 rounded-lg flex-1">
+              <Text className="text-xs font-gilroy-medium text-blue-600">Score</Text>
               <Text className="text-sm font-gilroy-bold text-blue-700">{route.score}/100</Text>
             </View>
-          </View>
-
-          {/* Key Metrics */}
-          <View className="flex-row items-center justify-between mt-3 pt-3 border-t border-gray-200">
-            <View className="flex-1 items-center">
-              <FontAwesome5 name="clock" size={14} color="#6B7280" />
-              <Text className="text-xs font-gilroy-bold text-gray-900 mt-1">
-                {formatDuration(route.duration_min)}
+            <View className="bg-purple-100 px-3 py-1.5 rounded-lg flex-1">
+              <Text className="text-xs font-gilroy-medium text-purple-600">ML Confidence</Text>
+              <Text className="text-sm font-gilroy-bold text-purple-700">
+                {Math.round(route.ml_confidence * 100)}%
               </Text>
-              <Text className="text-xs font-gilroy-regular text-gray-500">Duration</Text>
-            </View>
-            <View className="flex-1 items-center">
-              <FontAwesome5 name="road" size={14} color="#6B7280" />
-              <Text className="text-xs font-gilroy-bold text-gray-900 mt-1">
-                {route.distance_km.toFixed(1)} km
-              </Text>
-              <Text className="text-xs font-gilroy-regular text-gray-500">Distance</Text>
-            </View>
-            <View className="flex-1 items-center">
-              <FontAwesome5 name="money-bill-wave" size={14} color="#6B7280" />
-              <Text className="text-xs font-gilroy-bold text-gray-900 mt-1">
-                LKR {route.fare_lkr}
-              </Text>
-              <Text className="text-xs font-gilroy-regular text-gray-500">Fare</Text>
             </View>
           </View>
 
-          {/* Status Badges */}
-          <View className="flex-row items-center mt-3 gap-2">
-            {route.weather_conditions && (
-              <View className="bg-green-100 px-2 py-1 rounded-full">
-                <Text className="text-xs font-gilroy-medium text-green-700">
-                  ✅ {route.weather_conditions}
-                </Text>
-              </View>
-            )}
-            {route.congestion && (
-              <View className="bg-green-100 px-2 py-1 rounded-full">
+          {/* Status Badges - only show congestion, not weather */}
+          {route.congestion && (
+            <View className="mt-2">
+              <View className="bg-green-100 px-2 py-1 rounded-full inline-flex">
                 <Text className="text-xs font-gilroy-medium text-green-700">
                   🟢 {route.congestion} traffic
                 </Text>
               </View>
-            )}
-          </View>
-
-          {/* Expand/Collapse Indicator */}
-          <View className="flex-row items-center justify-center mt-3 pt-2 border-t border-gray-200">
-            <Text className="text-xs font-gilroy-medium text-gray-500 mr-1">
-              {expanded ? 'Hide' : 'View'} turn-by-turn directions
-            </Text>
-            <FontAwesome5
-              name={expanded ? 'chevron-up' : 'chevron-down'}
-              size={10}
-              color="#6B7280"
-            />
-          </View>
+            </View>
+          )}
         </View>
 
-        {/* Expandable Directions */}
-        {expanded && route.navigation_steps && route.navigation_steps.length > 0 && (
+        {/* Turn-by-Turn Directions */}
+        {route.navigation_steps && route.navigation_steps.length > 0 && (
           <View className="px-4 pb-4 bg-gray-50 border-t border-gray-200">
             <Text className="text-sm font-gilroy-bold text-gray-900 mb-3 mt-3">
               🗺️ Turn-by-Turn Directions
@@ -194,7 +171,7 @@ const RouteCard: React.FC<{ route: RouteDetails; index: number }> = ({ route, in
             ))}
           </View>
         )}
-      </TouchableOpacity>
+      </View>
     </View>
   );
 };
@@ -218,6 +195,10 @@ interface Message {
   };
   routeDetails?: RouteDetails[];
   mapData?: ChatMapData;
+  stationData?: {
+    origin: StationInfo;
+    destination: StationInfo;
+  };
 }
 
 export const ChatbotScreen: React.FC = () => {
@@ -352,17 +333,14 @@ export const ChatbotScreen: React.FC = () => {
                     transport_type: route.transport_type,
                     operator_name: route.operator_name,
                     score: Math.round((route.score || 0) * 100),
-                    duration_min:
-                      route.dynamic?.duration_min || route.static?.estimated_duration_min || 0,
-                    distance_km: route.dynamic?.distance_km || route.static?.distance_km || 0,
-                    fare_lkr: route.static?.base_fare_lkr || 0,
                     congestion: route.dynamic?.congestion,
                     weather_conditions:
                       route.dynamic?.weather_risk < 0.2 ? 'Good weather' : 'Check weather',
-                    navigation_steps: route.static?.navigation_steps,
+                    navigation_steps: route.navigation_steps || route.static?.navigation_steps,
                   }),
                 ),
                 mapData: extractMapData(msg.metadata),
+                stationData: msg.metadata.station_data,
               }
             : {}),
         }));
@@ -541,16 +519,13 @@ export const ChatbotScreen: React.FC = () => {
               transport_type: route.transport_type,
               operator_name: route.operator_name,
               score: Math.round((route.score || 0) * 100),
-              duration_min:
-                route.dynamic?.duration_min || route.static?.estimated_duration_min || 0,
-              distance_km: route.dynamic?.distance_km || route.static?.distance_km || 0,
-              fare_lkr: route.static?.base_fare_lkr || 0,
               congestion: route.dynamic?.congestion,
               weather_conditions:
                 route.dynamic?.weather_risk < 0.2 ? 'Good weather' : 'Check weather',
-              navigation_steps: route.static?.navigation_steps,
+              navigation_steps: route.navigation_steps || route.static?.navigation_steps,
             }),
           ),
+          stationData: botData.metadata?.station_data,
           mapData: (() => {
             const mapData = botData.metadata?.map_data;
             if (!mapData?.origin || !mapData?.destination || !Array.isArray(mapData.routes)) {
@@ -803,6 +778,39 @@ export const ChatbotScreen: React.FC = () => {
                 </Text>
               </View>
             )}
+          </View>
+        </View>
+      )}
+
+      {/* Render Station Data (Origin & Destination) */}
+      {!message.isUser && message.stationData && (
+        <View className="mb-4 mx-3">
+          <View className="bg-gradient-to-r from-blue-50 to-indigo-50 rounded-xl p-4 border border-blue-200">
+            <View className="flex-row items-center justify-between mb-3">
+              <View className="flex-1">
+                <Text className="text-xs font-gilroy-medium text-blue-600 mb-1">From</Text>
+                <Text className="text-sm font-gilroy-bold text-gray-900">
+                  {message.stationData.origin.matched_city_name}
+                </Text>
+                <Text className="text-xs font-gilroy-regular text-gray-600">
+                  {message.stationData.origin.has_railway_access && <Text>🚂 </Text>}
+                  {message.stationData.origin.has_bus_access && <Text>🚌 </Text>}
+                </Text>
+              </View>
+              <View className="px-2">
+                <FontAwesome5 name="arrow-right" size={14} color="#3B82F6" />
+              </View>
+              <View className="flex-1 items-end">
+                <Text className="text-xs font-gilroy-medium text-blue-600 mb-1">To</Text>
+                <Text className="text-sm font-gilroy-bold text-gray-900">
+                  {message.stationData.destination.matched_city_name}
+                </Text>
+                <Text className="text-xs font-gilroy-regular text-gray-600">
+                  {message.stationData.destination.has_railway_access && <Text>🚂 </Text>}
+                  {message.stationData.destination.has_bus_access && <Text>🚌 </Text>}
+                </Text>
+              </View>
+            </View>
           </View>
         </View>
       )}
