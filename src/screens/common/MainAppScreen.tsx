@@ -29,7 +29,7 @@ export const MainAppScreen: React.FC<Props> = ({ route, navigation }) => {
       case 'transport':
         return <TransportScreen navigation={navigation} />;
       case 'guide':
-        return <TourGuideScreen />;
+        return <TourGuideScreen navigation={navigation} />;
       case 'safety':
         return <SafetyScreen />;
       case 'weather':

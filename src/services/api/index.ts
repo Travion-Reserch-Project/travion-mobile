@@ -50,4 +50,17 @@ export type {
   StepResult,
   CulturalTip,
   EventInfo,
+  // Map-ready itinerary types
+  FinalItinerary,
+  FinalItineraryStop,
+  RouteCoordinate,
+  ContextualNote,
+  // Hotel search types
+  HotelSearchResult,
+  HotelSearchResponse,
+  // HITL selection & weather interrupt types
+  SelectionCard,
+  WeatherPromptOption,
+  ResumeSelectionRequest,
+  ResumeWeatherRequest,
 } from './TourPlanService';

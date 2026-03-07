@@ -1,4 +1,4 @@
-import { MainStackParamList } from '@navigation';
+import { MainStackParamList } from '@navigation/MainNavigator';
 import { useNavigation } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import React, { useEffect, useState } from 'react';
@@ -47,17 +47,46 @@ const SunProtectionScreen: React.FC = () => {
           setLocationName('Current Location');
         }
 
-        // Fetch prediction
-        try {
-          const response = await weatherService.predictSunRisk(latitude, longitude);
-          if (response.success) {
-            setPredictionData(response.data);
-          }
-        } catch (err) {
-          console.error('Prediction fetch error:', err);
-        } finally {
-          setLoading(false);
-        }
+        Geolocation.getCurrentPosition(
+          async position => {
+            const { latitude, longitude } = position.coords;
+
+            // Get Location Name
+            try {
+              const results = await RNGeocoding.from(latitude, longitude);
+              if (results && results?.results && results?.results.length > 0) {
+                const addressParts = results.results[0].formatted_address.split(',');
+                setLocationName(
+                  addressParts.length > 2
+                    ? `${addressParts[addressParts.length - 3]}, ${addressParts[addressParts.length - 1]
+                    }`
+                    : results.results[0].formatted_address,
+                );
+              }
+            } catch (err) {
+              console.error('Geocoding error:', err);
+              setLocationName('Current Location');
+            }
+
+            // Fetch prediction
+            try {
+              const response = await weatherService.predictSunRisk(latitude, longitude);
+              if (response.success) {
+                setPredictionData(response.data);
+              }
+            } catch (err) {
+              console.error('Prediction fetch error:', err);
+            } finally {
+              setLoading(false);
+            }
+          },
+          error => {
+            console.error('Geolocation error:', error);
+            // Fallback to default coordinates (Mirissa)
+            fetchPredictionWithDefaults();
+          },
+          { enableHighAccuracy: true, timeout: 15000, maximumAge: 10000 },
+        );
       } catch (err) {
         console.error('Setup/location error:', err);
         // Fallback to default coordinates (Mirissa)
@@ -316,17 +345,16 @@ const SunProtectionScreen: React.FC = () => {
               ? 'No special precautions needed'
               : 'Apply broad-spectrum sunscreen SPF 50+',
             riskLevel.toLowerCase() === 'moderate' ||
-            riskLevel.toLowerCase() === 'high' ||
-            riskLevel.toLowerCase() === 'very high'
+              riskLevel.toLowerCase() === 'high' ||
+              riskLevel.toLowerCase() === 'very high'
               ? 'Wear protective clothing & sunglasses'
               : 'Stay hydrated throughout the day',
             'Seek shade if staying outdoors for long',
           ].map((item, index) => (
             <View key={index} className="flex-row items-center mb-4">
               <View
-                className={`bg-${
-                  riskLevel.toLowerCase() === 'low' ? 'green' : 'orange'
-                }-500 p-2 rounded-full mr-4`}
+                className={`bg-${riskLevel.toLowerCase() === 'low' ? 'green' : 'orange'
+                  }-500 p-2 rounded-full mr-4`}
               >
                 <FontAwesome name="check" size={12} color="#fff" />
               </View>
