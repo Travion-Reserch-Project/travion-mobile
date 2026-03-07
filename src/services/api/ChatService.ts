@@ -218,4 +218,80 @@ export const chatService = {
       };
     }
   },
+
+  // Get location session - GET /chat/location/:locationName
+  async getLocationSession(locationName: string): Promise<{ session: any; hasSession: boolean }> {
+    const tokens = await AuthUtils.getStoredTokens();
+    const accessToken = tokens?.accessToken;
+    if (!accessToken) {
+      throw new Error('Not authenticated');
+    }
+
+    const response = await axios.get(
+      `${CHAT_API_BASE_URL}/chat/location/${encodeURIComponent(locationName)}`,
+      {
+        timeout: 15000,
+        headers: { Authorization: `Bearer ${accessToken}` },
+      },
+    );
+    return response.data.data;
+  },
+
+  // Get session messages - GET /chat/sessions/:sessionId/messages
+  async getSessionMessages(sessionId: string): Promise<any[]> {
+    const tokens = await AuthUtils.getStoredTokens();
+    const accessToken = tokens?.accessToken;
+    if (!accessToken) {
+      throw new Error('Not authenticated');
+    }
+
+    const response = await axios.get(
+      `${CHAT_API_BASE_URL}/chat/sessions/${encodeURIComponent(sessionId)}/messages`,
+      {
+        timeout: 15000,
+        headers: { Authorization: `Bearer ${accessToken}` },
+      },
+    );
+    return response.data.data?.messages || [];
+  },
+
+  // Send location message - POST /chat/location
+  async sendLocationMessage(locationName: string, message: string): Promise<any> {
+    const tokens = await AuthUtils.getStoredTokens();
+    const accessToken = tokens?.accessToken;
+    if (!accessToken) {
+      throw new Error('Not authenticated');
+    }
+
+    const response = await axios.post(
+      `${CHAT_API_BASE_URL}/chat/location`,
+      { locationName, message },
+      {
+        timeout: 120000,
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${accessToken}`,
+        },
+      },
+    );
+    return response.data.data;
+  },
+
+  // Clear messages - DELETE /chat/sessions/:sessionId/messages
+  async clearMessages(sessionId: string): Promise<any> {
+    const tokens = await AuthUtils.getStoredTokens();
+    const accessToken = tokens?.accessToken;
+    if (!accessToken) {
+      throw new Error('Not authenticated');
+    }
+
+    const response = await axios.delete(
+      `${CHAT_API_BASE_URL}/chat/sessions/${encodeURIComponent(sessionId)}/messages`,
+      {
+        timeout: 15000,
+        headers: { Authorization: `Bearer ${accessToken}` },
+      },
+    );
+    return response.data.data;
+  },
 };
