@@ -19,6 +19,7 @@ export interface IncidentReportInput {
   description: string;
   photoUrl?: string;
   isAnonymous?: boolean;
+  reporterDeviceToken?: string; // FCM token of the reporting device to exclude from push notifications
 }
 
 export interface IncidentReport {

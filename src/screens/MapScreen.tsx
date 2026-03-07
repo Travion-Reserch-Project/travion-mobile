@@ -15,9 +15,6 @@ import { useNavigation } from '@react-navigation/native';
 import type { SafetyAlert } from '../components/explore/SafetyAlerts';
 import { getCurrentPosition } from '@utils/geolocation';
 
-// Initialize geocoding with API key
-RNGeocoding.init(Config.GOOGLE_MAPS_API_KEY as string);
-
 interface LocationCoords {
   latitude: number;
   longitude: number;
@@ -192,6 +189,17 @@ export const MapScreen: React.FC<MapScreenProps> = ({ route }) => {
   useEffect(() => {
     const requestLocationPermission = async () => {
       try {
+        // Initialize geocoding with proper error handling
+        if (Config.GOOGLE_MAPS_API_KEY && Config.GOOGLE_MAPS_API_KEY !== 'YOUR_API_KEY') {
+          try {
+            RNGeocoding.init(Config.GOOGLE_MAPS_API_KEY as string);
+          } catch (error) {
+            console.warn('Failed to initialize RNGeocoding:', error);
+          }
+        } else {
+          console.warn('Google Maps API Key not properly configured');
+        }
+
         if (Platform.OS === 'android') {
           const granted = await PermissionsAndroid.request(
             PermissionsAndroid.PERMISSIONS.ACCESS_FINE_LOCATION,
@@ -530,7 +538,7 @@ export const MapScreen: React.FC<MapScreenProps> = ({ route }) => {
                     >
                       {/* Incident name */}
                       <Text className="text-sm font-gilroy-medium text-gray-800 flex-1">
-                        {alert.incidentType || alert.title}
+                        {alert.incidentType}
                       </Text>
 
                       {/* Risk level badge */}

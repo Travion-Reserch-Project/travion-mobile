@@ -2,20 +2,12 @@ import { MainStackParamList } from '@navigation/MainNavigator';
 import { useNavigation } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import React, { useEffect, useState } from 'react';
-import {
-  View,
-  Text,
-  TouchableOpacity,
-  ScrollView,
-  ActivityIndicator,
-  Platform,
-  PermissionsAndroid,
-} from 'react-native';
+import { View, Text, TouchableOpacity, ScrollView, ActivityIndicator } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import FontAwesome from 'react-native-vector-icons/FontAwesome';
-import Geolocation from '@react-native-community/geolocation';
 import RNGeocoding from 'react-native-geocoding';
 import { weatherService } from '../../services/api/WeatherService';
+import { getCurrentPosition } from '@utils';
 
 type NavigationProp = NativeStackNavigationProp<MainStackParamList>;
 
@@ -29,10 +21,30 @@ const SunProtectionScreen: React.FC = () => {
     const fetchPrediction = async () => {
       try {
         setLoading(true);
+        const position = await getCurrentPosition({
+          enableHighAccuracy: true,
+          timeout: 15000,
+          maximumAge: 10000,
+          retryAttempts: 1,
+        });
+        const { latitude, longitude } = position;
 
-        // Request Location Permission
-        if (Platform.OS === 'android') {
-          await PermissionsAndroid.request(PermissionsAndroid.PERMISSIONS.ACCESS_FINE_LOCATION);
+        // Get Location Name
+        try {
+          const results = await RNGeocoding.from(latitude, longitude);
+          if (results && results?.results && results?.results.length > 0) {
+            const addressParts = results.results[0].formatted_address.split(',');
+            setLocationName(
+              addressParts.length > 2
+                ? `${addressParts[addressParts.length - 3]}, ${
+                    addressParts[addressParts.length - 1]
+                  }`
+                : results.results[0].formatted_address,
+            );
+          }
+        } catch (err) {
+          console.error('Geocoding error:', err);
+          setLocationName('Current Location');
         }
 
         Geolocation.getCurrentPosition(
@@ -76,8 +88,9 @@ const SunProtectionScreen: React.FC = () => {
           { enableHighAccuracy: true, timeout: 15000, maximumAge: 10000 },
         );
       } catch (err) {
-        console.error('Setup error:', err);
-        setLoading(false);
+        console.error('Setup/location error:', err);
+        // Fallback to default coordinates (Mirissa)
+        fetchPredictionWithDefaults();
       }
     };
 

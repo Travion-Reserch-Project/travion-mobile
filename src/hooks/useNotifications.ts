@@ -1,8 +1,8 @@
 import { useEffect, useRef } from 'react';
 import { AppState, AppStateStatus } from 'react-native';
 import { NotificationService, NotificationPayload } from '@services/NotificationService';
-import Geolocation from '@react-native-community/geolocation';
 import { navigate } from '../navigation/navigationRef';
+import { getCurrentPosition } from '@utils';
 
 export const useNotifications = () => {
   const appState = useRef(AppState.currentState);
@@ -64,22 +64,24 @@ export const useNotifications = () => {
         });
 
         // Get current location and register token
-        Geolocation.getCurrentPosition(
-          async position => {
-            const { latitude, longitude } = position.coords;
-            const registered = await NotificationService.registerToken(latitude, longitude);
-            if (registered) {
-              console.log('[useNotifications] Token registered with location');
-              isInitializedRef.current = true;
-            }
-          },
-          error => {
-            console.error('[useNotifications] Geolocation error:', error);
-            // Still mark as initialized even if location fails
-            isInitializedRef.current = true;
-          },
-          { timeout: 15000, enableHighAccuracy: false },
-        );
+        try {
+          const position = await getCurrentPosition({
+            timeout: 15000,
+            enableHighAccuracy: false,
+            maximumAge: 10000,
+            retryAttempts: 1,
+          });
+          const { latitude, longitude } = position;
+          const registered = await NotificationService.registerToken(latitude, longitude);
+          if (registered) {
+            console.log('[useNotifications] Token registered with location');
+          }
+        } catch (error) {
+          console.error('[useNotifications] Geolocation error:', error);
+        } finally {
+          // Still mark as initialized even if location fails
+          isInitializedRef.current = true;
+        }
       } catch (error) {
         console.error('[useNotifications] Initialization error:', error);
         isInitializedRef.current = true;
@@ -91,17 +93,23 @@ export const useNotifications = () => {
       if (appState.current.match(/inactive|background/) && nextAppState === 'active') {
         // App has come to the foreground
         if (isInitializedRef.current) {
-          Geolocation.getCurrentPosition(
-            async position => {
-              const { latitude, longitude } = position.coords;
+          const updateLocationOnForeground = async () => {
+            try {
+              const position = await getCurrentPosition({
+                timeout: 15000,
+                enableHighAccuracy: false,
+                maximumAge: 10000,
+                retryAttempts: 1,
+              });
+              const { latitude, longitude } = position;
               await NotificationService.updateLocation(latitude, longitude);
               console.log('[useNotifications] Location updated on foreground');
-            },
-            error => {
+            } catch (error) {
               console.error('[useNotifications] Location update error:', error);
-            },
-            { timeout: 15000, enableHighAccuracy: false },
-          );
+            }
+          };
+
+          updateLocationOnForeground();
         }
       }
 

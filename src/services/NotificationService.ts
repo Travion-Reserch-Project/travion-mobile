@@ -13,6 +13,7 @@ import {
   type FirebaseMessagingTypes,
 } from '@react-native-firebase/messaging';
 import { BaseApiService } from './api/BaseApiService';
+import { AuthUtils } from '@utils/auth';
 
 const DEVICE_TOKEN_KEY = '@device_token';
 
@@ -91,9 +92,76 @@ class NotificationServiceClass extends BaseApiService {
     | ((data: NotificationPayload, title: string, message: string) => void)
     | undefined;
   private unsubscribeFunctions: Array<() => void> = [];
+  private tokenFetchInProgress: boolean = false;
 
   constructor() {
     super('/push-notifications');
+  }
+
+  /**
+   * Check if error is a Firebase configuration issue
+   */
+  private diagnoseFirebaseError(error: any): string {
+    const errorMsg = error?.message?.toString()?.toLowerCase() || '';
+
+    if (errorMsg.includes('fis_auth_error')) {
+      return (
+        'FIS_AUTH_ERROR: Firebase cannot authenticate your app. ' +
+        "Solution: Add your app's SHA-1 fingerprint to Firebase Console. " +
+        'See: https://firebase.google.com/docs/android/setup#console'
+      );
+    }
+    if (errorMsg.includes('permission')) {
+      return 'Permission issue: Notification permission may not be granted.';
+    }
+    if (errorMsg.includes('network') || errorMsg.includes('timeout')) {
+      return 'Network issue: Check internet connection and Firebase connectivity.';
+    }
+    return 'Firebase token request failed. Check Firebase configuration.';
+  }
+
+  /**
+   * Retry logic with exponential backoff
+   */
+  private async retryAsync<T>(
+    fn: () => Promise<T>,
+    maxAttempts: number = 3,
+    initialDelayMs: number = 1000,
+  ): Promise<T | null> {
+    let lastError: Error | null = null;
+
+    for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+      try {
+        const result = await fn();
+        if (attempt > 1) {
+          console.log(`[NotificationService] Retry succeeded on attempt ${attempt}`);
+        }
+        return result;
+      } catch (error) {
+        lastError = error as Error;
+        const isLastAttempt = attempt === maxAttempts;
+        const diagnosis = this.diagnoseFirebaseError(error);
+
+        if (!isLastAttempt) {
+          // Exponential backoff: 1s, 2s, 4s, etc.
+          const delayMs = initialDelayMs * Math.pow(2, attempt - 1);
+          console.warn(
+            `[NotificationService] Token fetch attempt ${attempt} failed (${delayMs}ms backoff): ${lastError?.message}`,
+          );
+          // Add small random jitter to prevent thundering herd
+          const jitter = Math.random() * 500;
+          await new Promise(resolve => setTimeout(resolve, delayMs + jitter));
+        } else {
+          console.error(
+            `[NotificationService] ❌ Token fetch failed after ${maxAttempts} attempts.\n` +
+              `Error: ${lastError?.message}\n` +
+              `Diagnosis: ${diagnosis}`,
+          );
+        }
+      }
+    }
+
+    return null;
   }
 
   /**
@@ -123,13 +191,9 @@ class NotificationServiceClass extends BaseApiService {
       // Create Android notification channel
       await createNotificationChannel();
 
-      // Get FCM token
-      const token = await getToken(messagingInstance);
-      if (token) {
-        this.fcmToken = token;
-        console.log('[NotificationService] FCM token obtained');
-        // Don't register automatically - wait for location
-      }
+      // Get FCM token with retry logic (non-blocking)
+      // This runs in background to prevent UI blocking if Firebase service delays
+      this.fetchTokenWithRetry(messagingInstance);
 
       // Setup foreground message handler
       const foregroundUnsubscribe = onMessage(messagingInstance, async remoteMessage => {
@@ -187,9 +251,14 @@ class NotificationServiceClass extends BaseApiService {
 
       // Setup token refresh handler
       const tokenRefreshUnsubscribe = onTokenRefresh(messagingInstance, async newToken => {
-        console.log('[NotificationService] Token refreshed');
-        this.fcmToken = newToken;
-        await AsyncStorage.setItem(DEVICE_TOKEN_KEY, newToken);
+        try {
+          console.log('[NotificationService] Token refreshed');
+          this.fcmToken = newToken;
+          await AsyncStorage.setItem(DEVICE_TOKEN_KEY, newToken);
+          console.log('[NotificationService] New token saved to storage');
+        } catch (error) {
+          console.error('[NotificationService] Error handling token refresh:', error);
+        }
       });
 
       // Setup background message handler
@@ -250,27 +319,79 @@ class NotificationServiceClass extends BaseApiService {
   }
 
   /**
-   * Get FCM token
+   * Fetch token with retry logic (runs in background)
+   */
+  private async fetchTokenWithRetry(
+    messagingInstance: FirebaseMessagingTypes.Module,
+  ): Promise<void> {
+    if (this.tokenFetchInProgress) {
+      return;
+    }
+
+    this.tokenFetchInProgress = true;
+
+    try {
+      const token = await this.retryAsync(
+        () => getToken(messagingInstance),
+        3, // max attempts
+        1000, // initial delay 1s
+      );
+
+      if (token) {
+        this.fcmToken = token;
+        await AsyncStorage.setItem(DEVICE_TOKEN_KEY, token);
+        console.log('[NotificationService] ✅ FCM token obtained successfully');
+      } else {
+        console.warn(
+          '[NotificationService] ⚠️  Failed to get FCM token after retries. ' +
+            'The app will continue to work but push notifications may not be delivered. ' +
+            'This is usually due to Firebase configuration issues.',
+        );
+      }
+    } catch (error) {
+      console.error(
+        '[NotificationService] Unexpected error fetching token:',
+        error,
+        '\nPlease ensure Firebase is properly configured in your project.',
+      );
+    } finally {
+      this.tokenFetchInProgress = false;
+    }
+  }
+
+  /**
+   * Get FCM token with fallback and retry logic
    */
   async getToken(): Promise<string | null> {
     try {
+      // Return cached token if available
       if (this.fcmToken) {
         return this.fcmToken;
       }
 
+      // Check AsyncStorage for previously saved token
       const stored = await AsyncStorage.getItem(DEVICE_TOKEN_KEY);
       if (stored) {
         this.fcmToken = stored;
         return stored;
       }
 
+      // Attempt to fetch fresh token with retry logic
       const messagingInstance = getMessaging(getApp());
-      const token = await getToken(messagingInstance);
+      const token = await this.retryAsync(
+        () => getToken(messagingInstance),
+        3, // max attempts
+        500, // initial delay 500ms (shorter for on-demand requests)
+      );
+
       if (token) {
         this.fcmToken = token;
         await AsyncStorage.setItem(DEVICE_TOKEN_KEY, token);
+        return token;
       }
-      return token || null;
+
+      console.warn('[NotificationService] Could not retrieve FCM token');
+      return null;
     } catch (error) {
       console.error('[NotificationService] Get token error:', error);
       return null;
@@ -285,6 +406,15 @@ class NotificationServiceClass extends BaseApiService {
       const token = this.fcmToken || (await this.getToken());
       if (!token) {
         console.warn('[NotificationService] No token to register');
+        return false;
+      }
+
+      // Check if user is authenticated before registering
+      const tokens = await AuthUtils.getStoredTokens();
+      if (!tokens?.accessToken) {
+        console.log(
+          '[NotificationService] User not authenticated yet, skipping token registration',
+        );
         return false;
       }
 

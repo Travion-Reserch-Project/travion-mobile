@@ -25,9 +25,7 @@ import colors from '../../theme/colors';
 import typography from '../../theme/typography';
 import { incidentReportService } from '@services/api';
 import { getCurrentPosition } from '@utils/geolocation';
-
-// Initialize geocoding
-RNGeocoding.init(Config.GOOGLE_MAPS_API_KEY as string);
+import { NotificationService } from '@services/NotificationService';
 
 type NavigationProp = NativeStackNavigationProp<MainStackParamList>;
 
@@ -90,6 +88,15 @@ export const ReportIncidentScreen: React.FC = () => {
 
   const requestLocationPermission = async () => {
     try {
+      // Initialize geocoding with proper error handling
+      if (Config.GOOGLE_MAPS_API_KEY && Config.GOOGLE_MAPS_API_KEY !== 'YOUR_API_KEY') {
+        try {
+          RNGeocoding.init(Config.GOOGLE_MAPS_API_KEY as string);
+        } catch (error) {
+          console.warn('Failed to initialize RNGeocoding:', error);
+        }
+      }
+
       if (Platform.OS === 'android') {
         const granted = await PermissionsAndroid.request(
           PermissionsAndroid.PERMISSIONS.ACCESS_FINE_LOCATION,
@@ -223,6 +230,9 @@ export const ReportIncidentScreen: React.FC = () => {
         throw new Error('Invalid incident type selected');
       }
 
+      // Get the device's FCM token to exclude self from push notifications
+      const deviceToken = await NotificationService.getToken();
+
       // Prepare the report data
       const reportData = {
         incidentType: incidentTypeLabel as
@@ -243,9 +253,19 @@ export const ReportIncidentScreen: React.FC = () => {
         description: description.trim(),
         photoUrl: photoUri || undefined,
         isAnonymous: true, // Reports are anonymous by default
+        reporterDeviceToken: deviceToken || undefined, // Exclude this device from push notifications
       };
 
       console.log('[ReportIncident] Submitting report:', reportData);
+
+      // Update device token location to match incident location before submitting
+      // This ensures the geospatial push notification query can find nearby devices
+      if (locationCoords?.latitude && locationCoords?.longitude) {
+        await NotificationService.updateLocation(
+          locationCoords.latitude,
+          locationCoords.longitude,
+        ).catch(err => console.warn('[ReportIncident] Failed to update device location:', err));
+      }
 
       // Submit to backend
       const result = await incidentReportService.createReport(reportData);

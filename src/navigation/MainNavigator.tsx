@@ -3,6 +3,8 @@ import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { UserProfileSetupScreen, MainAppScreen, PreferencesOnboardingScreen } from '@screens';
 import { MapScreen } from '@screens/MapScreen';
 import { ReportIncidentScreen } from '@screens/safety/ReportIncidentScreen';
+import { ReportRoadIssueScreen } from '@screens/transport/ReportRoadIssueScreen';
+import { IncidentMapScreen } from '../screens/safety/IncidentMapScreen';
 import { PoliceHelpScreen } from '@screens/safety/PoliceHelpScreen';
 import { AlertsScreen } from '@screens/safety/AlertsScreen';
 import { ProfileScreen } from '@screens/auth/ProfileScreen';
@@ -39,6 +41,13 @@ export type MainStackParamList = {
     selectedAlert?: SafetyAlert;
   };
   ReportIncidentScreen: undefined;
+  ReportRoadIssueScreen: undefined;
+  IncidentMapScreen:
+    | {
+        origin?: { latitude: number; longitude: number };
+        destination?: { latitude: number; longitude: number };
+      }
+    | undefined;
   PoliceHelpScreen: undefined;
   AlertsScreen: undefined;
   ProfileScreen: { userName?: string; userEmail?: string };
@@ -95,6 +104,10 @@ const ScreenWithSafeArea: React.FC<{ children: React.ReactNode }> = ({ children 
   );
 };
 
+const renderWithSafeArea = ({ children }: { children: React.ReactNode }) => {
+  return <ScreenWithSafeArea>{children}</ScreenWithSafeArea>;
+};
+
 // Simple Welcome Back component
 const WelcomeBackScreen: React.FC = () => {
   const navigation = useNavigation();
@@ -147,30 +160,48 @@ export const MainNavigator: React.FC = () => {
         headerShown: false,
         contentStyle: { flex: 1 },
       }}
-      screenLayout={({ children }) => <ScreenWithSafeArea>{children}</ScreenWithSafeArea>}
+      screenLayout={renderWithSafeArea}
     >
-      <Stack.Screen name="ProfileSetup" component={UserProfileSetupScreen} />
-      <Stack.Screen name="PreferencesOnboarding" component={PreferencesOnboardingScreen} />
-      <Stack.Screen name="WelcomeBack" component={WelcomeBackScreen} />
-      <Stack.Screen name="MainApp" component={MainAppScreen} />
-      <Stack.Screen name="MapScreen" component={MapScreen} />
-      <Stack.Screen name="ReportIncidentScreen" component={ReportIncidentScreen} />
-      <Stack.Screen name="PoliceHelpScreen" component={PoliceHelpScreen} />
-      <Stack.Screen name="AlertsScreen" component={AlertsScreen} />
-      <Stack.Screen name="ProfileScreen" component={ProfileScreen} />
-      <Stack.Screen name="ChatbotScreen" component={ChatbotScreen} />
-      <Stack.Screen name="SunProtection" component={SunProtectionScreen} />
-      <Stack.Screen name="SafetyAdvisor" component={SafetyAdvisorScreen} />
-      <Stack.Screen name="HealthProfileSetup" component={HealthProfileSetup} />
-      <Stack.Screen name="HealthProfileLanding" component={HealthProfileLanding} />
-      <Stack.Screen name="SkinAnalysis" component={SkinAnalysisScreen} />
-      <Stack.Screen name="SkinAnalysisResult" component={SkinAnalysisResultScreen} />
-      <Stack.Screen name="SunburnHistory" component={SunburnHistoryScreen} />
-      <Stack.Screen name="SkinHelthProfile" component={SkinHelthProfileScreen} />
-      <Stack.Screen name="FaceCapture" component={FaceCaptureScreen} />
-      <Stack.Screen name="LocationDetails" component={LocationDetailsScreen} />
-      <Stack.Screen name="LocationChat" component={LocationChatScreen} />
-      <Stack.Screen name="TourPlanChat" component={TourPlanChatScreen} />
+      {hasCompleteProfile ? (
+        <>
+          <Stack.Screen name="WelcomeBack" component={WelcomeBackScreen} />
+          <Stack.Screen name="MainApp" component={MainAppScreen} />
+          <Stack.Screen name="MapScreen" component={MapScreen} />
+          <Stack.Screen name="ReportIncidentScreen" component={ReportIncidentScreen} />
+          <Stack.Screen name="ReportRoadIssueScreen" component={ReportRoadIssueScreen} />
+          <Stack.Screen name="IncidentMapScreen" component={IncidentMapScreen} />
+          <Stack.Screen name="PoliceHelpScreen" component={PoliceHelpScreen} />
+          <Stack.Screen name="AlertsScreen" component={AlertsScreen} />
+          <Stack.Screen name="ProfileScreen" component={ProfileScreen} />
+          <Stack.Screen name="ChatbotScreen" component={ChatbotScreen} />
+          <Stack.Screen name="SunProtection" component={SunProtectionScreen} />
+          <Stack.Screen name="SafetyAdvisor" component={SafetyAdvisorScreen} />
+          <Stack.Screen name="HealthProfileSetup" component={HealthProfileSetup} />
+          <Stack.Screen name="HealthProfileLanding" component={HealthProfileLanding} />
+          <Stack.Screen name="SkinAnalysis" component={SkinAnalysisScreen} />
+          <Stack.Screen name="SkinAnalysisResult" component={SkinAnalysisResultScreen} />
+          <Stack.Screen name="SunburnHistory" component={SunburnHistoryScreen} />
+          <Stack.Screen name="SkinHelthProfile" component={SkinHelthProfileScreen} />
+          <Stack.Screen name="FaceCapture" component={FaceCaptureScreen} />
+          <Stack.Screen name="LocationDetails" component={LocationDetailsScreen} />
+          <Stack.Screen name="LocationChat" component={LocationChatScreen} />
+          <Stack.Screen name="TourPlanChat" component={TourPlanChatScreen} />
+        </>
+      ) : (
+        <>
+          <Stack.Screen name="ProfileSetup" component={UserProfileSetupScreen} />
+          <Stack.Screen name="PreferencesOnboarding" component={PreferencesOnboardingScreen} />
+          <Stack.Screen name="MainApp" component={MainAppScreen} />
+          <Stack.Screen name="MapScreen" component={MapScreen} />
+          <Stack.Screen name="ReportIncidentScreen" component={ReportIncidentScreen} />
+          <Stack.Screen name="ReportRoadIssueScreen" component={ReportRoadIssueScreen} />
+          <Stack.Screen name="IncidentMapScreen" component={IncidentMapScreen} />
+          <Stack.Screen name="PoliceHelpScreen" component={PoliceHelpScreen} />
+          <Stack.Screen name="AlertsScreen" component={AlertsScreen} />
+          <Stack.Screen name="ProfileScreen" component={ProfileScreen} />
+          <Stack.Screen name="ChatbotScreen" component={ChatbotScreen} />
+        </>
+      )}
     </Stack.Navigator>
   );
 };
