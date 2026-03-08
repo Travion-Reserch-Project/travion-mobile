@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { userService } from '@services/api/UserService';
+import { UVLocationMonitorService } from '@services/UVLocationMonitorService';
 import {
   View,
   Text,
@@ -8,8 +9,11 @@ import {
   TouchableOpacity,
   Platform,
   PermissionsAndroid,
+  Animated,
+  Dimensions,
+  StyleSheet,
+  StatusBar,
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
 import MaterialCommunityIcons from 'react-native-vector-icons/MaterialCommunityIcons';
 import LinearGradient from 'react-native-linear-gradient';
 import Geolocation from '@react-native-community/geolocation';
@@ -22,6 +26,7 @@ type SafetyAdvisorScreenNavigationProp = NativeStackNavigationProp<
   MainStackParamList,
   'SafetyAdvisor'
 >;
+const { width: SCREEN_W } = Dimensions.get('window');
 
 type RiskLevel = 'Low' | 'Moderate' | 'High' | 'Very High' | 'Extreme';
 
@@ -181,7 +186,13 @@ const generateForecast = (currentUv: number): { time: string; uv: number; isNow:
   return items;
 };
 
-const SafetyAdvisorScreen: React.FC = () => {
+interface SafetyAdvisorScreenProps {
+  onBack?: () => void;
+  uvIndexProp?: number;
+  riskLevelProp?: string;
+}
+
+const SafetyAdvisorScreen: React.FC<SafetyAdvisorScreenProps> = ({ onBack, uvIndexProp, riskLevelProp }) => {
   const route = useRoute<any>();
   const navigation = useNavigation<SafetyAdvisorScreenNavigationProp>();
 
@@ -190,7 +201,7 @@ const SafetyAdvisorScreen: React.FC = () => {
   const [locationCity, setLocationCity] = useState('');
   const [locationCountry, setLocationCountry] = useState('');
 
-  // ── Load alert preference ───────────────────────────────
+  // ── Load alert preference & sync monitor ───────────────
   useEffect(() => {
     const checkAlertsStatus = async () => {
       try {
@@ -198,6 +209,8 @@ const SafetyAdvisorScreen: React.FC = () => {
         if (storedValue !== null) {
           setIsAlertsEnabled(storedValue === 'true');
         }
+        // Ensure the monitor reflects the stored preference on every visit
+        await UVLocationMonitorService.syncWithPreference();
       } catch (error) {
         console.error('Failed to load high UV alerts preference:', error);
       }
@@ -254,6 +267,13 @@ const SafetyAdvisorScreen: React.FC = () => {
       await AsyncStorage.setItem('HIGH_UV_ALERTS_ENABLED', String(newValue));
       setIsAlertsEnabled(newValue);
       await userService.updatePreferences({ highUVAlerts: newValue } as any);
+
+      // Start or stop real-time UV location monitoring
+      if (newValue) {
+        await UVLocationMonitorService.start();
+      } else {
+        UVLocationMonitorService.stop();
+      }
     } catch (error) {
       console.error('Failed to toggle high UV alerts:', error);
     } finally {
@@ -262,8 +282,8 @@ const SafetyAdvisorScreen: React.FC = () => {
   };
 
   // ── Get params ──────────────────────────────────────────
-  const uvIndex = route.params?.uvIndex ?? 8;
-  const initialRiskLevel = route.params?.riskLevel;
+  const uvIndex = uvIndexProp ?? route.params?.uvIndex ?? 8;
+  const initialRiskLevel = riskLevelProp ?? route.params?.riskLevel;
 
   const getRiskLevel = (uv: number): RiskLevel => {
     if (uv <= 2) return 'Low';
@@ -292,211 +312,225 @@ const SafetyAdvisorScreen: React.FC = () => {
     ? `${locationCity}${locationCountry ? `, ${locationCountry}` : ''}`
     : 'Detecting...';
 
+  // Animations
+  const fadeIn = useRef(new Animated.Value(0)).current;
+  const heroSlide = useRef(new Animated.Value(30)).current;
+  const forecastFade = useRef(new Animated.Value(0)).current;
+  const forecastSlide = useRef(new Animated.Value(30)).current;
+  const tipsFade = useRef(new Animated.Value(0)).current;
+  const tipsSlide = useRef(new Animated.Value(30)).current;
+
+  useEffect(() => {
+    Animated.sequence([
+      Animated.parallel([
+        Animated.timing(fadeIn, { toValue: 1, duration: 400, useNativeDriver: true }),
+        Animated.spring(heroSlide, { toValue: 0, tension: 50, friction: 8, useNativeDriver: true }),
+      ]),
+      Animated.parallel([
+        Animated.timing(forecastFade, { toValue: 1, duration: 400, useNativeDriver: true }),
+        Animated.spring(forecastSlide, { toValue: 0, tension: 50, friction: 8, useNativeDriver: true }),
+      ]),
+      Animated.parallel([
+        Animated.timing(tipsFade, { toValue: 1, duration: 400, useNativeDriver: true }),
+        Animated.spring(tipsSlide, { toValue: 0, tension: 50, friction: 8, useNativeDriver: true }),
+      ]),
+    ]).start();
+  }, [fadeIn, heroSlide, forecastFade, forecastSlide, tipsFade, tipsSlide]);
+
   return (
-    <SafeAreaView className="flex-1 bg-gray-50">
-      {/* ── Header ─────────────────────────────────────────── */}
-      <View className="flex-row items-center justify-between px-5 py-3 bg-white"
-        style={{ elevation: 2, shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.05, shadowRadius: 4 }}>
-        <TouchableOpacity
-          onPress={() => navigation.goBack()}
-          className="w-10 h-10 rounded-full bg-gray-100 items-center justify-center"
-        >
+    <View style={sa.container}>
+      <StatusBar translucent backgroundColor="transparent" barStyle="dark-content" />
+      {/* Header */}
+      <View style={sa.header}>
+        <TouchableOpacity style={sa.headerBtn} onPress={() => onBack ? onBack() : navigation.goBack()}>
           <MaterialCommunityIcons name="arrow-left" size={20} color="#374151" />
         </TouchableOpacity>
-        <Text className="text-base font-gilroy-bold text-gray-900">Safety Advisor</Text>
-        <TouchableOpacity
-          className="w-10 h-10 rounded-full bg-gray-100 items-center justify-center"
-          onPress={toggleAlerts}
-        >
+        <Text style={sa.headerTitle}>Safety Advisor</Text>
+        <TouchableOpacity style={sa.headerBtn} onPress={toggleAlerts}>
           <MaterialCommunityIcons
             name={isAlertsEnabled ? 'bell-ring' : 'bell-outline'}
-            size={20}
-            color={isAlertsEnabled ? '#F5840E' : '#374151'}
+            size={20} color={isAlertsEnabled ? '#F5840E' : '#374151'}
           />
         </TouchableOpacity>
       </View>
 
-      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 100 }}>
-        {/* ── UV Hero Card ──────────────────────────────────── */}
-        <View className="mx-4 mt-3 rounded-3xl overflow-hidden bg-white"
-          style={{ elevation: 3, shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.06, shadowRadius: 10 }}>
+      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={sa.scrollContent}>
+        {/* UV Hero Card */}
+        <Animated.View style={[sa.heroCard, { opacity: fadeIn, transform: [{ translateY: heroSlide }] }]}>
+          <LinearGradient colors={riskColors.gradient} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={sa.heroStrip} />
 
-          {/* Top color strip */}
-          <LinearGradient colors={riskColors.gradient} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={{ height: 4 }} />
-
-          <View className="px-5 pt-4 pb-5">
+          <View style={sa.heroBody}>
             {/* Location pill */}
-            <View className="self-center flex-row items-center rounded-full px-4 py-1.5 mb-4"
-              style={{ backgroundColor: riskColors.bgLight, borderWidth: 1, borderColor: riskColors.color + '25' }}>
+            <View style={[sa.locPill, { backgroundColor: riskColors.bgLight, borderColor: riskColors.color + '25' }]}>
               <MaterialCommunityIcons name="map-marker" size={14} color={riskColors.color} />
-              <Text className="ml-1.5 text-xs font-gilroy-bold uppercase tracking-wider"
-                style={{ color: riskColors.color }}>
-                {locationDisplay}
-              </Text>
+              <Text style={[sa.locPillText, { color: riskColors.color }]}>{locationDisplay}</Text>
             </View>
 
-            {/* UV Index display */}
-            <View className="items-center">
-              <View className="flex-row items-baseline">
-                <Text className="text-base font-gilroy-medium text-gray-400">UV Index</Text>
-              </View>
-              <Text className="font-gilroy-bold" style={{ fontSize: 64, color: riskColors.color, lineHeight: 72 }}>
-                {uvIndex}
-              </Text>
-              <View className="flex-row items-center mt-1">
-                <View className="w-2 h-2 rounded-full mr-2" style={{ backgroundColor: riskColors.color }} />
-                <Text className="text-sm font-gilroy-medium text-gray-500">
-                  {riskLevel} Risk
-                </Text>
-                <Text className="text-sm font-gilroy-regular text-gray-400"> • Protection Essential</Text>
-              </View>
+            {/* UV Display */}
+            <View style={sa.uvRow}>
+              <Text style={sa.uvLabel}>UV Index</Text>
+            </View>
+            <Text style={[sa.uvBig, { color: riskColors.color }]}>{uvIndex}</Text>
+            <View style={sa.riskRow}>
+              <View style={[sa.riskDot, { backgroundColor: riskColors.color }]} />
+              <Text style={sa.riskText}>{riskLevel} Risk</Text>
+              <Text style={sa.riskSep}> • Protection Essential</Text>
             </View>
           </View>
-        </View>
+        </Animated.View>
 
-        {/* ── Hourly Forecast ──────────────────────────────── */}
-        <View className="mx-4 mt-4 bg-white rounded-3xl px-4 py-5"
-          style={{ elevation: 2, shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.04, shadowRadius: 6 }}>
-          <Text className="text-base font-gilroy-bold text-gray-800 mb-4">Hourly Forecast</Text>
-
+        {/* Hourly Forecast */}
+        <Animated.View style={[sa.forecastCard, { opacity: forecastFade, transform: [{ translateY: forecastSlide }] }]}>
+          <Text style={sa.sectionTitle}>Hourly Forecast</Text>
           <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-            <View className="flex-row">
+            <View style={sa.forecastRow}>
               {forecast.map((item, index) => {
                 const color = getUvColor(item.uv);
                 const label = getUvLabel(item.uv);
-                // Bar height proportional to UV (min 20, max 72)
                 const barHeight = Math.max(20, (item.uv / 12) * 72);
-
                 return (
-                  <View key={index} className="items-center mr-4" style={{ width: 48 }}>
-                    {/* Time label */}
-                    <Text
-                      className={`text-xs mb-2 ${item.isNow ? 'font-gilroy-bold' : 'font-gilroy-regular'}`}
-                      style={{ color: item.isNow ? '#F5840E' : '#9CA3AF' }}
-                    >
+                  <View key={index} style={sa.forecastItem}>
+                    <Text style={[sa.forecastTime, item.isNow && sa.forecastTimeNow]}>
                       {item.time}
                     </Text>
-
-                    {/* UV value */}
-                    <Text className="text-xs font-gilroy-bold mb-1" style={{ color }}>
-                      {item.uv}
-                    </Text>
-
-                    {/* Bar */}
-                    <View
-                      className="rounded-xl"
-                      style={{
-                        width: 36,
-                        height: barHeight,
-                        backgroundColor: color + '20',
-                        borderWidth: item.isNow ? 2 : 0,
-                        borderColor: item.isNow ? color : 'transparent',
-                        overflow: 'hidden',
-                      }}
-                    >
-                      <View
-                        style={{
-                          position: 'absolute',
-                          bottom: 0,
-                          left: 0,
-                          right: 0,
-                          height: '70%',
-                          backgroundColor: color,
-                          borderRadius: 10,
-                        }}
-                      />
+                    <Text style={[sa.forecastUv, { color }]}>{item.uv}</Text>
+                    <View style={[
+                      sa.forecastBar,
+                      { height: barHeight, backgroundColor: color + '20' },
+                      item.isNow && { borderWidth: 2, borderColor: color },
+                    ]}>
+                      <View style={[sa.forecastBarFill, { backgroundColor: color }]} />
                     </View>
-
-                    {/* Risk label */}
-                    <Text className="text-[10px] font-gilroy-bold mt-1.5" style={{ color }}>
-                      {label}
-                    </Text>
+                    <Text style={[sa.forecastLabel, { color }]}>{label}</Text>
                   </View>
                 );
               })}
             </View>
           </ScrollView>
-        </View>
+        </Animated.View>
 
-        {/* ── Safety Checklist ─────────────────────────────── */}
-        <View className="px-4 mt-5">
-          <View className="flex-row items-center mb-1">
+        {/* Safety Checklist */}
+        <Animated.View style={[sa.checklistSection, { opacity: tipsFade, transform: [{ translateY: tipsSlide }] }]}>
+          <View style={sa.checklistHeader}>
             <MaterialCommunityIcons name="shield-check" size={20} color={riskColors.color} />
-            <Text className="text-base font-gilroy-bold text-gray-800 ml-2">Safety Checklist</Text>
+            <Text style={sa.checklistTitle}>Safety Checklist</Text>
           </View>
-          <Text className="text-xs font-gilroy-regular text-gray-400 mb-4">
-            Follow these guidelines to stay safe today.
-          </Text>
+          <Text style={sa.checklistSub}>Follow these guidelines to stay safe today.</Text>
 
           {tips.map((tip, index) => (
-            <View
-              key={index}
-              className="bg-white rounded-2xl px-4 py-4 mb-3 flex-row items-start"
-              style={{ elevation: 1, shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.03, shadowRadius: 4 }}
-            >
-              <View
-                className="w-11 h-11 rounded-xl items-center justify-center mr-3"
-                style={{ backgroundColor: riskColors.bgLight }}
-              >
+            <View key={index} style={sa.tipCard}>
+              <View style={[sa.tipIcon, { backgroundColor: riskColors.bgLight }]}>
                 <MaterialCommunityIcons name={tip.icon} size={22} color={riskColors.color} />
               </View>
-              <View className="flex-1">
-                <Text className="text-sm font-gilroy-bold text-gray-900">{tip.title}</Text>
-                <Text className="text-xs font-gilroy-regular text-gray-500 mt-1 leading-4">
-                  {tip.description}
-                </Text>
+              <View style={sa.tipContent}>
+                <Text style={sa.tipTitle}>{tip.title}</Text>
+                <Text style={sa.tipDesc}>{tip.description}</Text>
               </View>
-              <View
-                className="w-6 h-6 rounded-full items-center justify-center mt-1"
-                style={{ backgroundColor: riskColors.bgLight }}
-              >
-                <Text className="text-[10px] font-gilroy-bold" style={{ color: riskColors.color }}>
-                  {index + 1}
-                </Text>
+              <View style={[sa.tipNum, { backgroundColor: riskColors.bgLight }]}>
+                <Text style={[sa.tipNumText, { color: riskColors.color }]}>{index + 1}</Text>
               </View>
             </View>
           ))}
-        </View>
+        </Animated.View>
       </ScrollView>
 
-      {/* ── Bottom CTA ─────────────────────────────────────── */}
-      <View className="absolute bottom-0 left-0 right-0 px-4 pb-5 pt-3 bg-gray-50">
-        <TouchableOpacity
-          activeOpacity={0.85}
-          onPress={toggleAlerts}
-          disabled={isLoading}
-        >
+      {/* Bottom CTA */}
+      <View style={sa.ctaWrap}>
+        <TouchableOpacity activeOpacity={0.85} onPress={toggleAlerts} disabled={isLoading}>
           <LinearGradient
             colors={isAlertsEnabled ? ['#EF4444', '#DC2626'] : ['#F5840E', '#E06D00']}
-            start={{ x: 0, y: 0 }}
-            end={{ x: 1, y: 0 }}
-            className="py-4 rounded-2xl flex-row justify-center items-center"
-            style={{
-              elevation: 4,
-              shadowColor: isAlertsEnabled ? '#EF4444' : '#F5840E',
-              shadowOffset: { width: 0, height: 4 },
-              shadowOpacity: 0.3,
-              shadowRadius: 8,
-              opacity: isLoading ? 0.7 : 1,
-            }}
+            start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}
+            style={[sa.ctaBtn, isLoading && { opacity: 0.7 }]}
           >
             <MaterialCommunityIcons
               name={isAlertsEnabled ? 'bell-off' : 'bell-ring'}
-              size={20}
-              color="#FFFFFF"
+              size={20} color="#FFFFFF"
             />
-            <Text className="text-white font-gilroy-bold text-base ml-2">
-              {isLoading
-                ? 'Updating...'
-                : isAlertsEnabled
-                ? 'Disable High UV Alerts'
-                : 'Enable High UV Alerts'}
+            <Text style={sa.ctaText}>
+              {isLoading ? 'Updating...' : isAlertsEnabled ? 'Disable High UV Alerts' : 'Enable High UV Alerts'}
             </Text>
           </LinearGradient>
         </TouchableOpacity>
       </View>
-    </SafeAreaView>
+    </View>
   );
 };
+
+const sa = StyleSheet.create({
+  container: { flex: 1, backgroundColor: '#F8FAFC' },
+  scrollContent: { paddingBottom: 100 },
+  header: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
+    paddingHorizontal: 20, paddingTop: (StatusBar.currentHeight || 0) + 12, paddingBottom: 12, backgroundColor: '#ffffff',
+    shadowColor: '#000', shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05, shadowRadius: 4, elevation: 2,
+  },
+  headerBtn: {
+    width: 40, height: 40, borderRadius: 20, backgroundColor: '#F3F4F6',
+    alignItems: 'center', justifyContent: 'center',
+  },
+  headerTitle: { fontSize: 16, fontWeight: '800', color: '#0f172a' },
+  heroCard: {
+    backgroundColor: '#ffffff', marginHorizontal: 16, marginTop: 12, borderRadius: 24,
+    overflow: 'hidden', shadowColor: '#000', shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.06, shadowRadius: 10, elevation: 3,
+  },
+  heroStrip: { height: 4 },
+  heroBody: { paddingHorizontal: 20, paddingTop: 16, paddingBottom: 20, alignItems: 'center' },
+  locPill: {
+    flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, paddingVertical: 6,
+    borderRadius: 20, borderWidth: 1, marginBottom: 16, gap: 6,
+  },
+  locPillText: { fontSize: 11, fontWeight: '800', textTransform: 'uppercase', letterSpacing: 1 },
+  uvRow: { flexDirection: 'row', alignItems: 'baseline' },
+  uvLabel: { fontSize: 15, fontWeight: '600', color: '#9CA3AF' },
+  uvBig: { fontSize: 64, fontWeight: '900', lineHeight: 72 },
+  riskRow: { flexDirection: 'row', alignItems: 'center', marginTop: 4 },
+  riskDot: { width: 8, height: 8, borderRadius: 4, marginRight: 8 },
+  riskText: { fontSize: 14, fontWeight: '600', color: '#64748b' },
+  riskSep: { fontSize: 14, color: '#9CA3AF' },
+  forecastCard: {
+    backgroundColor: '#ffffff', marginHorizontal: 16, marginTop: 16, borderRadius: 24,
+    paddingHorizontal: 16, paddingVertical: 20,
+    shadowColor: '#000', shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.04, shadowRadius: 6, elevation: 2,
+  },
+  sectionTitle: { fontSize: 16, fontWeight: '800', color: '#1f2937', marginBottom: 16 },
+  forecastRow: { flexDirection: 'row' },
+  forecastItem: { alignItems: 'center', marginRight: 16, width: 48 },
+  forecastTime: { fontSize: 12, color: '#9CA3AF', marginBottom: 8 },
+  forecastTimeNow: { color: '#F5840E', fontWeight: '800' },
+  forecastUv: { fontSize: 12, fontWeight: '800', marginBottom: 4 },
+  forecastBar: { width: 36, borderRadius: 12, overflow: 'hidden' },
+  forecastBarFill: { position: 'absolute', bottom: 0, left: 0, right: 0, height: '70%', borderRadius: 10 },
+  forecastLabel: { fontSize: 10, fontWeight: '800', marginTop: 6 },
+  checklistSection: { paddingHorizontal: 16, marginTop: 20 },
+  checklistHeader: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 4 },
+  checklistTitle: { fontSize: 16, fontWeight: '800', color: '#1f2937' },
+  checklistSub: { fontSize: 12, color: '#9CA3AF', marginBottom: 16 },
+  tipCard: {
+    backgroundColor: '#ffffff', borderRadius: 20, paddingHorizontal: 16, paddingVertical: 16,
+    marginBottom: 12, flexDirection: 'row', alignItems: 'flex-start',
+    shadowColor: '#000', shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.03, shadowRadius: 4, elevation: 1,
+  },
+  tipIcon: { width: 44, height: 44, borderRadius: 14, alignItems: 'center', justifyContent: 'center', marginRight: 12 },
+  tipContent: { flex: 1 },
+  tipTitle: { fontSize: 14, fontWeight: '800', color: '#0f172a' },
+  tipDesc: { fontSize: 12, color: '#64748b', marginTop: 4, lineHeight: 16 },
+  tipNum: { width: 24, height: 24, borderRadius: 12, alignItems: 'center', justifyContent: 'center', marginTop: 4 },
+  tipNumText: { fontSize: 10, fontWeight: '800' },
+  ctaWrap: {
+    position: 'absolute', bottom: 0, left: 0, right: 0,
+    paddingHorizontal: 16, paddingBottom: 24, paddingTop: 12, backgroundColor: '#F8FAFC',
+  },
+  ctaBtn: {
+    paddingVertical: 16, borderRadius: 20, flexDirection: 'row',
+    alignItems: 'center', justifyContent: 'center', gap: 8,
+    shadowColor: '#F5840E', shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3, shadowRadius: 8, elevation: 4,
+  },
+  ctaText: { color: '#ffffff', fontWeight: '800', fontSize: 16 },
+});
 
 export default SafetyAdvisorScreen;

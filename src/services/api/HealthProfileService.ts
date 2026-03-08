@@ -22,14 +22,14 @@ class HealthProfileService extends BaseApiService {
   /**
    * Get health profile by user ID
    */
-  async getHealthProfile(userId: string): Promise<HealthProfile> {
-    try {
-      const response = await this.authenticatedGet<HealthProfile>(`/${userId}`);
-      return this.handleApiResponse(response);
-    } catch (error) {
-      console.error('Get health profile failed:', error);
-      throw error;
+  async getHealthProfile(userId: string): Promise<HealthProfile | null> {
+    const response = await this.authenticatedGet<HealthProfile>(`/${userId}`);
+
+    if (!response.success && response.status === 404) {
+      return null;
     }
+
+    return this.handleApiResponse(response);
   }
 
   /**

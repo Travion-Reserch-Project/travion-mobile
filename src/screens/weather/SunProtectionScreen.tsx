@@ -1,7 +1,7 @@
 import { MainStackParamList } from '@navigation';
 import { useNavigation } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import {
   View,
   Text,
@@ -11,8 +11,10 @@ import {
   Platform,
   PermissionsAndroid,
   Dimensions,
+  Animated,
+  StyleSheet,
+  StatusBar,
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
 import Svg, { Circle, Line } from 'react-native-svg';
 import MaterialCommunityIcons from 'react-native-vector-icons/MaterialCommunityIcons';
 import FontAwesome5 from 'react-native-vector-icons/FontAwesome5';
@@ -22,6 +24,7 @@ import RNGeocoding from 'react-native-geocoding';
 import { weatherService } from '../../services/api/WeatherService';
 
 type NavigationProp = NativeStackNavigationProp<MainStackParamList>;
+const { width: SCREEN_W } = Dimensions.get('window');
 
 // ── Risk level configuration ────────────────────────────────
 const RISK_CONFIG: Record<string, {
@@ -111,13 +114,24 @@ const getRisk = (level: string) => {
   return RISK_CONFIG[key] || RISK_CONFIG.low;
 };
 
-const SunProtectionScreen: React.FC = () => {
+interface SunProtectionScreenProps {
+  onBack?: () => void;
+  onNavigateToSafetyAdvisor?: (params: { uvIndex: number; riskLevel: string }) => void;
+}
+
+const SunProtectionScreen: React.FC<SunProtectionScreenProps> = ({ onBack, onNavigateToSafetyAdvisor }) => {
   const navigation = useNavigation<NavigationProp>();
   const [loading, setLoading] = useState(true);
   const [predictionData, setPredictionData] = useState<any>(null);
   const [locationCity, setLocationCity] = useState('');
   const [locationCountry, setLocationCountry] = useState('');
 
+  // Animations
+  const fadeIn = useRef(new Animated.Value(0)).current;
+  const cardSlide = useRef(new Animated.Value(30)).current;
+  const cardFade = useRef(new Animated.Value(0)).current;
+  const factorsSlide = useRef(new Animated.Value(40)).current;
+  const factorsFade = useRef(new Animated.Value(0)).current;
   useEffect(() => {
     const fetchPrediction = async () => {
       try {
@@ -198,17 +212,15 @@ const SunProtectionScreen: React.FC = () => {
 
   if (loading) {
     return (
-      <SafeAreaView className="flex-1 bg-white items-center justify-center">
-        <View className="items-center">
-          <View className="w-16 h-16 rounded-full bg-orange-50 items-center justify-center mb-4">
+      <View style={sp.loadingWrap}>
+        <View style={sp.loadingInner}>
+          <View style={sp.loadingIcon}>
             <ActivityIndicator size="large" color="#F5840E" />
           </View>
-          <Text className="text-base font-gilroy-bold text-gray-700">Analyzing Sun Risk</Text>
-          <Text className="text-sm font-gilroy-regular text-gray-400 mt-1">
-            Checking UV levels & your profile...
-          </Text>
+          <Text style={sp.loadingTitle}>Analyzing Sun Risk</Text>
+          <Text style={sp.loadingSub}>Checking UV levels & your profile...</Text>
         </View>
-      </SafeAreaView>
+      </View>
     );
   }
 
@@ -220,22 +232,19 @@ const SunProtectionScreen: React.FC = () => {
   const lastUpdated = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
   const risk = getRisk(riskLevel);
 
-  // ── Gauge dimensions ──────────────────────────────────────
+  // Gauge dimensions
   const gaugeSize = 120;
   const gaugeStroke = 10;
   const gaugeRadius = (gaugeSize - gaugeStroke) / 2;
   const gaugeCx = gaugeSize / 2;
   const gaugeCy = gaugeSize / 2;
-  // Semi-circle arc (180°)
   const gaugeCircumference = Math.PI * gaugeRadius;
-  // Needle angle: -90 (left) to 90 (right)
   const needleAngle = risk.needle;
   const needleRad = ((needleAngle - 90) * Math.PI) / 180;
   const needleLen = gaugeRadius - 18;
   const needleX2 = gaugeCx + needleLen * Math.cos(needleRad);
   const needleY2 = gaugeCy + needleLen * Math.sin(needleRad);
 
-  // UV color helper
   const getUvColor = (uv: number) => {
     if (uv <= 2) return '#22C55E';
     if (uv <= 5) return '#F59E0B';
@@ -244,233 +253,273 @@ const SunProtectionScreen: React.FC = () => {
     return '#7C3AED';
   };
 
-  return (
-    <SafeAreaView className="flex-1 bg-gray-50">
-      <ScrollView
-        showsVerticalScrollIndicator={false}
-        contentContainerStyle={{ paddingBottom: 100 }}
-      >
-        {/* ── Header Card with Risk Meter + Location ──────── */}
-        <View
-          className="bg-white mx-4 mt-3 rounded-3xl overflow-hidden"
-          style={{ elevation: 3, shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.06, shadowRadius: 10 }}
-        >
-          {/* Top colored strip */}
-          <LinearGradient
-            colors={risk.gradient}
-            start={{ x: 0, y: 0 }}
-            end={{ x: 1, y: 0 }}
-            style={{ height: 4 }}
-          />
+  // Run entrance animations after data loads
+  Animated.sequence([
+    Animated.parallel([
+      Animated.timing(fadeIn, { toValue: 1, duration: 400, useNativeDriver: true }),
+      Animated.spring(cardSlide, { toValue: 0, tension: 50, friction: 8, useNativeDriver: true }),
+      Animated.timing(cardFade, { toValue: 1, duration: 500, useNativeDriver: true }),
+    ]),
+    Animated.parallel([
+      Animated.spring(factorsSlide, { toValue: 0, tension: 50, friction: 8, useNativeDriver: true }),
+      Animated.timing(factorsFade, { toValue: 1, duration: 400, useNativeDriver: true }),
+    ]),
+  ]).start();
 
-          <View className="px-5 pt-4 pb-5">
-            {/* Row: Gauge on left, Info on right */}
-            <View className="flex-row items-center">
-              {/* ── Risk Gauge (left) ── */}
-              <View style={{ width: gaugeSize, height: gaugeSize / 2 + 14 }} className="mr-4">
+  return (
+    <View style={sp.container}>
+      <StatusBar translucent backgroundColor="transparent" barStyle="dark-content" />
+
+      {/* Header */}
+      <View style={sp.header}>
+        <TouchableOpacity style={sp.headerBtn} onPress={() => onBack ? onBack() : navigation.goBack()}>
+          <MaterialCommunityIcons name="arrow-left" size={20} color="#374151" />
+        </TouchableOpacity>
+        <Text style={sp.headerTitle}>Sun Protection</Text>
+        <View style={sp.headerSpacer} />
+      </View>
+
+      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={sp.scrollContent}>
+
+        {/* Risk Header Card */}
+        <Animated.View style={[sp.riskCard, { opacity: cardFade, transform: [{ translateY: cardSlide }] }]}>
+          <LinearGradient colors={risk.gradient} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={sp.riskStrip} />
+
+          <View style={sp.riskBody}>
+            {/* Gauge + Info row */}
+            <View style={sp.riskRow}>
+              <View style={{ width: gaugeSize, height: gaugeSize / 2 + 14, marginRight: 16 }}>
                 <Svg width={gaugeSize} height={gaugeSize / 2 + 14}>
-                  {/* Background arc */}
                   <Circle
-                    cx={gaugeCx}
-                    cy={gaugeCy}
-                    r={gaugeRadius}
-                    stroke="#F3F4F6"
-                    strokeWidth={gaugeStroke}
-                    fill="none"
+                    cx={gaugeCx} cy={gaugeCy} r={gaugeRadius}
+                    stroke="#F3F4F6" strokeWidth={gaugeStroke} fill="none"
                     strokeDasharray={`${gaugeCircumference} ${gaugeCircumference}`}
-                    strokeLinecap="round"
-                    rotation="180"
-                    origin={`${gaugeCx}, ${gaugeCy}`}
+                    strokeLinecap="round" rotation="180" origin={`${gaugeCx}, ${gaugeCy}`}
                   />
-                  {/* Colored progress arc */}
                   <Circle
-                    cx={gaugeCx}
-                    cy={gaugeCy}
-                    r={gaugeRadius}
-                    stroke={risk.color}
-                    strokeWidth={gaugeStroke}
-                    fill="none"
+                    cx={gaugeCx} cy={gaugeCy} r={gaugeRadius}
+                    stroke={risk.color} strokeWidth={gaugeStroke} fill="none"
                     strokeDasharray={`${gaugeCircumference}`}
                     strokeDashoffset={gaugeCircumference * (1 - (needleAngle + 90) / 180)}
-                    strokeLinecap="round"
-                    rotation="180"
-                    origin={`${gaugeCx}, ${gaugeCy}`}
+                    strokeLinecap="round" rotation="180" origin={`${gaugeCx}, ${gaugeCy}`}
                   />
-                  {/* Needle */}
-                  <Line
-                    x1={gaugeCx}
-                    y1={gaugeCy}
-                    x2={needleX2}
-                    y2={needleY2}
-                    stroke={risk.color}
-                    strokeWidth={3}
-                    strokeLinecap="round"
-                  />
-                  {/* Center dot */}
+                  <Line x1={gaugeCx} y1={gaugeCy} x2={needleX2} y2={needleY2}
+                    stroke={risk.color} strokeWidth={3} strokeLinecap="round" />
                   <Circle cx={gaugeCx} cy={gaugeCy} r={5} fill={risk.color} />
                   <Circle cx={gaugeCx} cy={gaugeCy} r={3} fill="#FFFFFF" />
                 </Svg>
               </View>
-
-              {/* ── Info (right) ── */}
-              <View className="flex-1">
-                <View
-                  className="self-start px-3 py-1 rounded-full mb-2"
-                  style={{ backgroundColor: risk.bgLight, borderWidth: 1, borderColor: risk.color + '30' }}
-                >
-                  <Text className="text-xs font-gilroy-bold uppercase" style={{ color: risk.color }}>
-                    {riskLevel} Risk
-                  </Text>
+              <View style={sp.riskInfo}>
+                <View style={[sp.riskPill, { backgroundColor: risk.bgLight, borderColor: risk.color + '30' }]}>
+                  <Text style={[sp.riskPillText, { color: risk.color }]}>{riskLevel} Risk</Text>
                 </View>
-                <Text className="text-xl font-gilroy-bold text-gray-900 leading-6" numberOfLines={2}>
-                  {risk.title}
-                </Text>
+                <Text style={sp.riskTitle} numberOfLines={2}>{risk.title}</Text>
               </View>
             </View>
 
-            {/* Description */}
-            <Text className="text-sm font-gilroy-regular text-gray-500 mt-3 leading-5">
-              {risk.message}
-            </Text>
+            <Text style={sp.riskDesc}>{risk.message}</Text>
 
             {/* Location bar */}
-            <View className="flex-row items-center mt-4 bg-gray-50 rounded-xl px-3 py-2.5">
+            <View style={sp.locBar}>
               <MaterialCommunityIcons name="map-marker" size={18} color="#F5840E" />
-              <View className="flex-1 ml-2">
-                <Text className="text-sm font-gilroy-bold text-gray-800" numberOfLines={1}>
-                  {locationCity || 'Detecting...'}
-                  {locationCountry ? `, ${locationCountry}` : ''}
-                </Text>
-              </View>
-              <TouchableOpacity
-                className="bg-white px-3 py-1.5 rounded-lg"
-                style={{ elevation: 1, shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.05, shadowRadius: 2 }}
-                onPress={() => navigation.goBack()}
-              >
-                <Text className="text-xs font-gilroy-bold text-primary">Change</Text>
+              <Text style={sp.locText} numberOfLines={1}>
+                {locationCity || 'Detecting...'}{locationCountry ? `, ${locationCountry}` : ''}
+              </Text>
+              <TouchableOpacity style={sp.locChangeBtn} onPress={() => navigation.goBack()}>
+                <Text style={sp.locChangeText}>Change</Text>
               </TouchableOpacity>
             </View>
           </View>
-        </View>
+        </Animated.View>
 
-        {/* ── Contributing Factors ─────────────────────────── */}
-        <View className="px-4 mt-5">
-          <View className="flex-row items-center justify-between mb-3">
-            <Text className="text-base font-gilroy-bold text-gray-800">Contributing Factors</Text>
-            <View className="flex-row items-center">
+        {/* Contributing Factors */}
+        <Animated.View style={[sp.factorsSection, { opacity: factorsFade, transform: [{ translateY: factorsSlide }] }]}>
+          <View style={sp.factorsHeader}>
+            <Text style={sp.factorsTitle}>Contributing Factors</Text>
+            <View style={sp.updatedRow}>
               <MaterialCommunityIcons name="clock-outline" size={14} color="#9CA3AF" />
-              <Text className="text-xs font-gilroy-regular text-gray-400 ml-1">
-                Updated {lastUpdated}
-              </Text>
+              <Text style={sp.updatedText}>Updated {lastUpdated}</Text>
             </View>
           </View>
 
           {/* Skin Type Card */}
-          <View
-            className="bg-white rounded-2xl p-4 mb-3 flex-row items-center"
-            style={{ elevation: 1, shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.03, shadowRadius: 4 }}
-          >
-            <View className="w-11 h-11 rounded-xl items-center justify-center" style={{ backgroundColor: '#FFF7ED' }}>
+          <View style={sp.factorCard}>
+            <View style={[sp.factorIcon, { backgroundColor: '#FFF7ED' }]}>
               <MaterialCommunityIcons name="account" size={22} color="#F5840E" />
             </View>
-            <View className="ml-3 flex-1">
-              <Text className="text-xs font-gilroy-regular text-gray-400">Your Skin Type</Text>
-              <Text className="text-base font-gilroy-bold text-gray-900">Fitzpatrick Type {skinType}</Text>
+            <View style={sp.factorInfo}>
+              <Text style={sp.factorLabel}>Your Skin Type</Text>
+              <Text style={sp.factorValue}>Fitzpatrick Type {skinType}</Text>
             </View>
-            <TouchableOpacity
-              className="bg-orange-50 px-3 py-1.5 rounded-lg"
-              onPress={() => navigation.navigate('HealthProfileLanding')}
-            >
-              <Text className="text-xs font-gilroy-bold text-primary">Edit</Text>
+            <TouchableOpacity style={sp.factorEditBtn} onPress={() => navigation.navigate('HealthProfileLanding')}>
+              <Text style={sp.factorEditText}>Edit</Text>
             </TouchableOpacity>
           </View>
 
-          {/* UV + Temperature + Humidity row */}
-          <View className="flex-row mb-3">
-            {/* UV Index */}
-            <View
-              className="flex-1 bg-white rounded-2xl p-4 mr-2"
-              style={{ elevation: 1, shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.03, shadowRadius: 4 }}
-            >
-              <View className="flex-row items-center justify-between mb-2">
-                <View className="w-9 h-9 rounded-lg items-center justify-center" style={{ backgroundColor: risk.bgLight }}>
+          {/* UV + Temperature row */}
+          <View style={sp.factorRow}>
+            <View style={sp.factorSmallCard}>
+              <View style={sp.factorSmallTop}>
+                <View style={[sp.factorSmallIcon, { backgroundColor: risk.bgLight }]}>
                   <MaterialCommunityIcons name="white-balance-sunny" size={18} color={getUvColor(uvIndex)} />
                 </View>
-                <View className="px-2 py-0.5 rounded-full" style={{ backgroundColor: risk.bgLight }}>
-                  <Text className="text-[10px] font-gilroy-bold" style={{ color: risk.color }}>
-                    {riskLevel}
-                  </Text>
+                <View style={[sp.factorSmallPill, { backgroundColor: risk.bgLight }]}>
+                  <Text style={[sp.factorSmallPillText, { color: risk.color }]}>{riskLevel}</Text>
                 </View>
               </View>
-              <Text className="text-3xl font-gilroy-bold text-gray-900">{uvIndex}</Text>
-              <Text className="text-xs font-gilroy-regular text-gray-400 mt-0.5">UV Index</Text>
+              <Text style={sp.factorSmallValue}>{uvIndex}</Text>
+              <Text style={sp.factorSmallLabel}>UV Index</Text>
             </View>
-
-            {/* Temperature */}
-            <View
-              className="flex-1 bg-white rounded-2xl p-4 ml-2"
-              style={{ elevation: 1, shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.03, shadowRadius: 4 }}
-            >
-              <View className="flex-row items-center justify-between mb-2">
-                <View className="w-9 h-9 rounded-lg items-center justify-center" style={{ backgroundColor: '#FEF2F2' }}>
+            <View style={sp.factorSmallCard}>
+              <View style={sp.factorSmallTop}>
+                <View style={[sp.factorSmallIcon, { backgroundColor: '#FEF2F2' }]}>
                   <MaterialCommunityIcons name="thermometer" size={18} color="#EF4444" />
                 </View>
-                <View className="px-2 py-0.5 rounded-full" style={{ backgroundColor: '#EFF6FF' }}>
-                  <Text className="text-[10px] font-gilroy-bold text-blue-600">Live</Text>
+                <View style={[sp.factorSmallPill, { backgroundColor: '#EFF6FF' }]}>
+                  <Text style={[sp.factorSmallPillText, { color: '#2563EB' }]}>Live</Text>
                 </View>
               </View>
-              <Text className="text-3xl font-gilroy-bold text-gray-900">
-                {temperature}
-                <Text className="text-lg text-gray-400">°C</Text>
-              </Text>
-              <Text className="text-xs font-gilroy-regular text-gray-400 mt-0.5">Temperature</Text>
+              <Text style={sp.factorSmallValue}>{temperature}<Text style={sp.factorSmallUnit}>°C</Text></Text>
+              <Text style={sp.factorSmallLabel}>Temperature</Text>
             </View>
           </View>
-        </View>
+        </Animated.View>
 
-        {/* ── Recommended Actions ──────────────────────────── */}
-        <View className="px-4 mt-2">
-          <Text className="text-base font-gilroy-bold text-gray-800 mb-3">Recommended Actions</Text>
-
+        {/* Recommended Actions */}
+        <Animated.View style={[sp.actionsSection, { opacity: factorsFade }]}>
+          <Text style={sp.actionsTitle}>Recommended Actions</Text>
           {risk.actions.map((action, index) => (
-            <View
-              key={index}
-              className="bg-white rounded-2xl px-4 py-3.5 mb-2 flex-row items-center"
-              style={{ elevation: 1, shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.03, shadowRadius: 4 }}
-            >
-              <LinearGradient
-                colors={risk.gradient}
-                className="w-8 h-8 rounded-full items-center justify-center mr-3"
-              >
-                <Text className="text-white font-gilroy-bold text-xs">{index + 1}</Text>
+            <View key={index} style={sp.actionCard}>
+              <LinearGradient colors={risk.gradient} style={sp.actionNum}>
+                <Text style={sp.actionNumText}>{index + 1}</Text>
               </LinearGradient>
-              <Text className="text-sm font-gilroy-medium text-gray-700 flex-1">{action}</Text>
+              <Text style={sp.actionText}>{action}</Text>
             </View>
           ))}
-        </View>
+        </Animated.View>
       </ScrollView>
 
-      {/* ── Bottom CTA ─────────────────────────────────────── */}
-      <View className="absolute bottom-0 left-0 right-0 px-4 pb-5 pt-3 bg-gray-50">
+      {/* Bottom CTA */}
+      <View style={sp.ctaWrap}>
         <TouchableOpacity
           activeOpacity={0.85}
-          onPress={() => navigation.navigate('SafetyAdvisor', { uvIndex, riskLevel })}
+          onPress={() => onNavigateToSafetyAdvisor ? onNavigateToSafetyAdvisor({ uvIndex, riskLevel }) : navigation.navigate('SafetyAdvisor', { uvIndex, riskLevel })}
         >
           <LinearGradient
             colors={['#F5840E', '#E06D00']}
-            start={{ x: 0, y: 0 }}
-            end={{ x: 1, y: 0 }}
-            className="py-4 rounded-2xl flex-row justify-center items-center"
-            style={{ elevation: 4, shadowColor: '#F5840E', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.3, shadowRadius: 8 }}
+            start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}
+            style={sp.ctaBtn}
           >
             <MaterialCommunityIcons name="shield-sun" size={20} color="#FFFFFF" />
-            <Text className="text-white font-gilroy-bold text-base ml-2">Get Detailed Protection Plan</Text>
-            <MaterialCommunityIcons name="arrow-right" size={18} color="#FFFFFF" style={{ marginLeft: 8 }} />
+            <Text style={sp.ctaText}>Get Detailed Protection Plan</Text>
+            <MaterialCommunityIcons name="arrow-right" size={18} color="#FFFFFF" />
           </LinearGradient>
         </TouchableOpacity>
       </View>
-    </SafeAreaView>
+    </View>
   );
 };
+
+const sp = StyleSheet.create({
+  container: { flex: 1, backgroundColor: '#F8FAFC' },
+  scrollContent: { paddingBottom: 100 },
+  loadingWrap: { flex: 1, backgroundColor: '#ffffff', alignItems: 'center', justifyContent: 'center' },
+  loadingInner: { alignItems: 'center' },
+  loadingIcon: {
+    width: 64, height: 64, borderRadius: 32, backgroundColor: '#FFF7ED',
+    alignItems: 'center', justifyContent: 'center', marginBottom: 16,
+  },
+  loadingTitle: { fontSize: 16, fontWeight: '800', color: '#374151' },
+  loadingSub: { fontSize: 13, color: '#9CA3AF', marginTop: 4 },
+  header: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
+    paddingHorizontal: 20, paddingTop: (StatusBar.currentHeight || 0) + 12, paddingBottom: 12, backgroundColor: '#ffffff',
+    shadowColor: '#000', shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05, shadowRadius: 4, elevation: 2,
+  },
+  headerBtn: {
+    width: 40, height: 40, borderRadius: 20, backgroundColor: '#F3F4F6',
+    alignItems: 'center', justifyContent: 'center',
+  },
+  headerTitle: { fontSize: 16, fontWeight: '800', color: '#0f172a' },
+  headerSpacer: { width: 40 },
+  riskCard: {
+    backgroundColor: '#ffffff', marginHorizontal: 16, marginTop: 12, borderRadius: 24,
+    overflow: 'hidden', shadowColor: '#000', shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.06, shadowRadius: 10, elevation: 3,
+  },
+  riskStrip: { height: 4 },
+  riskBody: { paddingHorizontal: 20, paddingTop: 16, paddingBottom: 20 },
+  riskRow: { flexDirection: 'row', alignItems: 'center' },
+  riskInfo: { flex: 1 },
+  riskPill: {
+    alignSelf: 'flex-start', paddingHorizontal: 12, paddingVertical: 4,
+    borderRadius: 20, borderWidth: 1, marginBottom: 8,
+  },
+  riskPillText: { fontSize: 11, fontWeight: '800', textTransform: 'uppercase' },
+  riskTitle: { fontSize: 20, fontWeight: '900', color: '#0f172a', lineHeight: 24 },
+  riskDesc: { fontSize: 14, color: '#64748b', marginTop: 12, lineHeight: 20 },
+  locBar: {
+    flexDirection: 'row', alignItems: 'center', marginTop: 16,
+    backgroundColor: '#F8FAFC', borderRadius: 14, paddingHorizontal: 12, paddingVertical: 10,
+  },
+  locText: { flex: 1, fontSize: 14, fontWeight: '700', color: '#1f2937', marginLeft: 8 },
+  locChangeBtn: {
+    backgroundColor: '#ffffff', paddingHorizontal: 12, paddingVertical: 6, borderRadius: 8,
+    shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.05, shadowRadius: 2, elevation: 1,
+  },
+  locChangeText: { fontSize: 12, fontWeight: '800', color: '#F5840E' },
+  factorsSection: { paddingHorizontal: 16, marginTop: 20 },
+  factorsHeader: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12,
+  },
+  factorsTitle: { fontSize: 16, fontWeight: '800', color: '#1f2937' },
+  updatedRow: { flexDirection: 'row', alignItems: 'center', gap: 4 },
+  updatedText: { fontSize: 12, color: '#9CA3AF' },
+  factorCard: {
+    backgroundColor: '#ffffff', borderRadius: 20, padding: 16, flexDirection: 'row',
+    alignItems: 'center', marginBottom: 12,
+    shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.03, shadowRadius: 4, elevation: 1,
+  },
+  factorIcon: { width: 44, height: 44, borderRadius: 14, alignItems: 'center', justifyContent: 'center' },
+  factorInfo: { flex: 1, marginLeft: 12 },
+  factorLabel: { fontSize: 12, color: '#9CA3AF' },
+  factorValue: { fontSize: 15, fontWeight: '800', color: '#0f172a' },
+  factorEditBtn: { backgroundColor: '#FFF7ED', paddingHorizontal: 12, paddingVertical: 6, borderRadius: 8 },
+  factorEditText: { fontSize: 12, fontWeight: '800', color: '#F5840E' },
+  factorRow: { flexDirection: 'row', gap: 12, marginBottom: 12 },
+  factorSmallCard: {
+    flex: 1, backgroundColor: '#ffffff', borderRadius: 20, padding: 16,
+    shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.03, shadowRadius: 4, elevation: 1,
+  },
+  factorSmallTop: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 },
+  factorSmallIcon: { width: 36, height: 36, borderRadius: 10, alignItems: 'center', justifyContent: 'center' },
+  factorSmallPill: { paddingHorizontal: 8, paddingVertical: 2, borderRadius: 10 },
+  factorSmallPillText: { fontSize: 10, fontWeight: '800' },
+  factorSmallValue: { fontSize: 28, fontWeight: '900', color: '#0f172a' },
+  factorSmallUnit: { fontSize: 16, color: '#9CA3AF' },
+  factorSmallLabel: { fontSize: 12, color: '#9CA3AF', marginTop: 2 },
+  actionsSection: { paddingHorizontal: 16, marginTop: 8 },
+  actionsTitle: { fontSize: 16, fontWeight: '800', color: '#1f2937', marginBottom: 12 },
+  actionCard: {
+    backgroundColor: '#ffffff', borderRadius: 20, paddingHorizontal: 16, paddingVertical: 14,
+    marginBottom: 8, flexDirection: 'row', alignItems: 'center',
+    shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.03, shadowRadius: 4, elevation: 1,
+  },
+  actionNum: { width: 32, height: 32, borderRadius: 16, alignItems: 'center', justifyContent: 'center', marginRight: 12 },
+  actionNumText: { color: '#ffffff', fontWeight: '800', fontSize: 13 },
+  actionText: { fontSize: 14, color: '#374151', fontWeight: '600', flex: 1 },
+  ctaWrap: {
+    position: 'absolute', bottom: 0, left: 0, right: 0,
+    paddingHorizontal: 16, paddingBottom: 24, paddingTop: 12, backgroundColor: '#F8FAFC',
+  },
+  ctaBtn: {
+    paddingVertical: 16, borderRadius: 20, flexDirection: 'row',
+    alignItems: 'center', justifyContent: 'center', gap: 8,
+    shadowColor: '#F5840E', shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3, shadowRadius: 8, elevation: 4,
+  },
+  ctaText: { color: '#ffffff', fontWeight: '800', fontSize: 16 },
+});
 
 export default SunProtectionScreen;
