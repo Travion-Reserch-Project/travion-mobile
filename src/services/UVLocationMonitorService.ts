@@ -2,31 +2,33 @@
  * UVLocationMonitorService
  *
  * Monitors the user's real-time location and sends a local UV alert notification
- * whenever they move into a high-UV area (UV index >= 6).
+ * whenever they are in — or move into — a moderate-or-worse UV area (UV index >= 3).
  *
  * Design principles:
  *  - Singleton — only one GPS watcher ever runs at a time
- *  - Low accuracy GPS + 500m distanceFilter → minimal battery drain
+ *  - Immediate check on start (current position), then again on every 500m move
+ *  - Low-accuracy GPS + distanceFilter → minimal battery drain
  *  - 30-minute cooldown between alerts → no notification spam
- *  - No background service / foreground service needed; Notifee fires local
- *    notifications while the app is foregrounded or backgrounded via JS thread
+ *  - Local Notifee notification (no FCM round-trip needed)
  */
 
 import Geolocation from '@react-native-community/geolocation';
-import notifee from '@notifee/react-native';
+import notifee, { AndroidImportance } from '@notifee/react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { requestLocationPermission } from '@utils/geolocation';
 import { weatherService } from './api/WeatherService';
 
 // ── Constants ─────────────────────────────────────────────────────────────────
 const HIGH_UV_ALERTS_KEY = 'HIGH_UV_ALERTS_ENABLED';
-const HIGH_UV_THRESHOLD = 6;            // UV 6+ = "High" or worse
-const ALERT_COOLDOWN_MS = 30 * 60 * 1000; // 30 minutes between alerts
-const DISTANCE_FILTER_M = 500;          // Only trigger callback after moving 500m
+/** Trigger from Moderate (UV 3) upward */
+const ALERT_UV_THRESHOLD = 3;
+/** Minimum minutes between successive alerts */
+const ALERT_COOLDOWN_MS = 30 * 60 * 1000;
+/** Minimum movement (metres) before re-checking UV */
+const DISTANCE_FILTER_M = 500;
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
-/** Haversine distance between two GPS coordinates (in metres). */
 function haversineMetres(
   lat1: number, lon1: number,
   lat2: number, lon2: number,
@@ -43,9 +45,22 @@ function haversineMetres(
 }
 
 function getRiskLabel(uv: number): string {
+  if (uv <= 2) return 'Low';
+  if (uv <= 5) return 'Moderate';
   if (uv <= 7) return 'High';
   if (uv <= 10) return 'Very High';
   return 'Extreme';
+}
+
+/** Notification body copy matched to risk level */
+function getAlertBody(uv: number, riskLevel: string): string {
+  if (riskLevel === 'Moderate') {
+    return `UV index is ${uv} — Moderate risk. Apply SPF 30+ sunscreen before going outside.`;
+  }
+  if (riskLevel === 'High') {
+    return `UV index is ${uv} — High risk. Apply SPF 50+, wear a hat and seek shade between 11am–3pm.`;
+  }
+  return `UV index is ${uv} — ${riskLevel} risk. Avoid direct sun, apply SPF 50+ and stay in shade.`;
 }
 
 // ── Service ───────────────────────────────────────────────────────────────────
@@ -63,8 +78,10 @@ class UVLocationMonitorServiceClass {
   }
 
   /**
-   * Start GPS monitoring.
-   * Safe to call multiple times — only one watcher will run.
+   * Start monitoring.
+   * 1. Does an immediate UV check at the current position.
+   * 2. Sets up a watcher that re-checks every time the user moves ≥ 500 m.
+   * Safe to call multiple times — only one watcher runs.
    */
   async start(): Promise<void> {
     if (this.isRunning) {
@@ -74,28 +91,46 @@ class UVLocationMonitorServiceClass {
 
     const hasPermission = await requestLocationPermission();
     if (!hasPermission) {
-      console.warn('[UVMonitor] Location permission denied — cannot start monitoring');
+      console.warn('[UVMonitor] Location permission denied');
       return;
     }
 
-    console.log('[UVMonitor] Starting location monitoring');
+    console.log('[UVMonitor] Starting — immediate check + continuous watch');
 
-    // Use Geolocation directly so we can pass distanceFilter (not exposed by wrapper).
-    // distanceFilter=500 means the OS only wakes JS when user moves ≥ 500 m.
+    // ── 1. Immediate check at current position ──────────────────────────────
+    // watchPosition with distanceFilter only fires on movement, so we need a
+    // one-shot getCurrentPosition to check the user's current UV right away.
+    Geolocation.getCurrentPosition(
+      position => {
+        const { latitude, longitude } = position.coords;
+        this.lastChecked = { latitude, longitude };
+        this.checkUVAndAlert(latitude, longitude).catch(err =>
+          console.warn('[UVMonitor] Immediate check error:', err),
+        );
+      },
+      err => console.warn('[UVMonitor] Immediate position error:', err.message),
+      {
+        enableHighAccuracy: false,
+        timeout: 20_000,
+        maximumAge: 300_000,
+      },
+    );
+
+    // ── 2. Continuous watcher (fires on significant movement) ───────────────
     this.watchId = Geolocation.watchPosition(
       position => {
         const { latitude, longitude } = position.coords;
         this.onLocationUpdate(latitude, longitude);
       },
       error => {
-        console.warn('[UVMonitor] Location error:', error.message);
+        console.warn('[UVMonitor] Watch error:', error.message);
       },
       {
-        enableHighAccuracy: false,  // network/cell location — battery efficient
+        enableHighAccuracy: false,   // cell/WiFi — battery efficient
         timeout: 30_000,
-        maximumAge: 300_000,        // 5 min cached position is fine
+        maximumAge: 300_000,
         distanceFilter: DISTANCE_FILTER_M,
-      } as any, // distanceFilter is valid but not in the TS typings
+      } as any,
     );
   }
 
@@ -104,13 +139,13 @@ class UVLocationMonitorServiceClass {
     if (this.watchId !== null) {
       Geolocation.clearWatch(this.watchId);
       this.watchId = null;
-      console.log('[UVMonitor] Stopped location monitoring');
+      console.log('[UVMonitor] Stopped');
     }
   }
 
   /**
-   * Read the stored preference and start/stop accordingly.
-   * Call this on app boot so monitoring resumes if the user had it enabled.
+   * Read stored preference and start/stop accordingly.
+   * Call on app boot so monitoring resumes if the user had it enabled.
    */
   async syncWithPreference(): Promise<void> {
     try {
@@ -129,15 +164,13 @@ class UVLocationMonitorServiceClass {
   // ── Private ─────────────────────────────────────────────────────────────────
 
   private onLocationUpdate(latitude: number, longitude: number): void {
-    // Secondary distance guard in case distanceFilter isn't honoured (iOS quirk).
+    // Secondary JS-side distance guard (safety net for OS distanceFilter quirks).
     if (this.lastChecked) {
       const moved = haversineMetres(
         this.lastChecked.latitude, this.lastChecked.longitude,
         latitude, longitude,
       );
-      if (moved < DISTANCE_FILTER_M) {
-        return;
-      }
+      if (moved < DISTANCE_FILTER_M) return;
     }
 
     this.lastChecked = { latitude, longitude };
@@ -147,7 +180,6 @@ class UVLocationMonitorServiceClass {
   }
 
   private async checkUVAndAlert(latitude: number, longitude: number): Promise<void> {
-    // Skip if a fetch is already in-flight or we're within the cooldown window.
     if (this.isFetching) return;
     if (Date.now() - this.lastAlertAt < ALERT_COOLDOWN_MS) return;
 
@@ -166,14 +198,13 @@ class UVLocationMonitorServiceClass {
 
       console.log(`[UVMonitor] UV at (${latitude.toFixed(4)}, ${longitude.toFixed(4)}): ${uvIndex}`);
 
-      if (uvIndex >= HIGH_UV_THRESHOLD) {
+      if (uvIndex >= ALERT_UV_THRESHOLD) {
         const riskLabel = getRiskLabel(uvIndex);
         await this.sendLocalAlert(uvIndex, riskLabel);
         this.lastAlertAt = Date.now();
       }
     } catch (error) {
-      // Network or API failure — silently skip; will retry on next location change
-      console.warn('[UVMonitor] UV fetch failed:', error);
+      console.warn('[UVMonitor] UV fetch failed (will retry on next move):', error);
     } finally {
       this.isFetching = false;
     }
@@ -182,8 +213,8 @@ class UVLocationMonitorServiceClass {
   private async sendLocalAlert(uvIndex: number, riskLevel: string): Promise<void> {
     try {
       await notifee.displayNotification({
-        title: `High UV Alert — ${riskLevel} Risk`,
-        body: `UV index is ${uvIndex} at your current location. Apply SPF 50+ sunscreen and seek shade.`,
+        title: `UV Alert — ${riskLevel} Risk`,
+        body: getAlertBody(uvIndex, riskLevel),
         data: {
           type: 'uv_health_alert',
           screen: 'SafetyAdvisor',
@@ -192,15 +223,14 @@ class UVLocationMonitorServiceClass {
         },
         android: {
           channelId: 'uv_health_alerts',
+          importance: AndroidImportance.HIGH,
           pressAction: { id: 'default' },
-          // Show as heads-up notification
-          importance: 4,
         },
         ios: {
           sound: 'default',
         },
       });
-      console.log(`[UVMonitor] Alert fired: UV ${uvIndex} (${riskLevel})`);
+      console.log(`[UVMonitor] Alert sent — UV ${uvIndex} (${riskLevel})`);
     } catch (error) {
       console.warn('[UVMonitor] Failed to display alert:', error);
     }
