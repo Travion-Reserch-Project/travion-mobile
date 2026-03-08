@@ -139,7 +139,6 @@ export const SafetyAlerts: React.FC<SafetyAlertsProps> = ({
     Platform.OS === 'android' &&
     !!Config.GOOGLE_MAPS_API_KEY &&
     Config.GOOGLE_MAPS_API_KEY !== 'YOUR_API_KEY';
-  const useLitePreviewMap = Platform.OS === 'android';
 
   // Get selected alert (or default if index out of range)
   const selectedAlert = filteredAlerts[selectedAlertIndex] || filteredAlerts[0] || defaultAlerts[0];
@@ -722,26 +721,15 @@ export const SafetyAlerts: React.FC<SafetyAlertsProps> = ({
                 Location unavailable. Showing alerts without live map preview.
               </Text>
             </View>
-          ) : useLitePreviewMap ? (
-            <View className="flex-1 items-center justify-center bg-gray-100 px-4">
-              <FontAwesome5 name="map" size={24} color="#6B7280" />
-              <Text className="text-sm text-gray-700 mt-2 text-center font-gilroy-medium">
-                Map preview is simplified on Android for stability.
-              </Text>
-              <Text className="text-xs text-gray-500 mt-1 text-center">
-                Tap below to view the full live safety map.
-              </Text>
-            </View>
           ) : (
             <MapView
               className="flex-1"
-              provider={!useLitePreviewMap && shouldUseGoogleProvider ? PROVIDER_GOOGLE : undefined}
+              provider={shouldUseGoogleProvider ? PROVIDER_GOOGLE : undefined}
               initialRegion={mapRegion}
               scrollEnabled={false}
               zoomEnabled={false}
               pitchEnabled={false}
               rotateEnabled={false}
-              liteMode={useLitePreviewMap}
             >
               {/* Risk circle around current location */}
               {hasValidUserLocation && userLocation && (
