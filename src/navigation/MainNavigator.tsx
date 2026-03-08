@@ -164,6 +164,7 @@ export const MainNavigator: React.FC = () => {
     >
       {hasCompleteProfile ? (
         <>
+          <Stack.Screen name="PreferencesOnboarding" component={PreferencesOnboardingScreen} />
           <Stack.Screen name="WelcomeBack" component={WelcomeBackScreen} />
           <Stack.Screen name="MainApp" component={MainAppScreen} />
           <Stack.Screen name="MapScreen" component={MapScreen} />

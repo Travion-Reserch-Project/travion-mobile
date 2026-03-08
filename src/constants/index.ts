@@ -4,10 +4,12 @@ export const APP_NAME = 'Travion';
 export const APP_VERSION = '1.0.0';
 
 // API Configuration
+const DEV_MACHINE_IP = '10.202.187.170';
+
 export const API_CONFIG = {
   BASE_URL: __DEV__
     ? Platform.OS === 'android'
-      ? 'http://10.0.2.2:3001'
+      ? `http://${DEV_MACHINE_IP}:3001`
       : 'http://localhost:3001'
     : 'https://api.travion.online',
   API_VERSION: '/api/v1',

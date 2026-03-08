@@ -104,6 +104,15 @@ class NotificationServiceClass extends BaseApiService {
   private diagnoseFirebaseError(error: any): string {
     const errorMsg = error?.message?.toString()?.toLowerCase() || '';
 
+    if (errorMsg.includes('service_not_available')) {
+      return (
+        'SERVICE_NOT_AVAILABLE: Google Play Services is unavailable or unreachable. ' +
+        'Solutions: (1) Use a "Google Play" emulator image (not just "Google APIs") in AVD Manager. ' +
+        '(2) Run: adb shell pm clear com.google.android.gms && adb reboot. ' +
+        '(3) Open Play Store on the emulator and update Google Play Services. ' +
+        '(4) On physical device: ensure Google Play Services is installed and network is active.'
+      );
+    }
     if (errorMsg.includes('fis_auth_error')) {
       return (
         'FIS_AUTH_ERROR: Firebase cannot authenticate your app. ' +
