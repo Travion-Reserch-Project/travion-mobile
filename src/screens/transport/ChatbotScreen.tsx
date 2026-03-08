@@ -70,13 +70,6 @@ interface StationInfo {
 
 // Enhanced Route Card Component
 const RouteCard: React.FC<{ route: RouteDetails; index: number }> = ({ route, index }) => {
-  const getMedalEmoji = (idx: number) => {
-    if (idx === 0) return '🥇';
-    if (idx === 1) return '🥈';
-    if (idx === 2) return '🥉';
-    return '📍';
-  };
-
   const getTransportIcon = (type: string) => {
     switch (type.toLowerCase()) {
       case 'bus':
@@ -213,6 +206,7 @@ export const ChatbotScreen: React.FC = () => {
   ]);
   const [inputText, setInputText] = useState('');
   const [isTyping, setIsTyping] = useState(false);
+  const [chatMode, setChatMode] = useState<'recommendation' | 'agentic'>('recommendation');
   const [timetableModalVisible, setTimetableModalVisible] = useState(false);
   const [timetables, setTimetables] = useState<Timetable[]>([]);
   const [timetableLoading, setTimetableLoading] = useState(false);
@@ -233,12 +227,20 @@ export const ChatbotScreen: React.FC = () => {
     address: string;
   } | null>(null);
 
-  const quickSuggestions = [
-    'Best destinations for winter',
-    'Budget travel tips',
-    'Flight booking help',
-    'Hotel recommendations',
-  ];
+  const quickSuggestions = {
+    recommendation: [
+      'Colombo to Kandy by train',
+      'Best bus from Galle to Ella',
+      'Cheapest way to Nuwara Eliya',
+      'Quick route to airport',
+    ],
+    agentic: [
+      'What are the best places to visit in Kandy?',
+      'Tell me about Sri Lankan trains',
+      'Safety tips for traveling in Sri Lanka',
+      'Best time to visit Ella',
+    ],
+  };
 
   // Initialize geocoding
   useEffect(() => {
@@ -263,11 +265,14 @@ export const ChatbotScreen: React.FC = () => {
       if (response.success && 'data' in response) {
         setConversationId(response.data.conversation_id);
         setCurrentTripTitle(response.data.title);
+        const welcomeMessage =
+          chatMode === 'recommendation'
+            ? "🗺️ Hi! I'm your travel assistant. Where do you want to go?"
+            : "🤖 Hi! I'm your knowledge assistant. Ask me anything about travel, places, or transportation!";
         setMessages([
           {
             id: '1',
-            text:
-              response.data.message || "👋 Hi! I'm your travel assistant. Where do you want to go?",
+            text: response.data.message || welcomeMessage,
             isUser: false,
             timestamp: new Date(),
           },
@@ -474,88 +479,112 @@ export const ChatbotScreen: React.FC = () => {
     setIsTyping(true);
 
     try {
-      // Call chatbot service
-      console.log('Sending message to chatbot...');
+      // Call different endpoints based on mode
+      console.log(`Sending message in ${chatMode} mode...`);
 
-      const response = await chatService.sendChatbotMessage(textToSend);
+      let response;
+      if (chatMode === 'agentic') {
+        // Agentic Mode: Use RAG endpoint for knowledge-based questions
+        response = await chatService.askRAG(textToSend, conversationId || undefined);
+      } else {
+        // Recommendation Mode: Use message endpoint for transport queries
+        response = await chatService.sendChatbotMessage(textToSend, conversationId || undefined);
+      }
 
       if (response.success && 'data' in response && response.data) {
         const botData = response.data;
-        setConversationId(botData.conversation_id);
 
-        // Extract route summary from message
-        const fullMessageText = botData.message;
-        const summaryMatch = fullMessageText.match(
-          /\*\*Route Summary:\*\*([\s\S]*?)\*\*Detailed Route Options:\*\*/,
-        );
-        let routeSummary;
-
-        if (summaryMatch) {
-          const summaryText = summaryMatch[1];
-          const departureTimeMatch = summaryText.match(/Departure time considered: ([^\n]+)/);
-          const distanceMatch = summaryText.match(/Estimated trip distance: ([^\n]+)/);
-          const reasoningMatch = summaryText.match(/Reasoning: ([^\n]+)/);
-
-          routeSummary = {
-            departureTime: departureTimeMatch?.[1]?.trim(),
-            distance: distanceMatch?.[1]?.trim(),
-            reasoning: reasoningMatch?.[1]?.trim(),
+        // Handle different response structures for Recommendation vs Agentic modes
+        if (chatMode === 'agentic') {
+          // RAG mode - simple text response
+          const ragData = botData as any; // RAGResponseData
+          const botMessage: Message = {
+            id: (Date.now() + 1).toString(),
+            text: ragData.answer || 'No answer available',
+            isUser: false,
+            timestamp: new Date(),
           };
-        }
+          setMessages(prev => [...prev, botMessage]);
+        } else {
+          // Recommendation mode - complex transport data
+          setConversationId((botData as any).conversation_id);
 
-        // Extract simplified message (just the intro)
-        const simplifiedMessage =
-          fullMessageText.split('**Route Summary:**')[0]?.trim() || fullMessageText;
+          // Extract route summary from message
+          const fullMessageText = (botData as any).message;
+          const summaryMatch = fullMessageText?.match(
+            /\*\*Route Summary:\*\*([\s\S]*?)\*\*Detailed Route Options:\*\*/,
+          );
+          let routeSummary;
 
-        const botMessage: Message = {
-          id: (Date.now() + 1).toString(),
-          text: simplifiedMessage,
-          isUser: false,
-          timestamp: new Date(),
-          routeSummary,
-          routeDetails: botData.metadata?.transport_recommendations?.ranked_routes?.map(
-            (route: any) => ({
-              route_id: route.route_id,
-              transport_type: route.transport_type,
-              operator_name: route.operator_name,
-              score: Math.round((route.score || 0) * 100),
-              congestion: route.dynamic?.congestion,
-              weather_conditions:
-                route.dynamic?.weather_risk < 0.2 ? 'Good weather' : 'Check weather',
-              navigation_steps: route.navigation_steps || route.static?.navigation_steps,
-            }),
-          ),
-          stationData: botData.metadata?.station_data,
-          mapData: (() => {
-            const mapData = botData.metadata?.map_data;
-            if (!mapData?.origin || !mapData?.destination || !Array.isArray(mapData.routes)) {
-              return undefined;
-            }
+          if (summaryMatch) {
+            const summaryText = summaryMatch[1];
+            const departureTimeMatch = summaryText.match(/Departure time considered: ([^\n]+)/);
+            const distanceMatch = summaryText.match(/Estimated trip distance: ([^\n]+)/);
+            const reasoningMatch = summaryText.match(/Reasoning: ([^\n]+)/);
 
-            return {
-              origin: {
-                lat: mapData.origin.lat,
-                lng: mapData.origin.lng,
-              },
-              destination: {
-                lat: mapData.destination.lat,
-                lng: mapData.destination.lng,
-              },
-              routes: mapData.routes
-                .filter(
-                  (route: any) => typeof route?.polyline === 'string' && route.polyline.length > 0,
-                )
-                .map((route: any, index: number) => ({
-                  route_id: route.route_id,
-                  transport_type: route.transport_type,
-                  polyline: route.polyline,
-                  color: route.color || ['#3B82F6', '#F97316', '#10B981'][index % 3],
-                  navigation_steps: route.navigation_steps || [],
-                })),
-            } as ChatMapData;
-          })(),
-          recommendations: botData.metadata?.transport_recommendations?.ranked_routes?.map(
-            (route: any) => ({
+            routeSummary = {
+              departureTime: departureTimeMatch?.[1]?.trim(),
+              distance: distanceMatch?.[1]?.trim(),
+              reasoning: reasoningMatch?.[1]?.trim(),
+            };
+          }
+
+          // Extract simplified message (just the intro)
+          const simplifiedMessage =
+            fullMessageText?.split('**Route Summary:**')[0]?.trim() || fullMessageText;
+
+          const botMessage: Message = {
+            id: (Date.now() + 1).toString(),
+            text: simplifiedMessage,
+            isUser: false,
+            timestamp: new Date(),
+            routeSummary,
+            routeDetails: (botData as any).metadata?.transport_recommendations?.ranked_routes?.map(
+              (route: any) => ({
+                route_id: route.route_id,
+                transport_type: route.transport_type,
+                operator_name: route.operator_name,
+                score: Math.round((route.score || 0) * 100),
+                ml_confidence: route.ml_confidence || 0,
+                congestion: route.dynamic?.congestion,
+                weather_conditions:
+                  route.dynamic?.weather_risk < 0.2 ? 'Good weather' : 'Check weather',
+                navigation_steps: route.navigation_steps || route.static?.navigation_steps,
+              }),
+            ),
+            stationData: (botData as any).metadata?.station_data,
+            mapData: (() => {
+              const mapData = (botData as any).metadata?.map_data;
+              if (!mapData?.origin || !mapData?.destination || !Array.isArray(mapData.routes)) {
+                return undefined;
+              }
+
+              return {
+                origin: {
+                  lat: mapData.origin.lat,
+                  lng: mapData.origin.lng,
+                },
+                destination: {
+                  lat: mapData.destination.lat,
+                  lng: mapData.destination.lng,
+                },
+                routes: mapData.routes
+                  .filter(
+                    (route: any) =>
+                      typeof route?.polyline === 'string' && route.polyline.length > 0,
+                  )
+                  .map((route: any, index: number) => ({
+                    route_id: route.route_id,
+                    transport_type: route.transport_type,
+                    polyline: route.polyline,
+                    color: route.color || ['#3B82F6', '#F97316', '#10B981'][index % 3],
+                    navigation_steps: route.navigation_steps || [],
+                  })),
+              } as ChatMapData;
+            })(),
+            recommendations: (
+              botData as any
+            ).metadata?.transport_recommendations?.ranked_routes?.map((route: any) => ({
               service_id: route.route_id,
               mode: route.transport_type,
               operator: route.operator_name,
@@ -564,14 +593,15 @@ export const ChatbotScreen: React.FC = () => {
               fare_lkr: route.static?.base_fare_lkr || 0,
               reliability_stars: 4.5,
               is_recommended: route.ml_confidence > 0.7,
-            }),
-          ),
-          recommendationData: {
-            origin: botData.metadata?.locations_identified?.[0]?.name || 'Origin',
-            destination: botData.metadata?.locations_identified?.[1]?.name || 'Destination',
-          },
-        };
-        setMessages(prev => [...prev, botMessage]);
+            })),
+            recommendationData: {
+              origin: (botData as any).metadata?.locations_identified?.[0]?.name || 'Origin',
+              destination:
+                (botData as any).metadata?.locations_identified?.[1]?.name || 'Destination',
+            },
+          };
+          setMessages(prev => [...prev, botMessage]);
+        }
       } else {
         const errorMsg: Message = {
           id: (Date.now() + 1).toString(),
@@ -665,7 +695,6 @@ export const ChatbotScreen: React.FC = () => {
 
   const renderRecommendationCard = (rec: TransportRecommendation, recommendationData?: any) => (
     <View
-      key={rec.service_id}
       className={`rounded-xl p-4 mb-3 border-2 ${
         rec.is_recommended ? 'bg-green-50 border-green-400' : 'bg-white border-gray-200'
       }`}
@@ -846,9 +875,11 @@ export const ChatbotScreen: React.FC = () => {
       {/* Render recommendations if available (fallback for old format) */}
       {message.recommendations && message.recommendations.length > 0 && !message.routeDetails && (
         <View className="mb-4 px-3">
-          {message.recommendations.map(rec =>
-            renderRecommendationCard(rec, message.recommendationData),
-          )}
+          {message.recommendations.map(rec => (
+            <View key={rec.service_id}>
+              {renderRecommendationCard(rec, message.recommendationData)}
+            </View>
+          ))}
         </View>
       )}
 
@@ -897,7 +928,7 @@ export const ChatbotScreen: React.FC = () => {
               <View className="flex-row items-center">
                 <View className="w-2 h-2 bg-green-500 rounded-full mr-2" />
                 <Text className="text-sm font-gilroy-regular text-gray-600">
-                  {conversationId ? 'Active Trip' : 'Ready to plan'}
+                  {chatMode === 'recommendation' ? '🗺️ Route Planning' : '🤖 Knowledge Assistant'}
                 </Text>
               </View>
             </View>
@@ -927,6 +958,73 @@ export const ChatbotScreen: React.FC = () => {
             </View>
           </TouchableOpacity>
         </View>
+
+        {/* Mode Toggle */}
+        <View className="mt-3 bg-gray-100 rounded-lg p-1 flex-row">
+          <TouchableOpacity
+            className={`flex-1 rounded-md py-2 ${
+              chatMode === 'recommendation' ? 'bg-white shadow-sm' : ''
+            }`}
+            onPress={() => {
+              setChatMode('recommendation');
+              setMessages([
+                {
+                  id: Date.now().toString(),
+                  text: "🗺️ Recommendation Mode: I'll help you find the best transport routes!",
+                  isUser: false,
+                  timestamp: new Date(),
+                },
+              ]);
+            }}
+          >
+            <View className="flex-row items-center justify-center">
+              <FontAwesome5
+                name="route"
+                size={14}
+                color={chatMode === 'recommendation' ? '#F5840E' : '#6B7280'}
+              />
+              <Text
+                className={`ml-2 text-sm font-gilroy-bold ${
+                  chatMode === 'recommendation' ? 'text-primary' : 'text-gray-600'
+                }`}
+              >
+                Routes
+              </Text>
+            </View>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            className={`flex-1 rounded-md py-2 ml-1 ${
+              chatMode === 'agentic' ? 'bg-white shadow-sm' : ''
+            }`}
+            onPress={() => {
+              setChatMode('agentic');
+              setMessages([
+                {
+                  id: Date.now().toString(),
+                  text: '🤖 Agentic Mode: Ask me anything about travel, places, or transportation!',
+                  isUser: false,
+                  timestamp: new Date(),
+                },
+              ]);
+            }}
+          >
+            <View className="flex-row items-center justify-center">
+              <FontAwesome5
+                name="brain"
+                size={14}
+                color={chatMode === 'agentic' ? '#F5840E' : '#6B7280'}
+              />
+              <Text
+                className={`ml-2 text-sm font-gilroy-bold ${
+                  chatMode === 'agentic' ? 'text-primary' : 'text-gray-600'
+                }`}
+              >
+                Knowledge
+              </Text>
+            </View>
+          </TouchableOpacity>
+        </View>
       </View>
 
       <KeyboardAvoidingView
@@ -939,7 +1037,7 @@ export const ChatbotScreen: React.FC = () => {
           className="flex-1 px-6 pt-5 pb-5"
           showsVerticalScrollIndicator={false}
         >
-          {messages.map(renderMessage)}
+          {messages.map(message => renderMessage(message))}
 
           {/* Typing Indicator */}
           {isTyping && (
@@ -964,11 +1062,11 @@ export const ChatbotScreen: React.FC = () => {
         {messages.length === 1 && (
           <View className="px-4 pb-4">
             <Text className="text-sm font-gilroy-medium text-gray-600 mb-3">
-              Quick suggestions:
+              {chatMode === 'recommendation' ? 'Try asking:' : 'Example questions:'}
             </Text>
             <ScrollView horizontal showsHorizontalScrollIndicator={false}>
               <View className="flex-row space-x-3">
-                {quickSuggestions.map((suggestion, index) => (
+                {quickSuggestions[chatMode].map((suggestion, index) => (
                   <TouchableOpacity
                     key={index}
                     className="bg-white border border-gray-300 rounded-full px-4 py-2"
@@ -984,31 +1082,37 @@ export const ChatbotScreen: React.FC = () => {
 
         {/* Input Area */}
         <View className="bg-white px-4 py-4 border-t border-gray-200">
-          {/* Location Buttons */}
-          <View className="flex-row gap-2 mb-3">
-            <TouchableOpacity
-              className="flex-1 flex-row items-center justify-center bg-blue-50 rounded-full py-3 gap-2"
-              onPress={handleSelectLocationOnMap}
-            >
-              <FontAwesome5 name="map" size={14} color="#2563EB" />
-              <Text className="text-sm font-gilroy-medium text-blue-600">Select on Map</Text>
-            </TouchableOpacity>
+          {/* Location Buttons - Only show in Recommendation Mode */}
+          {chatMode === 'recommendation' && (
+            <View className="flex-row gap-2 mb-3">
+              <TouchableOpacity
+                className="flex-1 flex-row items-center justify-center bg-blue-50 rounded-full py-3 gap-2"
+                onPress={handleSelectLocationOnMap}
+              >
+                <FontAwesome5 name="map" size={14} color="#2563EB" />
+                <Text className="text-sm font-gilroy-medium text-blue-600">Select on Map</Text>
+              </TouchableOpacity>
 
-            <TouchableOpacity
-              className="flex-1 flex-row items-center justify-center bg-orange-50 rounded-full py-3 gap-2"
-              onPress={fetchCurrentLocation}
-              disabled={isTyping}
-            >
-              <FontAwesome5 name="location-arrow" size={14} color="#F5840E" />
-              <Text className="text-sm font-gilroy-medium text-orange-600">My Location</Text>
-            </TouchableOpacity>
-          </View>
+              <TouchableOpacity
+                className="flex-1 flex-row items-center justify-center bg-orange-50 rounded-full py-3 gap-2"
+                onPress={fetchCurrentLocation}
+                disabled={isTyping}
+              >
+                <FontAwesome5 name="location-arrow" size={14} color="#F5840E" />
+                <Text className="text-sm font-gilroy-medium text-orange-600">My Location</Text>
+              </TouchableOpacity>
+            </View>
+          )}
 
           {/* Text Input */}
           <View className="flex-row items-center bg-gray-100 rounded-full px-4 py-2">
             <TextInput
               className="flex-1 text-base font-gilroy-regular text-gray-900 py-2"
-              placeholder="Where do you want to go?"
+              placeholder={
+                chatMode === 'recommendation'
+                  ? 'Where do you want to go?'
+                  : 'Ask me anything about travel...'
+              }
               placeholderTextColor="#9CA3AF"
               value={inputText}
               onChangeText={setInputText}

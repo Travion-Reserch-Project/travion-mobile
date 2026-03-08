@@ -156,6 +156,24 @@ export interface ChatbotResponse {
   data: ChatbotResponseData;
 }
 
+// RAG Response Types (Agentic Mode)
+export interface RAGResponseData {
+  answer: string;
+  sources: Array<{
+    content: string;
+    metadata: any;
+    score: number;
+  }>;
+  confidence_score: number;
+  search_time_ms: number;
+  total_results: number;
+}
+
+export interface RAGResponse {
+  success: boolean;
+  data: RAGResponseData;
+}
+
 // Conversation/Trip Management Types
 export interface Conversation {
   conversation_id: string;
@@ -311,7 +329,7 @@ const chatService = {
     }
   },
 
-  // New endpoint - /chatbot/message
+  // Recommendation Mode - /chatbot/message (transport queries)
   async sendChatbotMessage(
     message: string,
     conversationId?: string,
@@ -354,6 +372,50 @@ const chatService = {
       console.error('Chatbot API Error:', error.message);
       const errorMessage =
         error.response?.data?.message || error.message || 'Failed to send message';
+      return {
+        success: false,
+        error: errorMessage,
+      };
+    }
+  },
+
+  // Agentic Mode - /chatbot/ask-rag (knowledge-based questions)
+  async askRAG(
+    question: string,
+    conversationId?: string,
+  ): Promise<RAGResponse | { success: false; error: string }> {
+    try {
+      const tokens = await AuthUtils.getStoredTokens();
+      const accessToken = tokens?.accessToken;
+
+      if (!accessToken) {
+        return {
+          success: false,
+          error: 'Not authenticated. Please log in.',
+        };
+      }
+
+      const payload: { message: string; conversation_id?: string } = { message: question };
+      if (conversationId) {
+        payload.conversation_id = conversationId;
+      }
+
+      const response = await axios.post<RAGResponse>(
+        `${CHAT_API_BASE_URL}/chatbot/ask-rag`,
+        payload,
+        {
+          timeout: 30000,
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${accessToken}`,
+          },
+        },
+      );
+      console.log('RAG API Response:', response.data);
+      return response.data;
+    } catch (error: any) {
+      console.error('RAG API Error:', error.message);
+      const errorMessage = error.response?.data?.message || error.message || 'Failed to get answer';
       return {
         success: false,
         error: errorMessage,
