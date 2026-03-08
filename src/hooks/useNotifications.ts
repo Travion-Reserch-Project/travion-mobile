@@ -1,11 +1,9 @@
 import { useEffect, useRef } from 'react';
-import { AppState, AppStateStatus } from 'react-native';
+import { Toast } from 'react-native-toast-notifications';
 import { NotificationService, NotificationPayload } from '@services/NotificationService';
 import { navigate } from '../navigation/navigationRef';
-import { getCurrentPosition } from '@utils';
 
 export const useNotifications = () => {
-  const appState = useRef(AppState.currentState);
   const isInitializedRef = useRef(false);
 
   /**
@@ -57,74 +55,40 @@ export const useNotifications = () => {
         await NotificationService.initialize((data, title, message) => {
           console.log('[useNotifications] Notification received:', { title, message, data });
 
+          // Show toast for foreground notifications
+          try {
+            const isUVAlert =
+              data.type === 'uv_health_alert' ||
+              data.riskLevel === 'high' ||
+              data.riskLevel === 'very high';
+            Toast.show(message, {
+              type: isUVAlert ? 'warning' : 'success',
+              placement: 'top',
+              duration: isUVAlert ? 6000 : 4000,
+              animationType: 'slide-in',
+            });
+          } catch (toastError) {
+            console.warn('[useNotifications] Failed to show toast:', toastError);
+          }
+
           // Handle deep linking if screen is specified
           if (data.screen) {
             handleNotificationNavigation(data);
           }
         });
 
-        // Get current location and register token
-        try {
-          const position = await getCurrentPosition({
-            timeout: 15000,
-            enableHighAccuracy: false,
-            maximumAge: 10000,
-            retryAttempts: 1,
-          });
-          const { latitude, longitude } = position;
-          const registered = await NotificationService.registerToken(latitude, longitude);
-          if (registered) {
-            console.log('[useNotifications] Token registered with location');
-          }
-        } catch (error) {
-          console.error('[useNotifications] Geolocation error:', error);
-        } finally {
-          // Still mark as initialized even if location fails
-          isInitializedRef.current = true;
-        }
+        isInitializedRef.current = true;
       } catch (error) {
         console.error('[useNotifications] Initialization error:', error);
         isInitializedRef.current = true;
       }
     };
 
-    // Update location when app comes to foreground
-    const handleAppStateChange = (nextAppState: AppStateStatus) => {
-      if (appState.current.match(/inactive|background/) && nextAppState === 'active') {
-        // App has come to the foreground
-        if (isInitializedRef.current) {
-          const updateLocationOnForeground = async () => {
-            try {
-              const position = await getCurrentPosition({
-                timeout: 15000,
-                enableHighAccuracy: false,
-                maximumAge: 10000,
-                retryAttempts: 1,
-              });
-              const { latitude, longitude } = position;
-              await NotificationService.updateLocation(latitude, longitude);
-              console.log('[useNotifications] Location updated on foreground');
-            } catch (error) {
-              console.error('[useNotifications] Location update error:', error);
-            }
-          };
-
-          updateLocationOnForeground();
-        }
-      }
-
-      appState.current = nextAppState;
-    };
-
     // Initialize on mount
     initializeNotifications();
 
-    // Subscribe to app state changes
-    const subscription = AppState.addEventListener('change', handleAppStateChange);
-
     // Cleanup on unmount
     return () => {
-      subscription.remove();
       NotificationService.cleanup();
     };
   }, []);

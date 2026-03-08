@@ -99,6 +99,7 @@ const requestMessagingPermission = async (): Promise<boolean> => {
 class NotificationServiceClass extends BaseApiService {
   private fcmToken: string | null = null;
   private isInitialized: boolean = false;
+  private isInitializing: boolean = false;
   private notificationCallback:
     | ((data: NotificationPayload, title: string, message: string) => void)
     | undefined;
@@ -190,10 +191,12 @@ class NotificationServiceClass extends BaseApiService {
   async initialize(
     onNotification?: (data: NotificationPayload, title: string, message: string) => void,
   ): Promise<void> {
-    if (this.isInitialized) {
-      console.log('[NotificationService] Already initialized');
+    if (this.isInitialized || this.isInitializing) {
+      console.log('[NotificationService] Already initialized or initializing');
       return;
     }
+
+    this.isInitializing = true;
 
     try {
       // Store the callback for later use
@@ -285,35 +288,10 @@ class NotificationServiceClass extends BaseApiService {
         }
       });
 
-      // Setup background message handler
-      setBackgroundMessageHandler(
-        messagingInstance,
-        async (remoteMessage: FirebaseMessagingTypes.RemoteMessage) => {
-          // Handle background messages
-          console.log('[NotificationService] Background message received');
-          const title = remoteMessage.notification?.title || 'New Message';
-          const message = remoteMessage.notification?.body || 'You have a new notification';
-
-          try {
-            await notifee.displayNotification({
-              title,
-              body: message,
-              android: {
-                channelId: 'default',
-                pressAction: {
-                  id: 'default',
-                },
-              },
-              ios: {
-                sound: 'default',
-              },
-            });
-          } catch (error) {
-            console.warn('[NotificationService] Failed to display background notification:', error);
-          }
-          return;
-        },
-      );
+      // NOTE: setBackgroundMessageHandler is intentionally NOT called here.
+      // It is registered once at module scope in index.js via registerBackgroundMessageHandler().
+      // Calling it again from within a component lifecycle causes double-registration issues
+      // with @react-native-firebase/messaging v23+.
 
       // Setup Notifee press handler (when user taps notification from notification center)
       const notifeeUnsubscribe = notifee.onForegroundEvent(async ({ type, detail }) => {
@@ -339,6 +317,7 @@ class NotificationServiceClass extends BaseApiService {
       ];
     } catch (error) {
       console.error('[NotificationService] Initialize error:', error);
+      this.isInitializing = false;
     }
   }
 

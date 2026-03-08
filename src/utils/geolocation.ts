@@ -1,6 +1,12 @@
 import Geolocation from '@react-native-community/geolocation';
 import { Platform, PermissionsAndroid } from 'react-native';
 
+// Configure to use Android LocationManager instead of FusedLocationProvider.
+// This avoids crashes in Play Services listener cleanup on certain devices/emulators.
+Geolocation.setRNConfiguration({
+  locationProvider: 'android',
+});
+
 export interface LocationCoords {
   latitude: number;
   longitude: number;

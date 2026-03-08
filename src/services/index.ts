@@ -7,11 +7,6 @@ export { locationService } from './api/LocationService';
 export { tourPlanService } from './api/TourPlanService';
 export { roadIssueService } from './api/RoadIssueService';
 export { initializeFirebaseMessaging, registerBackgroundMessageHandler } from './firebaseMessaging';
-export {
-  startBackgroundLocationService,
-  stopBackgroundLocationService,
-  isBackgroundLocationRunning,
-} from './BackgroundLocationService';
 export { NotificationService } from './NotificationService';
 export type { AuthTokens, User } from '@types';
 export type { SafetyAlert, SafetyPredictionResponse } from './api/SafetyService';
