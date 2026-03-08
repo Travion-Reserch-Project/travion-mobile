@@ -1,7 +1,7 @@
 import { MainStackParamList } from '@navigation/MainNavigator';
 import { useNavigation } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
   View,
   Text,
@@ -11,11 +11,15 @@ import {
   PermissionsAndroid,
   Platform,
   ActivityIndicator,
+  Dimensions,
 } from 'react-native';
+import Svg, { Circle } from 'react-native-svg';
 import FontAwesome5 from 'react-native-vector-icons/FontAwesome5';
+import MaterialCommunityIcons from 'react-native-vector-icons/MaterialCommunityIcons';
 import Geolocation from '@react-native-community/geolocation';
 import RNGeocoding from 'react-native-geocoding';
 import Config from 'react-native-config';
+import LinearGradient from 'react-native-linear-gradient';
 import { weatherService } from '../../services/api/WeatherService';
 
 // Initialize geocoding with API key
@@ -25,14 +29,50 @@ if (Config.GOOGLE_MAPS_API_KEY) {
 
 type NavigationProp = NativeStackNavigationProp<MainStackParamList>;
 
+// ── UV level color mapping ──────────────────────────────────
+const getUvColor = (uv: number): string => {
+  if (uv <= 2) return '#22C55E';   // green – Low
+  if (uv <= 5) return '#F59E0B';   // amber – Moderate
+  if (uv <= 7) return '#F97316';   // orange – High
+  if (uv <= 10) return '#EF4444';  // red – Very High
+  return '#7C3AED';                // purple – Extreme
+};
+
+const getUvGradient = (uv: number): string[] => {
+  if (uv <= 2) return ['#22C55E', '#16A34A'];
+  if (uv <= 5) return ['#FBBF24', '#F59E0B'];
+  if (uv <= 7) return ['#FB923C', '#F97316'];
+  if (uv <= 10) return ['#F87171', '#EF4444'];
+  return ['#A78BFA', '#7C3AED'];
+};
+
+const getUvBg = (uv: number): string => {
+  if (uv <= 2) return '#F0FDF4';
+  if (uv <= 5) return '#FFFBEB';
+  if (uv <= 7) return '#FFF7ED';
+  if (uv <= 10) return '#FEF2F2';
+  return '#F5F3FF';
+};
+
+const getAlertInfo = (uv: number) => {
+  if (uv <= 2) return { text: 'No Protection Needed', icon: 'shield-check', colors: ['#22C55E', '#16A34A'] };
+  if (uv <= 5) return { text: 'Protection Recommended', icon: 'shield-alert', colors: ['#FBBF24', '#F59E0B'] };
+  if (uv <= 7) return { text: 'Protection Required', icon: 'shield-alert', colors: ['#FB923C', '#EA580C'] };
+  if (uv <= 10) return { text: 'Extra Protection Needed', icon: 'alert-octagon', colors: ['#F87171', '#DC2626'] };
+  return { text: 'Avoid Sun Exposure!', icon: 'alert-decagram', colors: ['#A78BFA', '#7C3AED'] };
+};
+
 export const WeatherScreen: React.FC = () => {
   const navigation = useNavigation<NavigationProp>();
 
   const [loading, setLoading] = useState(true);
   const [locationName, setLocationName] = useState('Detecting location...');
+  const [locationCity, setLocationCity] = useState('');
+  const [locationCountry, setLocationCountry] = useState('');
   const [uvIndex, setUvIndex] = useState<number | string>('--');
   const [uvLevel, setUvLevel] = useState('Loading...');
   const [weatherData, setWeatherData] = useState<any>(null);
+  const [currentTime, setCurrentTime] = useState(new Date());
 
   // Track whether the component is still mounted to prevent state updates after unmount
   const isMountedRef = useRef(true);
@@ -40,22 +80,43 @@ export const WeatherScreen: React.FC = () => {
   // Default fallback coordinates (Colombo, Sri Lanka)
   const DEFAULT_COORDS = { latitude: 6.9271, longitude: 79.8612 };
 
+  // ── Live clock tick ───────────────────────────────────────
+  useEffect(() => {
+    const timer = setInterval(() => {
+      if (isMountedRef.current) setCurrentTime(new Date());
+    }, 1000);
+    return () => clearInterval(timer);
+  }, []);
+
   // Helper: fetch location name via reverse geocoding
   const resolveLocationName = async (latitude: number, longitude: number) => {
     try {
       const results = await RNGeocoding.from(latitude, longitude);
       if (results && results.results && results.results.length > 0) {
         const address = results.results[0];
-        const parts = address.formatted_address.split(',').map((p: string) => p.trim());
-        if (parts.length >= 2) {
-          setLocationName(`${parts[parts.length - 3]}, ${parts[parts.length - 1]}`);
-        } else {
-          setLocationName(address.formatted_address);
+        const components = address.address_components || [];
+
+        let city = '';
+        let country = '';
+        let area = '';
+
+        for (const comp of components) {
+          const types = comp.types || [];
+          if (types.includes('locality')) city = comp.long_name;
+          else if (types.includes('administrative_area_level_1') && !city) area = comp.long_name;
+          if (types.includes('country')) country = comp.long_name;
         }
+
+        const displayCity = city || area || 'Unknown';
+        setLocationCity(displayCity);
+        setLocationCountry(country);
+        setLocationName(`${displayCity}, ${country}`);
       }
     } catch (err) {
       console.error('Reverse geocoding error:', err);
       setLocationName('Unknown Location');
+      setLocationCity('Unknown');
+      setLocationCountry('');
     }
   };
 
@@ -200,7 +261,7 @@ export const WeatherScreen: React.FC = () => {
     return () => {
       isMountedRef.current = false;
     };
-  });
+  }, []);
 
   // Helper to format conditions from data
   const getConditionValue = (type: string, defaultValue: string) => {
@@ -209,12 +270,12 @@ export const WeatherScreen: React.FC = () => {
     switch (type) {
       case 'temp':
         return weatherData.temperature
-          ? `${weatherData.temperature?.degrees}°C`
+          ? `${weatherData.temperature?.degrees}`
           : weatherData.temp_c
-          ? `${weatherData.temp_c}°C`
+          ? `${weatherData.temp_c}`
           : defaultValue;
       case 'humidity':
-        return weatherData.relativeHumidity ? `${weatherData.relativeHumidity}%` : defaultValue;
+        return weatherData.relativeHumidity ? `${weatherData.relativeHumidity}` : defaultValue;
       case 'sky':
         return weatherData.cloudCover
           ? weatherData.cloudCover > 60
@@ -223,123 +284,270 @@ export const WeatherScreen: React.FC = () => {
             ? 'Partly Cloudy'
             : 'Clear Sky'
           : defaultValue;
-      case 'time':
-        return new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
       default:
         return defaultValue;
     }
   };
 
+  // ── UV ring dimensions ────────────────────────────────────
+  const screenWidth = Dimensions.get('window').width;
+  const ringSize = screenWidth * 0.55;
+  const strokeWidth = 14;
+  const radius = (ringSize - strokeWidth) / 2;
+  const circumference = 2 * Math.PI * radius;
+  const uvNum = typeof uvIndex === 'number' ? uvIndex : 0;
+  const progress = Math.min(uvNum / 12, 1);
+  const strokeDashoffset = circumference * (1 - progress);
+  const uvColor = getUvColor(uvNum);
+  const alertInfo = getAlertInfo(uvNum);
+
+  // ── Time formatting ───────────────────────────────────────
+  const hours = currentTime.getHours();
+  const minutes = currentTime.getMinutes();
+  const seconds = currentTime.getSeconds();
+  const ampm = hours >= 12 ? 'PM' : 'AM';
+  const displayHour = hours % 12 || 12;
+  const pad = (n: number) => n.toString().padStart(2, '0');
+
+  // ── Sky condition icon ────────────────────────────────────
+  const skyCondition = getConditionValue('sky', 'Clear Sky');
+  const getSkyIcon = () => {
+    if (hours >= 19 || hours < 6) return 'weather-night';
+    switch (skyCondition) {
+      case 'Cloudy': return 'weather-cloudy';
+      case 'Partly Cloudy': return 'weather-partly-cloudy';
+      default: return 'weather-sunny';
+    }
+  };
+
   if (loading && !weatherData) {
     return (
-      <View className="flex-1 bg-gray-50 items-center justify-center">
-        <ActivityIndicator size="large" color="#2563EB" />
-        <Text className="mt-4 text-gray-500 font-semibold">Updating weather data...</Text>
+      <View className="flex-1 bg-white items-center justify-center">
+        <View className="items-center">
+          <ActivityIndicator size="large" color="#F5840E" />
+          <Text className="mt-4 text-gray-500 font-gilroy-medium text-base">
+            Fetching weather data...
+          </Text>
+        </View>
       </View>
     );
   }
 
+  const tempValue = getConditionValue('temp', '32');
+  const humidityValue = getConditionValue('humidity', '78');
+
   return (
     <View className="flex-1 bg-gray-50">
-      <StatusBar barStyle="dark-content" backgroundColor="#F9FAFB" />
+      <StatusBar barStyle="dark-content" backgroundColor="#FFFFFF" />
 
-      {/* 🔽 Scroll starts here */}
       <ScrollView
         showsVerticalScrollIndicator={false}
-        contentContainerStyle={{ paddingBottom: 40 }}
+        contentContainerStyle={{ paddingBottom: 100 }}
       >
-        <View className="bg-white px-6 py-4 border-b border-gray-200">
-          <Text className="text-2xl font-gilroy-bold text-gray-900">Weather</Text>
+        {/* ── Header with location ─────────────────────────── */}
+        <View className="bg-white px-5 pt-4 pb-2">
+          <View className="flex-row items-center justify-between">
+            <View className="flex-1">
+              <Text className="text-xs font-gilroy-medium text-gray-400 uppercase tracking-wider">
+                Current Location
+              </Text>
+              <View className="flex-row items-center mt-1">
+                <MaterialCommunityIcons name="map-marker" size={20} color="#F5840E" />
+                <Text className="text-lg font-gilroy-bold text-gray-900 ml-1" numberOfLines={1}>
+                  {locationCity || 'Detecting...'}
+                </Text>
+              </View>
+              {locationCountry ? (
+                <Text className="text-sm font-gilroy-regular text-gray-400 ml-6">
+                  {locationCountry}
+                </Text>
+              ) : null}
+            </View>
+            <TouchableOpacity
+              className="bg-gray-100 w-10 h-10 rounded-full items-center justify-center"
+              onPress={() => navigation.navigate('HealthProfileLanding')}
+            >
+              <FontAwesome5 name="user-shield" size={16} color="#F5840E" />
+            </TouchableOpacity>
+          </View>
+        </View>
 
-          {/* Location */}
-          <Text className="text-primary text-sm font-semibold mb-1">AUTO-DETECTED</Text>
-          <Text className="text-3xl font-bold text-gray-900 mb-6">{locationName}</Text>
+        {/* ── UV Index Ring Section ────────────────────────── */}
+        <View className="bg-white mx-4 mt-3 rounded-3xl px-5 py-6 items-center"
+          style={{ elevation: 2, shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.05, shadowRadius: 8 }}>
 
-          {/* UV Ring */}
-          <View className="items-center justify-center mb-6">
-            <View className="w-64 h-64 rounded-full border-[16px] border-gray-200 items-center justify-center">
-              {/* Fake progress overlay */}
-              <View
-                className="absolute w-64 h-64 rounded-full border-[16px] border-primary"
-                style={{
-                  // Simple logic to show partial border based on UV index (max 12 for extreme)
-                  transform: [{ rotate: '-90deg' }],
-                  borderRightColor: Number(uvIndex) > 0 ? '#2563EB' : 'transparent',
-                  borderTopColor: Number(uvIndex) > 3 ? '#2563EB' : 'transparent',
-                  borderLeftColor: Number(uvIndex) > 6 ? '#2563EB' : 'transparent',
-                  borderBottomColor: Number(uvIndex) > 9 ? '#2563EB' : 'transparent',
-                }}
+          <View style={{ width: ringSize, height: ringSize }} className="items-center justify-center">
+            {/* Background ring */}
+            <Svg width={ringSize} height={ringSize} style={{ position: 'absolute' }}>
+              <Circle
+                cx={ringSize / 2}
+                cy={ringSize / 2}
+                r={radius}
+                stroke="#F3F4F6"
+                strokeWidth={strokeWidth}
+                fill="none"
               />
+              <Circle
+                cx={ringSize / 2}
+                cy={ringSize / 2}
+                r={radius}
+                stroke={uvColor}
+                strokeWidth={strokeWidth}
+                fill="none"
+                strokeDasharray={`${circumference}`}
+                strokeDashoffset={strokeDashoffset}
+                strokeLinecap="round"
+                rotation="-90"
+                origin={`${ringSize / 2}, ${ringSize / 2}`}
+              />
+            </Svg>
 
-              <View className="items-center">
-                <Text className="text-5xl font-bold text-gray-900">{uvIndex}</Text>
-                <Text className="text-sm text-gray-500">UV INDEX</Text>
-                <Text className="text-primary font-semibold mt-1">{uvLevel}</Text>
+            {/* Center content */}
+            <View className="items-center">
+              <Text style={{ fontSize: 48, color: uvColor }} className="font-gilroy-bold">
+                {uvIndex}
+              </Text>
+              <Text className="text-xs font-gilroy-medium text-gray-400 tracking-widest">
+                UV INDEX
+              </Text>
+              <View
+                style={{ backgroundColor: getUvBg(uvNum), borderColor: uvColor, borderWidth: 1 }}
+                className="mt-2 px-4 py-1 rounded-full"
+              >
+                <Text style={{ color: uvColor }} className="text-sm font-gilroy-bold">
+                  {uvLevel}
+                </Text>
               </View>
             </View>
           </View>
 
-          {/* Alert */}
-          {Number(uvIndex) >= 3 && (
-            <View className="bg-orange-100 px-6 py-2 rounded-full self-center mb-6 flex-row items-center">
-              <FontAwesome5 name="exclamation-triangle" size={14} color="#EA580C" />
-              <Text className="text-orange-600 font-semibold ml-2">Protection Required</Text>
+          {/* Alert Banner */}
+          <LinearGradient
+            colors={alertInfo.colors}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 0 }}
+            className="mt-5 w-full rounded-2xl px-5 py-3 flex-row items-center"
+          >
+            <MaterialCommunityIcons name={alertInfo.icon} size={22} color="#FFFFFF" />
+            <Text className="text-white font-gilroy-bold text-sm ml-3 flex-1">
+              {alertInfo.text}
+            </Text>
+            <MaterialCommunityIcons name="chevron-right" size={20} color="#FFFFFF" />
+          </LinearGradient>
+        </View>
+
+        {/* ── Current Conditions ───────────────────────────── */}
+        <View className="px-4 mt-5">
+          <View className="flex-row items-center justify-between mb-3">
+            <Text className="text-base font-gilroy-bold text-gray-800">Current Conditions</Text>
+            <View className="flex-row items-center">
+              <View className="w-2 h-2 rounded-full bg-success mr-2" />
+              <Text className="text-xs font-gilroy-medium text-gray-400">Live</Text>
             </View>
-          )}
-
-          {/* Conditions Header */}
-          <View className="flex-row justify-between mb-4">
-            <Text className="text-base font-semibold text-gray-900">Current Conditions</Text>
-            <Text className="text-sm text-gray-400">Updated just now</Text>
           </View>
 
-          {/* Conditions Grid */}
-          <View className="flex-row flex-wrap justify-between">
-            <ConditionCard
-              icon="temperature-high"
-              title="Temperature"
-              value={getConditionValue('temp', '32°C')}
-            />
-            <ConditionCard
-              icon="tint"
-              title="Humidity"
-              value={getConditionValue('humidity', '78%')}
-            />
-            <ConditionCard
-              icon="cloud-sun"
-              title="Sky Condition"
-              value={getConditionValue('sky', 'Clear Sky')}
-            />
-            <ConditionCard
-              icon="clock"
-              title="Local Time"
-              value={getConditionValue('time', '14:30')}
-            />
+          {/* ── Top row: Temp & Humidity ── */}
+          <View className="flex-row mb-3">
+            {/* Temperature Card */}
+            <View className="flex-1 bg-white rounded-2xl p-4 mr-2"
+              style={{ elevation: 1, shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.03, shadowRadius: 4 }}>
+              <View className="flex-row items-center justify-between">
+                <View className="bg-blue-50 w-10 h-10 rounded-xl items-center justify-center"
+                  style={{ backgroundColor: '#EFF6FF' }}>
+                  <MaterialCommunityIcons name="thermometer" size={22} color="#3B82F6" />
+                </View>
+                <Text className="text-xs font-gilroy-medium text-gray-400">TEMP</Text>
+              </View>
+              <Text className="text-3xl font-gilroy-bold text-gray-900 mt-3">
+                {tempValue}
+                <Text className="text-lg text-gray-400">°C</Text>
+              </Text>
+              <Text className="text-xs font-gilroy-regular text-gray-400 mt-1">Temperature</Text>
+            </View>
+
+            {/* Humidity Card */}
+            <View className="flex-1 bg-white rounded-2xl p-4 ml-2"
+              style={{ elevation: 1, shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.03, shadowRadius: 4 }}>
+              <View className="flex-row items-center justify-between">
+                <View className="w-10 h-10 rounded-xl items-center justify-center"
+                  style={{ backgroundColor: '#F0F9FF' }}>
+                  <MaterialCommunityIcons name="water-percent" size={22} color="#0EA5E9" />
+                </View>
+                <Text className="text-xs font-gilroy-medium text-gray-400">HUM</Text>
+              </View>
+              <Text className="text-3xl font-gilroy-bold text-gray-900 mt-3">
+                {humidityValue}
+                <Text className="text-lg text-gray-400">%</Text>
+              </Text>
+              <Text className="text-xs font-gilroy-regular text-gray-400 mt-1">Humidity</Text>
+            </View>
           </View>
 
-          {/* CTA */}
+          {/* ── Bottom row: Sky & Clock ── */}
+          <View className="flex-row">
+            {/* Sky Condition Card */}
+            <View className="flex-1 bg-white rounded-2xl p-4 mr-2"
+              style={{ elevation: 1, shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.03, shadowRadius: 4 }}>
+              <View className="flex-row items-center justify-between">
+                <View className="w-10 h-10 rounded-xl items-center justify-center"
+                  style={{ backgroundColor: '#FFF7ED' }}>
+                  <MaterialCommunityIcons name={getSkyIcon()} size={22} color="#F97316" />
+                </View>
+                <Text className="text-xs font-gilroy-medium text-gray-400">SKY</Text>
+              </View>
+              <Text className="text-lg font-gilroy-bold text-gray-900 mt-3" numberOfLines={1}>
+                {skyCondition}
+              </Text>
+              <Text className="text-xs font-gilroy-regular text-gray-400 mt-1">Condition</Text>
+            </View>
+
+            {/* Clock Card */}
+            <View className="flex-1 bg-white rounded-2xl p-4 ml-2"
+              style={{ elevation: 1, shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.03, shadowRadius: 4 }}>
+              <View className="flex-row items-center justify-between">
+                <View className="w-10 h-10 rounded-xl items-center justify-center"
+                  style={{ backgroundColor: '#F5F3FF' }}>
+                  <MaterialCommunityIcons name="clock-outline" size={22} color="#7C3AED" />
+                </View>
+                <Text className="text-xs font-gilroy-medium text-gray-400">LOCAL</Text>
+              </View>
+              <View className="flex-row items-baseline mt-3">
+                <Text className="text-2xl font-gilroy-bold text-gray-900">
+                  {pad(displayHour)}:{pad(minutes)}
+                </Text>
+                <Text className="text-xs font-gilroy-bold text-gray-400 ml-1">
+                  :{pad(seconds)}
+                </Text>
+                <Text className="text-xs font-gilroy-bold ml-1" style={{ color: '#7C3AED' }}>
+                  {ampm}
+                </Text>
+              </View>
+              <Text className="text-xs font-gilroy-regular text-gray-400 mt-1">Local Time</Text>
+            </View>
+          </View>
+        </View>
+
+        {/* ── CTA Button ───────────────────────────────────── */}
+        <View className="px-4 mt-6">
           <TouchableOpacity
-            className="bg-primary py-4 rounded-full items-center mt-6"
+            activeOpacity={0.85}
             onPress={() => navigation.navigate('SunProtection')}
           >
-            <Text className="text-white text-lg font-bold">Check Risk</Text>
+            <LinearGradient
+              colors={['#F5840E', '#E06D00']}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 0 }}
+              className="py-4 rounded-2xl items-center flex-row justify-center"
+              style={{ elevation: 4, shadowColor: '#F5840E', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.3, shadowRadius: 8 }}
+            >
+              <MaterialCommunityIcons name="shield-sun" size={20} color="#FFFFFF" />
+              <Text className="text-white text-base font-gilroy-bold ml-2">
+                Check Sun Risk & Protection
+              </Text>
+            </LinearGradient>
           </TouchableOpacity>
         </View>
       </ScrollView>
-      {/* 🔼 Scroll ends here */}
-    </View>
-  );
-};
-
-/**
- * Reusable condition card
- */
-const ConditionCard = ({ title, value, icon }: { title: string; value: string; icon: string }) => {
-  return (
-    <View className="w-[48%] bg-gray-50 p-5 rounded-2xl mb-4">
-      <FontAwesome5 name={icon} size={18} color="#2563EB" />
-      <Text className="text-xl font-bold text-gray-900 mt-2">{value}</Text>
-      <Text className="text-sm text-gray-500 mt-1">{title}</Text>
     </View>
   );
 };
