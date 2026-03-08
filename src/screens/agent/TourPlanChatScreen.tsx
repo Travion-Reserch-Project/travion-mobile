@@ -19,13 +19,15 @@ import {
   Dimensions,
   Animated,
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Ionicons from 'react-native-vector-icons/Ionicons';
 import MaterialCommunityIcons from 'react-native-vector-icons/MaterialCommunityIcons';
 import FontAwesome5 from 'react-native-vector-icons/FontAwesome5';
 import LinearGradient from 'react-native-linear-gradient';
 import Markdown from 'react-native-markdown-display';
-import { TourPlanCard } from '../../components/chat/TourPlanCard';
+import SelectionPrompt from '../../components/chat/SelectionPrompt';
+import TimelineItinerary from '../../components/chat/TimelineItinerary';
+import { useInterruptResume } from '../../hooks/useInterruptResume';
 import { ApiError } from '../../services/api/client';
 import {
   tourPlanService,
@@ -38,6 +40,8 @@ import {
   type EventInfo,
   type FinalItinerary,
   type HotelSearchResult,
+  type SelectionCard,
+  type WeatherPromptOption,
 } from '../../services/api';
 
 const { width } = Dimensions.get('window');
@@ -89,7 +93,7 @@ interface TourPlanChatScreenProps {
 
 interface ChatMessage {
   id: string;
-  role: 'user' | 'assistant' | 'plan' | 'clarification' | 'event' | 'weather_alert' | 'hotel_results';
+  role: 'user' | 'assistant' | 'plan' | 'clarification' | 'event' | 'weather_alert' | 'hotel_results' | 'selection_cards' | 'weather_decision';
   content: string;
   timestamp: Date;
   planData?: {
@@ -105,6 +109,11 @@ interface ChatMessage {
   events?: EventInfo[];
   interruptReason?: string;
   hotelResults?: HotelSearchResult[];
+  // HITL selection & weather interrupt data
+  selectionCards?: SelectionCard[];
+  weatherPromptMessage?: string;
+  weatherPromptOptions?: WeatherPromptOption[];
+  threadId?: string;
 }
 
 // Format timestamp like WhatsApp (HH:MM)
@@ -288,7 +297,7 @@ const HotelSearchCard: React.FC<{ message: ChatMessage }> = ({ message }) => {
           <MaterialCommunityIcons name="magnify" size={16} color={THEME.primary} />
           <Text style={styles.hotelSearchTitle}>
             {message.hotelResults[0]?.type === 'restaurant' ? 'Restaurants' :
-             message.hotelResults[0]?.type === 'bar' ? 'Nightlife' : 'Hotels'} Found
+              message.hotelResults[0]?.type === 'bar' ? 'Nightlife' : 'Hotels'} Found
           </Text>
         </View>
         {message.hotelResults.map((result, index) => (
@@ -389,10 +398,7 @@ const ClarificationBubble: React.FC<{
 // WhatsApp-style message bubble
 const MessageBubble: React.FC<{
   message: ChatMessage;
-  onAcceptPlan: () => void;
-  onModifyPlan: () => void;
-  isAccepting: boolean;
-}> = ({ message, onAcceptPlan, onModifyPlan, isAccepting }) => {
+}> = ({ message }) => {
   const isUser = message.role === 'user';
   const isPlan = message.role === 'plan';
   const fadeAnim = useRef(new Animated.Value(0)).current;
@@ -428,18 +434,15 @@ const MessageBubble: React.FC<{
   if (isPlan && message.planData) {
     return (
       <Animated.View style={[styles.planBubbleContainer, { opacity: fadeAnim }]}>
-        <TourPlanCard
-          itinerary={message.planData.itinerary}
-          metadata={message.planData.metadata}
-          warnings={message.planData.warnings}
-          tips={message.planData.tips}
-          culturalTips={message.planData.culturalTips}
-          finalItinerary={message.planData.finalItinerary}
-          weatherData={message.planData.weatherData}
-          onAccept={onAcceptPlan}
-          onModify={onModifyPlan}
-          isLoading={isAccepting}
-        />
+        {/* Minimalist timeline itinerary */}
+        {message.planData.finalItinerary ? (
+          <TimelineItinerary itinerary={message.planData.finalItinerary} />
+        ) : (
+          /* Fallback: show plan summary as markdown when finalItinerary is missing */
+          <View style={styles.assistantBubble}>
+            <Markdown style={markdownStyles}>{message.content}</Markdown>
+          </View>
+        )}
       </Animated.View>
     );
   }
@@ -526,9 +529,24 @@ export const TourPlanChatScreen: React.FC<TourPlanChatScreenProps> = ({ route, n
   const [threadId, setThreadId] = useState<string | null>(null);
   const [currentPlan, setCurrentPlan] = useState<TourPlanResponse | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [pendingSelection, setPendingSelection] = useState<{
+    cards: SelectionCard[];
+    promptText?: string;
+  } | null>(null);
 
   const scrollViewRef = useRef<ScrollView>(null);
   const inputRef = useRef<TextInput>(null);
+  const insets = useSafeAreaInsets();
+
+  // HITL interrupt/resume hook
+  const {
+    interruptState,
+    isResuming,
+    detectInterrupt,
+    clearInterrupt,
+    resumeSelection,
+    resumeWeather,
+  } = useInterruptResume(threadId);
 
   // Initial plan generation - runs once on mount
   useEffect(() => {
@@ -571,10 +589,10 @@ export const TourPlanChatScreen: React.FC<TourPlanChatScreenProps> = ({ route, n
       const alertText = response.interruptReason.includes('rain')
         ? 'Heavy rain is predicted for some locations. The AI has flagged this for your review.'
         : response.interruptReason.includes('heat')
-        ? 'Extreme heat conditions detected. Consider adjusting outdoor activities.'
-        : response.interruptReason.includes('poya')
-        ? 'A Poya day falls within your trip dates. Some restrictions may apply.'
-        : 'A weather or safety constraint has been detected for your trip.';
+          ? 'Extreme heat conditions detected. Consider adjusting outdoor activities.'
+          : response.interruptReason.includes('poya')
+            ? 'A Poya day falls within your trip dates. Some restrictions may apply.'
+            : 'A weather or safety constraint has been detected for your trip.';
 
       newMessages.push({
         id: (Date.now() + 0.5).toString(),
@@ -593,6 +611,41 @@ export const TourPlanChatScreen: React.FC<TourPlanChatScreenProps> = ({ route, n
         content: response.clarificationQuestion.question,
         timestamp: new Date(),
         clarificationData: response.clarificationQuestion,
+      });
+    } else if (response.pendingUserSelection && response.selectionCards && response.selectionCards.length > 0) {
+      // HITL: Agent paused for selection — show only bottom panel, no chat bubble
+      setPendingSelection({
+        cards: response.selectionCards,
+        promptText: response.promptText,
+      });
+    } else if (response.weatherInterrupt && response.weatherPromptOptions && response.weatherPromptOptions.length > 0) {
+      // HITL: Agent paused for weather decision — show as selection prompt
+      const weatherCards: SelectionCard[] = response.weatherPromptOptions.map((opt) => ({
+        card_id: `weather_${opt.id}`,
+        title: opt.label,
+        subtitle: opt.description || '',
+        badge: opt.id === 'switch_indoor' ? 'Recommended' : undefined,
+        image_url: undefined,
+        rating: undefined,
+        price_range: undefined,
+        description: opt.description || '',
+        tags: [],
+        distance_km: undefined,
+        vibe_match_score: undefined,
+      }));
+      // Show weather alert as a chat bubble first
+      if (response.weatherPromptMessage) {
+        newMessages.push({
+          id: (Date.now() + 1.5).toString(),
+          role: 'weather_alert',
+          content: response.weatherPromptMessage,
+          timestamp: new Date(),
+          interruptReason: response.interruptReason,
+        });
+      }
+      setPendingSelection({
+        cards: weatherCards,
+        promptText: 'How to handle the weather?',
       });
     } else if (response.itinerary && response.itinerary.length > 0) {
       // Add plan message
@@ -631,12 +684,11 @@ export const TourPlanChatScreen: React.FC<TourPlanChatScreenProps> = ({ route, n
     const welcomeMessage: ChatMessage = {
       id: Date.now().toString(),
       role: 'assistant',
-      content: `Creating your personalized tour plan for **${
-        selectedLocations.length
-      } locations** (${formatDateRange(
-        startDate,
-        endDate,
-      )}).\n\nOptimizing for golden hour, crowd levels, and local events...`,
+      content: `Creating your personalized tour plan for **${selectedLocations.length
+        } locations** (${formatDateRange(
+          startDate,
+          endDate,
+        )}).\n\nOptimizing for golden hour, crowd levels, and local events...`,
       timestamp: new Date(),
     };
     setMessages([welcomeMessage]);
@@ -886,6 +938,111 @@ export const TourPlanChatScreen: React.FC<TourPlanChatScreenProps> = ({ route, n
     [isSending, selectedLocations],
   );
 
+  // HITL: Handle user selecting a hotel/restaurant card
+  const handleSelectionChoice = useCallback(
+    async (cardId: string) => {
+      if (!threadId || isSending) return;
+      setIsSending(true);
+
+      // Clear the pending selection from the bottom bar
+      setPendingSelection(null);
+
+      // Weather cards (weather_switch_indoor, weather_reschedule, weather_keep)
+      if (cardId.startsWith('weather_')) {
+        const weatherChoice = cardId.replace('weather_', '');
+        const weatherLabels: Record<string, string> = {
+          switch_indoor: 'Switch to indoor alternatives',
+          reschedule: 'Reschedule affected activities',
+          keep: 'Keep the original plan',
+        };
+        const userMessage: ChatMessage = {
+          id: Date.now().toString(),
+          role: 'user',
+          content: weatherLabels[weatherChoice] || weatherChoice,
+          timestamp: new Date(),
+        };
+        setMessages(prev => [...prev, userMessage]);
+
+        try {
+          const response = await tourPlanService.resumeWeather({
+            threadId,
+            userWeatherChoice: weatherChoice,
+          });
+          setThreadId(response.threadId);
+          handleApiResponse(response);
+        } catch (err: any) {
+          console.error('Weather resume failed:', err);
+          setMessages(prev => [
+            ...prev,
+            {
+              id: (Date.now() + 1).toString(),
+              role: 'assistant',
+              content: `Couldn't process your weather choice. Please try again.`,
+              timestamp: new Date(),
+            },
+          ]);
+        } finally {
+          setIsSending(false);
+        }
+        return;
+      }
+
+      // Map known card IDs to friendly labels
+      const knownLabels: Record<string, string> = {
+        pref_dining: '🍽️ Dining Only',
+        pref_accommodation: '🏨 Stays Only',
+        pref_both: '🍽️🏨 Both — Restaurants & Accommodations',
+        pref_none: '⏩ Activities Only',
+        budget_low: '💰 Budget Friendly',
+        budget_medium: '💎 Mid-Range',
+        budget_high: '👑 Premium',
+        __SKIP__: 'Skipped this step',
+      };
+      const selectionLabel = knownLabels[cardId] || `Selected: ${cardId}`;
+
+      // Show user's selection as a message
+      const userMessage: ChatMessage = {
+        id: Date.now().toString(),
+        role: 'user',
+        content: selectionLabel,
+        timestamp: new Date(),
+      };
+      setMessages(prev => [...prev, userMessage]);
+
+      try {
+        const response = await tourPlanService.resumeSelection({
+          threadId,
+          selectedCandidateId: cardId,
+        });
+
+        setThreadId(response.threadId);
+        handleApiResponse(response);
+      } catch (err: any) {
+        console.error('Selection resume failed:', err);
+        setMessages(prev => [
+          ...prev,
+          {
+            id: (Date.now() + 1).toString(),
+            role: 'assistant',
+            content: `Couldn't process your selection. Please try again.`,
+            timestamp: new Date(),
+          },
+        ]);
+      } finally {
+        setIsSending(false);
+      }
+    },
+    [threadId, isSending],
+  );
+
+  // HITL: Handle user skipping restaurant selection
+  const handleSkipSelection = useCallback(async () => {
+    if (!threadId || isSending) return;
+    // Use a sentinel ID that the backend recognises as "skip"
+    handleSelectionChoice('__SKIP__');
+  }, [threadId, isSending, handleSelectionChoice]);
+
+  // HITL: Handle user's weather decision
   const quickReplies = [
     { text: 'More photo time', icon: 'camera' },
     { text: 'Avoid crowds', icon: 'users' },
@@ -905,13 +1062,13 @@ export const TourPlanChatScreen: React.FC<TourPlanChatScreenProps> = ({ route, n
   const moreCount = selectedLocations.length > 2 ? ` +${selectedLocations.length - 2}` : '';
 
   return (
-    <SafeAreaView style={styles.container} edges={['top']}>
+    <View style={styles.container}>
       <StatusBar barStyle="light-content" backgroundColor={THEME.primary} />
 
-      {/* WhatsApp-style Header */}
+      {/* WhatsApp-style Header — extends behind safe area */}
       <LinearGradient
         colors={[THEME.primary, THEME.primaryDark]}
-        style={styles.header}
+        style={[styles.header, { marginTop: -insets.top, paddingTop: insets.top + 8 }]}
         start={{ x: 0, y: 0 }}
         end={{ x: 1, y: 0 }}
       >
@@ -923,16 +1080,18 @@ export const TourPlanChatScreen: React.FC<TourPlanChatScreenProps> = ({ route, n
           <Ionicons name="arrow-back" size={22} color={THEME.white} />
         </TouchableOpacity>
 
-        {/* AI Avatar in header */}
+        {/* AI Avatar with online dot */}
         <View style={styles.headerAvatar}>
           <MaterialCommunityIcons name="robot-happy-outline" size={20} color={THEME.white} />
+          <View style={styles.onlineDot} />
         </View>
 
         <View style={styles.headerTextContainer}>
           <Text style={styles.headerTitle}>Tour Planner AI</Text>
           <Text style={styles.headerSubtitle} numberOfLines={1}>
-            {locationNames}
-            {moreCount} {'\u00B7'} {formatDateRange(startDate, endDate)}
+            {isLoading || isSending
+              ? 'typing...'
+              : `${locationNames}${moreCount} \u00B7 ${formatDateRange(startDate, endDate)}`}
           </Text>
         </View>
 
@@ -982,9 +1141,6 @@ export const TourPlanChatScreen: React.FC<TourPlanChatScreenProps> = ({ route, n
               <MessageBubble
                 key={message.id}
                 message={message}
-                onAcceptPlan={handleAcceptPlan}
-                onModifyPlan={handleModifyPlan}
-                isAccepting={isAccepting}
               />
             );
           })}
@@ -1013,49 +1169,62 @@ export const TourPlanChatScreen: React.FC<TourPlanChatScreenProps> = ({ route, n
           </View>
         )}
 
-        {/* Input Area */}
-        <View style={styles.inputContainer}>
-          <View style={styles.inputWrapper}>
-            <TextInput
-              ref={inputRef}
-              style={styles.textInput}
-              placeholder="Type a message..."
-              placeholderTextColor={THEME.gray[400]}
-              value={inputText}
-              onChangeText={setInputText}
-              multiline
-              maxLength={500}
-              editable={!isSending && !isLoading && !!threadId}
-              onSubmitEditing={handleSend}
-              blurOnSubmit={false}
-            />
-          </View>
-          <TouchableOpacity
-            style={[
-              styles.sendButton,
-              (!inputText.trim() || isSending || isLoading || !threadId) &&
+        {/* Input Area — swap for SelectionPrompt when pending */}
+        {pendingSelection && pendingSelection.cards.length > 0 ? (
+          <SelectionPrompt
+            cards={pendingSelection.cards}
+            promptText={pendingSelection.promptText || 'Pick one'}
+            onSelect={handleSelectionChoice}
+            onSkip={handleSkipSelection}
+            onCustomResponse={(text) => handleSelectionChoice(text)}
+            disabled={isSending}
+            loading={isSending}
+          />
+        ) : (
+          <View style={styles.inputContainer}>
+            <View style={styles.inputWrapper}>
+              <TextInput
+                ref={inputRef}
+                style={styles.textInput}
+                placeholder="Type a message..."
+                placeholderTextColor={THEME.gray[400]}
+                value={inputText}
+                onChangeText={setInputText}
+                multiline
+                maxLength={500}
+                editable={!isSending && !isLoading && !!threadId}
+                onSubmitEditing={handleSend}
+                blurOnSubmit={false}
+              />
+            </View>
+            <TouchableOpacity
+              style={[
+                styles.sendButton,
+                (!inputText.trim() || isSending || isLoading || !threadId) &&
                 styles.sendButtonDisabled,
-            ]}
-            onPress={handleSend}
-            disabled={!inputText.trim() || isSending || isLoading || !threadId}
-            activeOpacity={0.7}
-          >
-            {isSending ? (
-              <ActivityIndicator size="small" color={THEME.white} />
-            ) : (
-              <Ionicons name="send" size={18} color={THEME.white} />
-            )}
-          </TouchableOpacity>
-        </View>
+              ]}
+              onPress={handleSend}
+              disabled={!inputText.trim() || isSending || isLoading || !threadId}
+              activeOpacity={0.7}
+            >
+              {isSending ? (
+                <ActivityIndicator size="small" color={THEME.white} />
+              ) : (
+                <Ionicons name="send" size={18} color={THEME.white} />
+              )}
+            </TouchableOpacity>
+          </View>
+        )}
       </KeyboardAvoidingView>
-    </SafeAreaView>
+    </View>
   );
 };
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: THEME.chatBg,
+    backgroundColor: THEME.primary,
+    overflow: 'visible',
   },
 
   // Header (WhatsApp style)
@@ -1079,6 +1248,17 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     marginLeft: 4,
+  },
+  onlineDot: {
+    position: 'absolute',
+    bottom: 1,
+    right: 1,
+    width: 10,
+    height: 10,
+    borderRadius: 5,
+    backgroundColor: '#4ADE80',
+    borderWidth: 2,
+    borderColor: THEME.primary,
   },
   headerTextContainer: {
     flex: 1,
@@ -1105,13 +1285,15 @@ const styles = StyleSheet.create({
   // Chat area
   chatArea: {
     flex: 1,
+    backgroundColor: THEME.chatBg,
   },
   messagesScroll: {
     flex: 1,
   },
   messagesContent: {
-    paddingVertical: 8,
-    paddingHorizontal: 12,
+    paddingTop: 6,
+    paddingBottom: 8,
+    paddingHorizontal: 10,
   },
 
   // Date separator

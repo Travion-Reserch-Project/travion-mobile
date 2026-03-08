@@ -1,7 +1,6 @@
 /**
  * LocationChatScreen
- * AI-powered chat screen focused on a specific location
- * Redesigned with app theme and enhanced UX
+ * WhatsApp-style AI-powered chat screen focused on a specific location
  */
 
 import React, { useState, useEffect, useRef, useCallback } from 'react';
@@ -20,29 +19,28 @@ import {
   Dimensions,
   Animated,
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Ionicons from 'react-native-vector-icons/Ionicons';
 import MaterialCommunityIcons from 'react-native-vector-icons/MaterialCommunityIcons';
 import FontAwesome5 from 'react-native-vector-icons/FontAwesome5';
 import LinearGradient from 'react-native-linear-gradient';
-import LottieView from 'lottie-react-native';
 import Markdown from 'react-native-markdown-display';
 import { useChatStore } from '@stores';
 import type { ChatMessage } from '@types';
 
-const { width, height } = Dimensions.get('window');
-const BOTTOM_PADDING = Platform.OS === 'ios' ? 34 : 20;
+const { width } = Dimensions.get('window');
+const BOTTOM_PADDING = Platform.OS === 'ios' ? 34 : 16;
 
-// App Theme Colors
+// WhatsApp-inspired theme (matches TourPlanChatScreen)
 const THEME = {
   primary: '#F5840E',
-  primaryLight: '#FFF7ED',
   primaryDark: '#C2410C',
-  secondary: '#5856D6',
-  accent: '#FF6B35',
-  success: '#10B981',
-  warning: '#FBBF24',
-  error: '#EF4444',
+  chatBg: '#ECE5DD',
+  userBubble: '#DCF8C6',
+  aiBubble: '#FFFFFF',
+  inputBg: '#FFFFFF',
+  sendBtn: '#075E54',
+  tickColor: '#4FC3F7',
   dark: '#1F2937',
   gray: {
     50: '#F9FAFB',
@@ -56,10 +54,10 @@ const THEME = {
     800: '#1F2937',
   },
   white: '#FFFFFF',
+  success: '#10B981',
+  warning: '#FBBF24',
+  error: '#EF4444',
 };
-
-// Loading animation
-const typingAnimation = require('@assets/animations/onbord1.json');
 
 interface LocationChatScreenProps {
   route: {
@@ -70,344 +68,188 @@ interface LocationChatScreenProps {
   navigation: any;
 }
 
-// Message bubble component with enhanced styling
-const MessageBubble: React.FC<{
-  message: ChatMessage;
-  isLast: boolean;
-  isFirst: boolean;
-}> = ({ message, isLast, isFirst }) => {
-  const isUser = message.role === 'user';
-  const fadeAnim = useRef(new Animated.Value(0)).current;
-  const slideAnim = useRef(new Animated.Value(isUser ? 20 : -20)).current;
-
-  useEffect(() => {
-    Animated.parallel([
-      Animated.timing(fadeAnim, {
-        toValue: 1,
-        duration: 300,
-        useNativeDriver: true,
-      }),
-      Animated.timing(slideAnim, {
-        toValue: 0,
-        duration: 300,
-        useNativeDriver: true,
-      }),
-    ]).start();
-  }, []);
-
-  // Markdown styles for assistant messages with orange theme
-  const markdownStyles = {
-    body: {
-      fontSize: 15,
-      fontFamily: 'Gilroy-Regular',
-      color: THEME.dark,
-      lineHeight: 23,
-    },
-    paragraph: {
-      marginTop: 0,
-      marginBottom: 10,
-    },
-    strong: {
-      fontFamily: 'Gilroy-Bold',
-      color: THEME.dark,
-    },
-    em: {
-      fontFamily: 'Gilroy-Regular',
-      fontStyle: 'italic' as const,
-    },
-    heading1: {
-      fontSize: 18,
-      fontFamily: 'Gilroy-Bold',
-      color: THEME.primary,
-      marginBottom: 10,
-      marginTop: 8,
-    },
-    heading2: {
-      fontSize: 16,
-      fontFamily: 'Gilroy-Bold',
-      color: THEME.primaryDark,
-      marginBottom: 8,
-      marginTop: 6,
-    },
-    heading3: {
-      fontSize: 15,
-      fontFamily: 'Gilroy-SemiBold',
-      color: THEME.primary,
-      marginBottom: 6,
-      marginTop: 4,
-    },
-    bullet_list: {
-      marginVertical: 6,
-    },
-    ordered_list: {
-      marginVertical: 6,
-    },
-    list_item: {
-      marginVertical: 3,
-    },
-    bullet_list_icon: {
-      marginRight: 10,
-      color: THEME.primary,
-    },
-    code_inline: {
-      backgroundColor: THEME.primaryLight,
-      fontFamily: 'monospace',
-      fontSize: 13,
-      paddingHorizontal: 6,
-      paddingVertical: 2,
-      borderRadius: 6,
-      color: THEME.primaryDark,
-    },
-    code_block: {
-      backgroundColor: THEME.gray[100],
-      padding: 12,
-      borderRadius: 12,
-      fontFamily: 'monospace',
-      fontSize: 13,
-    },
-    link: {
-      color: THEME.primary,
-      textDecorationLine: 'underline' as const,
-    },
-    blockquote: {
-      backgroundColor: THEME.primaryLight,
-      borderLeftColor: THEME.primary,
-      borderLeftWidth: 4,
-      paddingLeft: 12,
-      paddingVertical: 8,
-      marginVertical: 8,
-      borderRadius: 8,
-    },
-  };
-
-  return (
-    <Animated.View
-      style={[
-        styles.messageBubbleContainer,
-        isUser ? styles.userBubbleContainer : styles.assistantBubbleContainer,
-        {
-          opacity: fadeAnim,
-          transform: [{ translateX: slideAnim }],
-        },
-      ]}
-    >
-      {!isUser && (
-        <View style={styles.avatarContainer}>
-          <LinearGradient
-            colors={[THEME.primary, THEME.accent]}
-            style={styles.aiAvatar}
-            start={{ x: 0, y: 0 }}
-            end={{ x: 1, y: 1 }}
-          >
-            <MaterialCommunityIcons name="robot-happy-outline" size={16} color={THEME.white} />
-          </LinearGradient>
-        </View>
-      )}
-      <View
-        style={[
-          styles.messageBubble,
-          isUser ? styles.userBubble : styles.assistantBubble,
-        ]}
-      >
-        {isUser ? (
-          <LinearGradient
-            colors={[THEME.primary, THEME.primaryDark]}
-            style={styles.userBubbleGradient}
-            start={{ x: 0, y: 0 }}
-            end={{ x: 1, y: 1 }}
-          >
-            <Text style={styles.userMessageText}>{message.content}</Text>
-            <Text style={styles.userMessageTime}>{formatTime(message.timestamp)}</Text>
-          </LinearGradient>
-        ) : (
-          <View style={styles.assistantBubbleContent}>
-            <Markdown style={markdownStyles}>{message.content}</Markdown>
-            <View style={styles.assistantMessageFooter}>
-              <MaterialCommunityIcons name="sparkles" size={12} color={THEME.primary} />
-              <Text style={styles.assistantMessageTime}>{formatTime(message.timestamp)}</Text>
-            </View>
-          </View>
-        )}
-      </View>
-      {isUser && (
-        <View style={styles.userAvatarContainer}>
-          <View style={styles.userAvatar}>
-            <Ionicons name="person" size={14} color={THEME.white} />
-          </View>
-        </View>
-      )}
-    </Animated.View>
-  );
-};
-
-// Format timestamp
+// Format timestamp like WhatsApp (HH:MM)
 const formatTime = (date: Date): string => {
   const d = new Date(date);
   return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
 };
 
-// Enhanced typing indicator component
+// Date separator component (WhatsApp style)
+const DateSeparator: React.FC<{ date: string }> = ({ date }) => (
+  <View style={styles.dateSeparator}>
+    <View style={styles.dateSeparatorPill}>
+      <Text style={styles.dateSeparatorText}>{date}</Text>
+    </View>
+  </View>
+);
+
+// AI response metadata badge
+const MetadataBadge: React.FC<{
+  icon: string;
+  label: string;
+  color: string;
+}> = ({ icon, label, color }) => (
+  <View style={[styles.metadataBadge, { backgroundColor: `${color}12` }]}>
+    <Ionicons name={icon as any} size={11} color={color} />
+    <Text style={[styles.metadataBadgeText, { color }]}>{label}</Text>
+  </View>
+);
+
+// WhatsApp-style message bubble
+const MessageBubble: React.FC<{
+  message: ChatMessage;
+}> = ({ message }) => {
+  const isUser = message.role === 'user';
+  const fadeAnim = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    Animated.timing(fadeAnim, {
+      toValue: 1,
+      duration: 200,
+      useNativeDriver: true,
+    }).start();
+  }, [fadeAnim]);
+
+  const markdownStyles = {
+    body: {
+      fontSize: 14.5,
+      fontFamily: 'Gilroy-Regular',
+      color: THEME.dark,
+      lineHeight: 21,
+    },
+    paragraph: { marginTop: 0, marginBottom: 6 },
+    strong: { fontFamily: 'Gilroy-Bold', color: THEME.dark },
+    heading1: { fontSize: 16, fontFamily: 'Gilroy-Bold', color: THEME.primary, marginBottom: 6 },
+    heading2: {
+      fontSize: 15,
+      fontFamily: 'Gilroy-Bold',
+      color: THEME.primaryDark,
+      marginBottom: 4,
+    },
+    heading3: {
+      fontSize: 14.5,
+      fontFamily: 'Gilroy-Bold',
+      color: THEME.dark,
+      marginBottom: 3,
+    },
+    bullet_list_icon: { marginRight: 8, color: THEME.primary },
+    bullet_list: { marginBottom: 4 },
+    ordered_list: { marginBottom: 4 },
+    link: { color: THEME.primary, textDecorationLine: 'underline' as const },
+    blockquote: {
+      backgroundColor: '#FFF7ED',
+      borderLeftColor: THEME.primary,
+      borderLeftWidth: 3,
+      paddingLeft: 10,
+      paddingVertical: 4,
+      marginVertical: 4,
+    },
+  };
+
+  const meta = message.metadata;
+  const hasMetadata = !isUser && !!meta && !!(meta.documentsRetrieved || meta.webSearchUsed || meta.reasoningLoops);
+
+  return (
+    <Animated.View
+      style={[isUser ? styles.userBubbleRow : styles.aiBubbleRow, { opacity: fadeAnim }]}
+    >
+      <View style={[styles.messageBubble, isUser ? styles.userBubble : styles.assistantBubble]}>
+        {/* Bubble tail */}
+        <View style={isUser ? styles.userBubbleTail : styles.aiBubbleTail} />
+
+        {isUser ? (
+          <>
+            <Text style={styles.userMessageText}>{message.content}</Text>
+            <View style={styles.userBubbleFooter}>
+              <Text style={styles.bubbleTimeUser}>{formatTime(message.timestamp)}</Text>
+              <Ionicons
+                name="checkmark-done"
+                size={14}
+                color={THEME.tickColor}
+                style={{ marginLeft: 4 }}
+              />
+            </View>
+          </>
+        ) : (
+          <>
+            <Markdown style={markdownStyles}>{message.content}</Markdown>
+
+            {/* AI Source & Metadata Footer */}
+            {hasMetadata && (
+              <View style={styles.metadataContainer}>
+                <View style={styles.metadataDivider} />
+                <View style={styles.metadataBadgeRow}>
+                  {meta!.documentsRetrieved != null && meta!.documentsRetrieved > 0 ? (
+                    <MetadataBadge
+                      icon="library-outline"
+                      label={`${meta!.documentsRetrieved} sources`}
+                      color="#7C3AED"
+                    />
+                  ) : null}
+                  {meta!.webSearchUsed === true ? (
+                    <MetadataBadge
+                      icon="globe-outline"
+                      label="Web search"
+                      color="#0891B2"
+                    />
+                  ) : null}
+                  {meta!.reasoningLoops != null && meta!.reasoningLoops > 0 ? (
+                    <MetadataBadge
+                      icon="sparkles-outline"
+                      label={meta!.reasoningLoops > 1 ? `${meta!.reasoningLoops}x verified` : 'Verified'}
+                      color="#059669"
+                    />
+                  ) : null}
+                </View>
+              </View>
+            )}
+
+            <Text style={styles.bubbleTime}>{formatTime(message.timestamp)}</Text>
+          </>
+        )}
+      </View>
+    </Animated.View>
+  );
+};
+
+// Typing indicator (WhatsApp style)
 const TypingIndicator: React.FC = () => {
-  const pulseAnim = useRef(new Animated.Value(0.4)).current;
+  const pulseAnim = useRef(new Animated.Value(0.3)).current;
 
   useEffect(() => {
     Animated.loop(
       Animated.sequence([
-        Animated.timing(pulseAnim, {
-          toValue: 1,
-          duration: 800,
-          useNativeDriver: true,
-        }),
-        Animated.timing(pulseAnim, {
-          toValue: 0.4,
-          duration: 800,
-          useNativeDriver: true,
-        }),
-      ])
+        Animated.timing(pulseAnim, { toValue: 1, duration: 600, useNativeDriver: true }),
+        Animated.timing(pulseAnim, { toValue: 0.3, duration: 600, useNativeDriver: true }),
+      ]),
     ).start();
-  }, []);
+  }, [pulseAnim]);
 
   return (
-    <View style={styles.typingContainer}>
-      <View style={styles.avatarContainer}>
-        <LinearGradient
-          colors={[THEME.primary, THEME.accent]}
-          style={styles.aiAvatar}
-          start={{ x: 0, y: 0 }}
-          end={{ x: 1, y: 1 }}
-        >
-          <MaterialCommunityIcons name="robot-happy-outline" size={16} color={THEME.white} />
-        </LinearGradient>
-      </View>
-      <View style={styles.typingBubble}>
-        <View style={styles.typingDotsContainer}>
+    <View style={styles.aiBubbleRow}>
+      <View style={[styles.messageBubble, styles.assistantBubble, styles.typingBubble]}>
+        <View style={styles.aiBubbleTail} />
+        <View style={styles.typingDotsRow}>
           <Animated.View style={[styles.typingDot, { opacity: pulseAnim }]} />
-          <Animated.View style={[styles.typingDot, styles.typingDotMiddle, { opacity: pulseAnim }]} />
+          <Animated.View style={[styles.typingDot, { opacity: pulseAnim, marginHorizontal: 4 }]} />
           <Animated.View style={[styles.typingDot, { opacity: pulseAnim }]} />
         </View>
-        <Text style={styles.typingText}>AI is thinking...</Text>
       </View>
     </View>
   );
 };
 
-// Quick suggestion chip component
-const SuggestionChip: React.FC<{
+// Quick reply chip
+const QuickReply: React.FC<{
   text: string;
   icon: string;
   onPress: () => void;
 }> = ({ text, icon, onPress }) => (
-  <TouchableOpacity style={styles.suggestionChip} onPress={onPress} activeOpacity={0.7}>
-    <FontAwesome5 name={icon} size={12} color={THEME.primary} />
-    <Text style={styles.suggestionChipText}>{text}</Text>
+  <TouchableOpacity style={styles.quickReply} onPress={onPress} activeOpacity={0.7}>
+    <FontAwesome5 name={icon} size={11} color={THEME.primary} />
+    <Text style={styles.quickReplyText}>{text}</Text>
   </TouchableOpacity>
 );
-
-// Enhanced empty state component
-const EmptyState: React.FC<{
-  locationName: string;
-  onSuggestionPress: (text: string) => void;
-}> = ({ locationName, onSuggestionPress }) => {
-  const scaleAnim = useRef(new Animated.Value(0.9)).current;
-  const fadeAnim = useRef(new Animated.Value(0)).current;
-
-  useEffect(() => {
-    Animated.parallel([
-      Animated.spring(scaleAnim, {
-        toValue: 1,
-        friction: 8,
-        tension: 40,
-        useNativeDriver: true,
-      }),
-      Animated.timing(fadeAnim, {
-        toValue: 1,
-        duration: 500,
-        useNativeDriver: true,
-      }),
-    ]).start();
-  }, []);
-
-  const suggestions = [
-    { text: 'Best time to visit?', icon: 'clock' },
-    { text: 'Tell me the history', icon: 'book' },
-    { text: 'Photography tips', icon: 'camera' },
-    { text: 'Hidden gems nearby', icon: 'gem' },
-    { text: 'Local food to try', icon: 'utensils' },
-    { text: 'Safety tips', icon: 'shield-alt' },
-  ];
-
-  return (
-    <Animated.View
-      style={[
-        styles.emptyStateContainer,
-        {
-          opacity: fadeAnim,
-          transform: [{ scale: scaleAnim }],
-        },
-      ]}
-    >
-      <View style={styles.emptyStateHeader}>
-        <LinearGradient
-          colors={[THEME.primary, THEME.accent]}
-          style={styles.emptyStateIconBg}
-          start={{ x: 0, y: 0 }}
-          end={{ x: 1, y: 1 }}
-        >
-          <MaterialCommunityIcons name="robot-happy-outline" size={40} color={THEME.white} />
-        </LinearGradient>
-        <View style={styles.emptyStateBadge}>
-          <MaterialCommunityIcons name="sparkles" size={10} color={THEME.primary} />
-          <Text style={styles.emptyStateBadgeText}>AI Powered</Text>
-        </View>
-      </View>
-
-      <Text style={styles.emptyStateTitle}>Your Personal Guide for</Text>
-      <Text style={styles.emptyStateLocation}>{locationName}</Text>
-      <Text style={styles.emptyStateSubtitle}>
-        Ask me anything! I can help with history, best visiting times, photography tips, local cuisine, and hidden gems.
-      </Text>
-
-      <View style={styles.suggestionSection}>
-        <View style={styles.suggestionLabelRow}>
-          <View style={styles.suggestionLabelLine} />
-          <Text style={styles.suggestionLabel}>Quick Questions</Text>
-          <View style={styles.suggestionLabelLine} />
-        </View>
-        <View style={styles.suggestionGrid}>
-          {suggestions.map((suggestion, index) => (
-            <SuggestionChip
-              key={index}
-              text={suggestion.text}
-              icon={suggestion.icon}
-              onPress={() => onSuggestionPress(suggestion.text)}
-            />
-          ))}
-        </View>
-      </View>
-
-      <View style={styles.featureCards}>
-        <View style={styles.featureCard}>
-          <View style={[styles.featureIconBg, { backgroundColor: '#D1FAE5' }]}>
-            <FontAwesome5 name="brain" size={14} color="#059669" />
-          </View>
-          <Text style={styles.featureText}>Smart Responses</Text>
-        </View>
-        <View style={styles.featureCard}>
-          <View style={[styles.featureIconBg, { backgroundColor: '#E0F2FE' }]}>
-            <FontAwesome5 name="globe" size={14} color="#0EA5E9" />
-          </View>
-          <Text style={styles.featureText}>Local Knowledge</Text>
-        </View>
-        <View style={styles.featureCard}>
-          <View style={[styles.featureIconBg, { backgroundColor: THEME.primaryLight }]}>
-            <FontAwesome5 name="heart" size={14} color={THEME.primary} />
-          </View>
-          <Text style={styles.featureText}>Personalized</Text>
-        </View>
-      </View>
-    </Animated.View>
-  );
-};
 
 export const LocationChatScreen: React.FC<LocationChatScreenProps> = ({
   route,
@@ -417,6 +259,7 @@ export const LocationChatScreen: React.FC<LocationChatScreenProps> = ({
   const [inputText, setInputText] = useState('');
   const scrollViewRef = useRef<ScrollView>(null);
   const inputRef = useRef<TextInput>(null);
+  const insets = useSafeAreaInsets();
 
   const {
     setCurrentLocation,
@@ -484,14 +327,23 @@ export const LocationChatScreen: React.FC<LocationChatScreenProps> = ({
     );
   }, [locationName, clearChat]);
 
+  const suggestions = [
+    { text: 'Best time to visit?', icon: 'clock' },
+    { text: 'Tell me the history', icon: 'book' },
+    { text: 'Photography tips', icon: 'camera' },
+    { text: 'Hidden gems nearby', icon: 'gem' },
+    { text: 'Local food to try', icon: 'utensils' },
+    { text: 'Safety tips', icon: 'shield-alt' },
+  ];
+
   return (
-    <SafeAreaView style={styles.container} edges={['top']}>
+    <View style={styles.container}>
       <StatusBar barStyle="light-content" backgroundColor={THEME.primary} />
 
-      {/* Enhanced Header */}
+      {/* WhatsApp-style Header */}
       <LinearGradient
         colors={[THEME.primary, THEME.primaryDark]}
-        style={styles.header}
+        style={[styles.header, { marginTop: -insets.top, paddingTop: insets.top + 8 }]}
         start={{ x: 0, y: 0 }}
         end={{ x: 1, y: 0 }}
       >
@@ -500,36 +352,31 @@ export const LocationChatScreen: React.FC<LocationChatScreenProps> = ({
           onPress={() => navigation.goBack()}
           activeOpacity={0.7}
         >
-          <Ionicons name="chevron-back" size={24} color={THEME.white} />
+          <Ionicons name="arrow-back" size={22} color={THEME.white} />
         </TouchableOpacity>
 
-        <View style={styles.headerTitleContainer}>
-          <View style={styles.headerIconBg}>
-            <MaterialCommunityIcons name="robot-happy-outline" size={20} color={THEME.primary} />
-          </View>
-          <View style={styles.headerTextContainer}>
-            <View style={styles.headerTitleRow}>
-              <Text style={styles.headerTitle}>AI Travel Guide</Text>
-              <View style={styles.onlineBadge}>
-                <View style={styles.onlineDot} />
-                <Text style={styles.onlineText}>Online</Text>
-              </View>
-            </View>
-            <Text style={styles.headerSubtitle} numberOfLines={1}>
-              {locationName}
-            </Text>
-          </View>
+        {/* AI Avatar with online dot */}
+        <View style={styles.headerAvatar}>
+          <MaterialCommunityIcons name="robot-happy-outline" size={20} color={THEME.white} />
+          <View style={styles.onlineDot} />
+        </View>
+
+        <View style={styles.headerTextContainer}>
+          <Text style={styles.headerTitle}>AI Travel Guide</Text>
+          <Text style={styles.headerSubtitle} numberOfLines={1}>
+            {isLoading || isSending ? 'typing...' : locationName}
+          </Text>
         </View>
 
         <TouchableOpacity
-          style={styles.menuButton}
+          style={styles.headerBtn}
           onPress={handleClearChat}
           activeOpacity={0.7}
           disabled={messages.length === 0}
         >
           <Ionicons
             name="ellipsis-vertical"
-            size={20}
+            size={18}
             color={messages.length === 0 ? 'rgba(255,255,255,0.4)' : THEME.white}
           />
         </TouchableOpacity>
@@ -537,62 +384,93 @@ export const LocationChatScreen: React.FC<LocationChatScreenProps> = ({
 
       {/* Chat Content */}
       <KeyboardAvoidingView
-        style={styles.keyboardAvoidingView}
+        style={styles.chatArea}
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
         keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 0}
       >
-        {isLoading ? (
-          <View style={styles.loadingContainer}>
-            <LottieView
-              source={typingAnimation}
-              autoPlay
-              loop
-              style={styles.loadingAnimation}
-            />
-            <Text style={styles.loadingText}>Loading your conversation...</Text>
-          </View>
-        ) : messages.length === 0 ? (
-          <EmptyState locationName={locationName} onSuggestionPress={handleSuggestionPress} />
-        ) : (
-          <ScrollView
-            ref={scrollViewRef}
-            style={styles.messagesScrollView}
-            contentContainerStyle={styles.messagesContainer}
-            showsVerticalScrollIndicator={false}
-            keyboardShouldPersistTaps="handled"
-          >
-            {/* Conversation Start Indicator */}
-            <View style={styles.conversationStart}>
-              <View style={styles.conversationStartLine} />
-              <View style={styles.conversationStartBadge}>
-                <MaterialCommunityIcons name="message-text-clock-outline" size={12} color={THEME.gray[400]} />
-                <Text style={styles.conversationStartText}>Conversation about {locationName}</Text>
-              </View>
-              <View style={styles.conversationStartLine} />
-            </View>
+        <ScrollView
+          ref={scrollViewRef}
+          style={styles.messagesScroll}
+          contentContainerStyle={styles.messagesContent}
+          showsVerticalScrollIndicator={false}
+          keyboardShouldPersistTaps="handled"
+        >
+          {/* Date separator */}
+          <DateSeparator date="Today" />
 
-            {messages.map((message, index) => (
-              <MessageBubble
-                key={message.id}
-                message={message}
-                isLast={index === messages.length - 1}
-                isFirst={index === 0}
-              />
-            ))}
-            {isSending && <TypingIndicator />}
-          </ScrollView>
+          {isLoading ? (
+            <View style={styles.aiBubbleRow}>
+              <View style={[styles.messageBubble, styles.assistantBubble, { paddingVertical: 12 }]}>
+                <View style={styles.aiBubbleTail} />
+                <ActivityIndicator size="small" color={THEME.primary} />
+                <Text style={[styles.bubbleTime, { marginTop: 6 }]}>Loading conversation...</Text>
+              </View>
+            </View>
+          ) : messages.length === 0 ? (
+            /* Empty state as a centered chat prompt */
+            <View style={styles.emptyStateContainer}>
+              <View style={styles.emptyStateIconBg}>
+                <MaterialCommunityIcons name="robot-happy-outline" size={36} color={THEME.white} />
+              </View>
+              <Text style={styles.emptyStateTitle}>Your AI Guide for</Text>
+              <Text style={styles.emptyStateLocation}>{locationName}</Text>
+              <Text style={styles.emptyStateSubtitle}>
+                Ask me anything about this place — history, tips, food, hidden gems, and more!
+              </Text>
+              <View style={styles.suggestionsContainer}>
+                <ScrollView
+                  horizontal
+                  showsHorizontalScrollIndicator={false}
+                  contentContainerStyle={styles.suggestionsScroll}
+                >
+                  {suggestions.map((s, i) => (
+                    <QuickReply
+                      key={i}
+                      text={s.text}
+                      icon={s.icon}
+                      onPress={() => handleSuggestionPress(s.text)}
+                    />
+                  ))}
+                </ScrollView>
+              </View>
+            </View>
+          ) : (
+            <>
+              {messages.map(message => (
+                <MessageBubble key={message.id} message={message} />
+              ))}
+              {isSending && <TypingIndicator />}
+            </>
+          )}
+        </ScrollView>
+
+        {/* Quick suggestions (shown when messages exist and not sending) */}
+        {!isLoading && !isSending && messages.length > 0 && messages.length <= 2 && (
+          <View style={styles.quickRepliesContainer}>
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              contentContainerStyle={styles.quickRepliesScroll}
+            >
+              {suggestions.map((s, i) => (
+                <QuickReply
+                  key={i}
+                  text={s.text}
+                  icon={s.icon}
+                  onPress={() => handleSuggestionPress(s.text)}
+                />
+              ))}
+            </ScrollView>
+          </View>
         )}
 
-        {/* Enhanced Input Area */}
+        {/* WhatsApp-style Input Area */}
         <View style={styles.inputContainer}>
           <View style={styles.inputWrapper}>
-            <TouchableOpacity style={styles.attachButton} activeOpacity={0.7}>
-              <Ionicons name="add-circle-outline" size={24} color={THEME.gray[400]} />
-            </TouchableOpacity>
             <TextInput
               ref={inputRef}
               style={styles.textInput}
-              placeholder="Ask anything about this place..."
+              placeholder="Type a message..."
               placeholderTextColor={THEME.gray[400]}
               value={inputText}
               onChangeText={setInputText}
@@ -602,503 +480,365 @@ export const LocationChatScreen: React.FC<LocationChatScreenProps> = ({
               onSubmitEditing={handleSend}
               blurOnSubmit={false}
             />
-            <TouchableOpacity
-              style={[
-                styles.sendButton,
-                (!inputText.trim() || isSending) && styles.sendButtonDisabled,
-              ]}
-              onPress={handleSend}
-              disabled={!inputText.trim() || isSending}
-              activeOpacity={0.7}
-            >
-              {isSending ? (
-                <ActivityIndicator size="small" color={THEME.white} />
-              ) : (
-                <LinearGradient
-                  colors={inputText.trim() ? [THEME.primary, THEME.primaryDark] : [THEME.gray[300], THEME.gray[300]]}
-                  style={styles.sendButtonGradient}
-                  start={{ x: 0, y: 0 }}
-                  end={{ x: 1, y: 1 }}
-                >
-                  <Ionicons name="send" size={18} color={THEME.white} />
-                </LinearGradient>
-              )}
-            </TouchableOpacity>
           </View>
-          <View style={styles.inputFooter}>
-            <MaterialCommunityIcons name="shield-check-outline" size={12} color={THEME.gray[400]} />
-            <Text style={styles.inputHint}>
-              AI responses are for guidance. Verify important details locally.
-            </Text>
-          </View>
+          <TouchableOpacity
+            style={[
+              styles.sendButton,
+              (!inputText.trim() || isSending) && styles.sendButtonDisabled,
+            ]}
+            onPress={handleSend}
+            disabled={!inputText.trim() || isSending}
+            activeOpacity={0.7}
+          >
+            {isSending ? (
+              <ActivityIndicator size="small" color={THEME.white} />
+            ) : (
+              <Ionicons name="send" size={18} color={THEME.white} />
+            )}
+          </TouchableOpacity>
         </View>
       </KeyboardAvoidingView>
-    </SafeAreaView>
+    </View>
   );
 };
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: THEME.gray[50],
+    backgroundColor: THEME.primary,
+    overflow: 'visible',
   },
 
-  // Header
+  // Header (WhatsApp style)
   header: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: 16,
-    paddingVertical: 14,
+    paddingHorizontal: 8,
+    paddingVertical: 10,
   },
   backButton: {
-    width: 42,
-    height: 42,
+    width: 36,
+    height: 36,
     alignItems: 'center',
     justifyContent: 'center',
-    borderRadius: 14,
-    backgroundColor: 'rgba(255,255,255,0.15)',
   },
-  headerTitleContainer: {
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginLeft: 12,
-  },
-  headerIconBg: {
-    width: 42,
-    height: 42,
-    borderRadius: 14,
-    backgroundColor: THEME.white,
+  headerAvatar: {
+    width: 38,
+    height: 38,
+    borderRadius: 19,
+    backgroundColor: 'rgba(255,255,255,0.2)',
     alignItems: 'center',
     justifyContent: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
+    marginLeft: 4,
+  },
+  onlineDot: {
+    position: 'absolute',
+    bottom: 1,
+    right: 1,
+    width: 10,
+    height: 10,
+    borderRadius: 5,
+    backgroundColor: '#4ADE80',
+    borderWidth: 2,
+    borderColor: THEME.primary,
   },
   headerTextContainer: {
-    marginLeft: 12,
     flex: 1,
-  },
-  headerTitleRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    marginLeft: 10,
   },
   headerTitle: {
-    fontSize: 17,
+    fontSize: 16,
     fontFamily: 'Gilroy-Bold',
     color: THEME.white,
   },
-  onlineBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: 'rgba(255,255,255,0.2)',
-    paddingHorizontal: 8,
-    paddingVertical: 3,
-    borderRadius: 10,
-    marginLeft: 8,
-  },
-  onlineDot: {
-    width: 6,
-    height: 6,
-    borderRadius: 3,
-    backgroundColor: '#34D399',
-    marginRight: 4,
-  },
-  onlineText: {
-    fontSize: 10,
-    fontFamily: 'Gilroy-SemiBold',
-    color: THEME.white,
-  },
   headerSubtitle: {
-    fontSize: 13,
+    fontSize: 12,
     fontFamily: 'Gilroy-Regular',
     color: 'rgba(255,255,255,0.8)',
-    marginTop: 2,
+    marginTop: 1,
   },
-  menuButton: {
-    width: 42,
-    height: 42,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderRadius: 14,
-    backgroundColor: 'rgba(255,255,255,0.15)',
-  },
-
-  // Content
-  keyboardAvoidingView: {
-    flex: 1,
-  },
-  loadingContainer: {
-    flex: 1,
+  headerBtn: {
+    width: 36,
+    height: 36,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  loadingAnimation: {
-    width: 120,
-    height: 120,
+
+  // Chat area
+  chatArea: {
+    flex: 1,
+    backgroundColor: THEME.chatBg,
   },
-  loadingText: {
-    marginTop: 16,
-    fontSize: 15,
-    fontFamily: 'Gilroy-Medium',
-    color: THEME.gray[500],
+  messagesScroll: {
+    flex: 1,
+  },
+  messagesContent: {
+    paddingTop: 6,
+    paddingBottom: 8,
+    paddingHorizontal: 10,
+    flexGrow: 1,
   },
 
-  // Messages
-  messagesScrollView: {
-    flex: 1,
-  },
-  messagesContainer: {
-    paddingVertical: 20,
-    paddingHorizontal: 16,
-  },
-  conversationStart: {
-    flexDirection: 'row',
+  // Date separator
+  dateSeparator: {
     alignItems: 'center',
-    marginBottom: 20,
+    marginVertical: 12,
   },
-  conversationStartLine: {
-    flex: 1,
-    height: 1,
-    backgroundColor: THEME.gray[200],
+  dateSeparatorPill: {
+    backgroundColor: 'rgba(225,218,208,0.9)',
+    paddingHorizontal: 14,
+    paddingVertical: 5,
+    borderRadius: 8,
   },
-  conversationStartBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: THEME.white,
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 16,
-    marginHorizontal: 12,
-    gap: 6,
-  },
-  conversationStartText: {
-    fontSize: 11,
+  dateSeparatorText: {
+    fontSize: 12,
     fontFamily: 'Gilroy-Medium',
-    color: THEME.gray[400],
+    color: THEME.gray[700],
   },
-  messageBubbleContainer: {
+
+  // Message rows
+  userBubbleRow: {
     flexDirection: 'row',
-    marginBottom: 16,
-    alignItems: 'flex-end',
-  },
-  userBubbleContainer: {
     justifyContent: 'flex-end',
+    marginBottom: 4,
   },
-  assistantBubbleContainer: {
+  aiBubbleRow: {
+    flexDirection: 'row',
     justifyContent: 'flex-start',
-  },
-  avatarContainer: {
-    marginRight: 10,
     marginBottom: 4,
   },
-  aiAvatar: {
-    width: 34,
-    height: 34,
-    borderRadius: 12,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  userAvatarContainer: {
-    marginLeft: 10,
-    marginBottom: 4,
-  },
-  userAvatar: {
-    width: 28,
-    height: 28,
-    borderRadius: 10,
-    backgroundColor: THEME.gray[300],
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
+
+  // Message bubble
   messageBubble: {
-    maxWidth: width * 0.72,
-    borderRadius: 22,
-    overflow: 'hidden',
+    maxWidth: width * 0.78,
+    borderRadius: 8,
+    paddingHorizontal: 10,
+    paddingVertical: 7,
+    position: 'relative',
   },
   userBubble: {
-    marginLeft: 'auto',
-  },
-  userBubbleGradient: {
-    paddingHorizontal: 18,
-    paddingVertical: 14,
-    borderRadius: 22,
-    borderBottomRightRadius: 6,
+    backgroundColor: THEME.userBubble,
+    borderTopRightRadius: 2,
+    marginRight: 4,
   },
   assistantBubble: {
-    backgroundColor: THEME.white,
-    borderBottomLeftRadius: 6,
+    backgroundColor: THEME.aiBubble,
+    borderTopLeftRadius: 2,
+    marginLeft: 4,
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.06,
-    shadowRadius: 8,
-    elevation: 3,
-  },
-  assistantBubbleContent: {
-    paddingHorizontal: 18,
-    paddingVertical: 14,
-  },
-  userMessageText: {
-    fontSize: 15,
-    fontFamily: 'Gilroy-Regular',
-    color: THEME.white,
-    lineHeight: 22,
-  },
-  userMessageTime: {
-    fontSize: 10,
-    fontFamily: 'Gilroy-Regular',
-    color: 'rgba(255,255,255,0.7)',
-    marginTop: 8,
-    textAlign: 'right',
-  },
-  assistantMessageFooter: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginTop: 10,
-    paddingTop: 10,
-    borderTopWidth: 1,
-    borderTopColor: THEME.gray[100],
-    gap: 6,
-  },
-  assistantMessageTime: {
-    fontSize: 10,
-    fontFamily: 'Gilroy-Regular',
-    color: THEME.gray[400],
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.04,
+    shadowRadius: 2,
+    elevation: 1,
   },
 
-  // Typing Indicator
-  typingContainer: {
-    flexDirection: 'row',
-    alignItems: 'flex-end',
-    marginBottom: 12,
+  // Bubble tails
+  userBubbleTail: {
+    position: 'absolute',
+    top: 0,
+    right: -6,
+    width: 0,
+    height: 0,
+    borderLeftWidth: 6,
+    borderLeftColor: THEME.userBubble,
+    borderTopWidth: 8,
+    borderTopColor: 'transparent',
+    borderBottomWidth: 0,
+    borderBottomColor: 'transparent',
   },
+  aiBubbleTail: {
+    position: 'absolute',
+    top: 0,
+    left: -6,
+    width: 0,
+    height: 0,
+    borderRightWidth: 6,
+    borderRightColor: THEME.aiBubble,
+    borderTopWidth: 8,
+    borderTopColor: 'transparent',
+    borderBottomWidth: 0,
+    borderBottomColor: 'transparent',
+  },
+
+  // User message
+  userMessageText: {
+    fontSize: 14.5,
+    fontFamily: 'Gilroy-Regular',
+    color: THEME.dark,
+    lineHeight: 20,
+  },
+  userBubbleFooter: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'flex-end',
+    marginTop: 3,
+  },
+  bubbleTimeUser: {
+    fontSize: 11,
+    fontFamily: 'Gilroy-Regular',
+    color: THEME.gray[500],
+  },
+  bubbleTime: {
+    fontSize: 11,
+    fontFamily: 'Gilroy-Regular',
+    color: THEME.gray[400],
+    textAlign: 'right',
+    marginTop: 3,
+  },
+
+  // Typing
   typingBubble: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: THEME.white,
-    paddingHorizontal: 18,
-    paddingVertical: 14,
-    borderRadius: 22,
-    borderBottomLeftRadius: 6,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.06,
-    shadowRadius: 8,
-    elevation: 3,
+    paddingVertical: 12,
+    paddingHorizontal: 16,
   },
-  typingDotsContainer: {
+  typingDotsRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginRight: 10,
   },
   typingDot: {
     width: 8,
     height: 8,
     borderRadius: 4,
-    backgroundColor: THEME.primary,
-  },
-  typingDotMiddle: {
-    marginHorizontal: 4,
-  },
-  typingText: {
-    fontSize: 13,
-    fontFamily: 'Gilroy-Medium',
-    color: THEME.primary,
+    backgroundColor: THEME.gray[400],
   },
 
-  // Empty State
+  // Empty state
   emptyStateContainer: {
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
     paddingHorizontal: 28,
-  },
-  emptyStateHeader: {
-    alignItems: 'center',
-    marginBottom: 20,
+    paddingVertical: 40,
   },
   emptyStateIconBg: {
-    width: 90,
-    height: 90,
-    borderRadius: 28,
+    width: 72,
+    height: 72,
+    borderRadius: 36,
+    backgroundColor: THEME.primary,
     alignItems: 'center',
     justifyContent: 'center',
-    shadowColor: THEME.primary,
-    shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.25,
-    shadowRadius: 16,
-    elevation: 10,
-  },
-  emptyStateBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: THEME.primaryLight,
-    paddingHorizontal: 12,
-    paddingVertical: 5,
-    borderRadius: 14,
-    marginTop: -10,
-    gap: 5,
-  },
-  emptyStateBadgeText: {
-    fontSize: 11,
-    fontFamily: 'Gilroy-Bold',
-    color: THEME.primary,
+    marginBottom: 16,
   },
   emptyStateTitle: {
-    fontSize: 16,
+    fontSize: 14,
     fontFamily: 'Gilroy-Medium',
     color: THEME.gray[500],
-    marginTop: 8,
   },
   emptyStateLocation: {
-    fontSize: 24,
+    fontSize: 20,
     fontFamily: 'Gilroy-Bold',
     color: THEME.dark,
     marginTop: 4,
     textAlign: 'center',
   },
   emptyStateSubtitle: {
-    fontSize: 14,
+    fontSize: 13,
     fontFamily: 'Gilroy-Regular',
-    color: THEME.gray[400],
+    color: THEME.gray[500],
     textAlign: 'center',
-    marginTop: 12,
-    lineHeight: 21,
+    marginTop: 10,
+    lineHeight: 19,
   },
-  suggestionSection: {
-    marginTop: 28,
+  suggestionsContainer: {
+    marginTop: 20,
     width: '100%',
   },
-  suggestionLabelRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 16,
-  },
-  suggestionLabelLine: {
-    flex: 1,
-    height: 1,
-    backgroundColor: THEME.gray[200],
-  },
-  suggestionLabel: {
-    fontSize: 12,
-    fontFamily: 'Gilroy-SemiBold',
-    color: THEME.gray[400],
-    marginHorizontal: 14,
-    textTransform: 'uppercase',
-    letterSpacing: 0.5,
-  },
-  suggestionGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    justifyContent: 'center',
-    gap: 10,
-  },
-  suggestionChip: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: THEME.white,
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    borderRadius: 20,
-    borderWidth: 1.5,
-    borderColor: THEME.gray[200],
+  suggestionsScroll: {
+    paddingHorizontal: 4,
     gap: 8,
-  },
-  suggestionChipText: {
-    fontSize: 13,
-    fontFamily: 'Gilroy-Medium',
-    color: THEME.gray[600],
-  },
-  featureCards: {
-    flexDirection: 'row',
-    marginTop: 28,
-    gap: 12,
-  },
-  featureCard: {
-    alignItems: 'center',
-    gap: 8,
-  },
-  featureIconBg: {
-    width: 44,
-    height: 44,
-    borderRadius: 14,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  featureText: {
-    fontSize: 11,
-    fontFamily: 'Gilroy-Medium',
-    color: THEME.gray[500],
   },
 
-  // Input Area
-  inputContainer: {
-    backgroundColor: THEME.white,
-    paddingHorizontal: 16,
-    paddingTop: 14,
-    paddingBottom: BOTTOM_PADDING,
+  // Quick replies
+  quickRepliesContainer: {
     borderTopWidth: 1,
-    borderTopColor: THEME.gray[100],
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: -4 },
-    shadowOpacity: 0.05,
-    shadowRadius: 12,
-    elevation: 8,
+    borderTopColor: 'rgba(0,0,0,0.06)',
+    backgroundColor: THEME.chatBg,
+    paddingVertical: 8,
   },
-  inputWrapper: {
+  quickRepliesScroll: {
+    paddingHorizontal: 12,
+    gap: 8,
+  },
+  quickReply: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: THEME.white,
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    borderRadius: 18,
+    borderWidth: 1,
+    borderColor: THEME.primary,
+    gap: 6,
+  },
+  quickReplyText: {
+    fontSize: 13,
+    fontFamily: 'Gilroy-Medium',
+    color: THEME.primary,
+  },
+
+  // Input area
+  inputContainer: {
     flexDirection: 'row',
     alignItems: 'flex-end',
-    backgroundColor: THEME.gray[50],
-    borderRadius: 26,
-    borderWidth: 1.5,
-    borderColor: THEME.gray[200],
-    paddingLeft: 6,
-    paddingRight: 6,
-    paddingVertical: 6,
+    paddingHorizontal: 8,
+    paddingTop: 6,
+    paddingBottom: BOTTOM_PADDING,
+    backgroundColor: THEME.chatBg,
+    gap: 6,
   },
-  attachButton: {
-    width: 40,
-    height: 40,
-    alignItems: 'center',
+  inputWrapper: {
+    flex: 1,
+    backgroundColor: THEME.white,
+    borderRadius: 24,
+    paddingHorizontal: 14,
+    paddingVertical: Platform.OS === 'ios' ? 8 : 2,
+    minHeight: 44,
     justifyContent: 'center',
   },
   textInput: {
-    flex: 1,
     fontSize: 15,
     fontFamily: 'Gilroy-Regular',
     color: THEME.dark,
     maxHeight: 100,
-    paddingVertical: 10,
-    paddingHorizontal: 4,
+    paddingVertical: Platform.OS === 'ios' ? 4 : 6,
   },
   sendButton: {
     width: 44,
     height: 44,
     borderRadius: 22,
-    overflow: 'hidden',
+    backgroundColor: THEME.primary,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   sendButtonDisabled: {
-    opacity: 0.6,
+    backgroundColor: THEME.gray[300],
   },
-  sendButtonGradient: {
-    width: '100%',
-    height: '100%',
-    alignItems: 'center',
-    justifyContent: 'center',
+
+  // Metadata badges
+  metadataContainer: {
+    marginTop: 6,
   },
-  inputFooter: {
+  metadataDivider: {
+    height: 1,
+    backgroundColor: THEME.gray[200],
+    marginBottom: 6,
+  },
+  metadataBadgeRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 5,
+  },
+  metadataBadge: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'center',
-    marginTop: 10,
-    gap: 6,
+    paddingHorizontal: 7,
+    paddingVertical: 3,
+    borderRadius: 10,
+    gap: 3,
   },
-  inputHint: {
-    fontSize: 11,
-    fontFamily: 'Gilroy-Regular',
-    color: THEME.gray[400],
+  metadataBadgeText: {
+    fontSize: 10.5,
+    fontFamily: 'Gilroy-Medium',
   },
 });
 

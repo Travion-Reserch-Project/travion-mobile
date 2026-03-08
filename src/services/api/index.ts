@@ -58,4 +58,9 @@ export type {
   // Hotel search types
   HotelSearchResult,
   HotelSearchResponse,
+  // HITL selection & weather interrupt types
+  SelectionCard,
+  WeatherPromptOption,
+  ResumeSelectionRequest,
+  ResumeWeatherRequest,
 } from './TourPlanService';

@@ -121,6 +121,10 @@ export interface FinalItineraryStop {
   ethical_note?: string;
   best_photo_time?: string;
   notes?: string;
+  // ── Visual Hierarchy Fields ──
+  visual_hierarchy?: number;
+  best_for_photos?: boolean;
+  photo_urls?: string[];
 }
 
 export interface FinalItinerary {
@@ -180,6 +184,55 @@ export interface AcceptPlanRequest {
   metadata?: TourPlanMetadata;
 }
 
+// ── HITL Selection & Weather Interrupt Types ──
+
+export interface SelectionCard {
+  card_id: string;
+  title: string;
+  subtitle?: string;
+  badge?: string;
+  image_url?: string;
+  photo_urls?: string[];
+  rating?: number;
+  price_range?: string;
+  vibe_match_score?: number;
+  description?: string;
+  tags?: string[];
+  distance_km?: number;
+}
+
+export interface SearchCandidate {
+  id: string;
+  name: string;
+  type: string;
+  description: string;
+  price_range?: string;
+  rating?: number;
+  opening_hours?: string;
+  lat?: number;
+  lng?: number;
+  url?: string;
+  location_name: string;
+  vibe_match_score?: number;
+  photo_urls?: string[];
+}
+
+export interface WeatherPromptOption {
+  id: string;
+  label: string;
+  description: string;
+}
+
+export interface ResumeSelectionRequest {
+  threadId: string;
+  selectedCandidateId: string;
+}
+
+export interface ResumeWeatherRequest {
+  threadId: string;
+  userWeatherChoice: 'switch_indoor' | 'reschedule' | 'keep';
+}
+
 export interface TourPlanResponse {
   threadId: string;
   response: string;
@@ -195,6 +248,17 @@ export interface TourPlanResponse {
   finalItinerary?: FinalItinerary;
   weatherData?: Record<string, any>;
   interruptReason?: string;
+  restaurantRecommendations?: any[];
+  accommodationRecommendations?: any[];
+  // ── HITL Interrupt Fields ──
+  pendingUserSelection?: boolean;
+  selectionCards?: SelectionCard[];
+  promptText?: string;
+  searchCandidates?: SearchCandidate[];
+  mcpSearchMetadata?: Record<string, any>;
+  weatherInterrupt?: boolean;
+  weatherPromptMessage?: string;
+  weatherPromptOptions?: WeatherPromptOption[];
 }
 
 export interface AcceptPlanResponse {
@@ -326,6 +390,63 @@ class TourPlanService extends BaseApiService {
       return result;
     } catch (error: any) {
       console.error('Hotel search failed:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Resume the graph after user selects a search candidate (HITL)
+   * POST /api/v1/tour-plan/resume-selection
+   */
+  async resumeSelection(request: ResumeSelectionRequest): Promise<TourPlanResponse> {
+    try {
+      console.log(
+        'TourPlanService.resumeSelection - thread:',
+        request.threadId,
+        'candidate:',
+        request.selectedCandidateId,
+      );
+
+      const response = await this.authenticatedPost<TourPlanResponse>(
+        '/resume-selection',
+        request,
+        { timeout: 180000, retries: 0 },
+      );
+      const result = this.handleApiResponse(response);
+      const planData: TourPlanResponse = result.data || result;
+
+      console.log('TourPlanService.resumeSelection - Selection resumed successfully');
+      return planData;
+    } catch (error: any) {
+      console.error('Resume selection failed:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Resume the graph after user decides on weather action (HITL)
+   * POST /api/v1/tour-plan/resume-weather
+   */
+  async resumeWeather(request: ResumeWeatherRequest): Promise<TourPlanResponse> {
+    try {
+      console.log(
+        'TourPlanService.resumeWeather - thread:',
+        request.threadId,
+        'choice:',
+        request.userWeatherChoice,
+      );
+
+      const response = await this.authenticatedPost<TourPlanResponse>('/resume-weather', request, {
+        timeout: 180000,
+        retries: 0,
+      });
+      const result = this.handleApiResponse(response);
+      const planData: TourPlanResponse = result.data || result;
+
+      console.log('TourPlanService.resumeWeather - Weather resume successful');
+      return planData;
+    } catch (error: any) {
+      console.error('Resume weather failed:', error);
       throw error;
     }
   }
