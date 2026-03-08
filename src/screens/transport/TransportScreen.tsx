@@ -5,16 +5,15 @@ import {
   StatusBar,
   ScrollView,
   ActivityIndicator,
-  Platform,
   TouchableOpacity,
   StyleSheet,
 } from 'react-native';
 import FontAwesome5 from 'react-native-vector-icons/FontAwesome5';
-import Geolocation from '@react-native-community/geolocation';
 import RNGeocoding from 'react-native-geocoding';
 import Config from 'react-native-config';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import type { MainStackParamList } from '../../navigation/MainNavigator';
+import { getCurrentPosition } from '@utils';
 
 interface TransportScreenProps {
   navigation?: NativeStackNavigationProp<MainStackParamList>;
@@ -34,38 +33,40 @@ export const TransportScreen: React.FC<TransportScreenProps> = ({ navigation }) 
   useEffect(() => {
     const fetchLocation = async () => {
       setLocationLoading(true);
-      Geolocation.getCurrentPosition(
-        async position => {
-          const { latitude, longitude } = position.coords;
-          try {
-            if (Config.GOOGLE_MAPS_API_KEY) {
-              const results = await RNGeocoding.from(latitude, longitude);
-              if (results?.results?.length) {
-                const address = results.results[0];
-                const parts = (address.formatted_address || '').split(',').map(p => p.trim());
-                const cleaned = parts.filter(p => p && !/^\d+$/.test(p));
-                const city = cleaned[0] || 'Current location';
-                const region = cleaned[1] || '';
-                setLocationName(region ? `${city}, ${region}` : city);
-              } else {
-                setLocationName(`Lat ${latitude.toFixed(3)}, Lng ${longitude.toFixed(3)}`);
-              }
+      try {
+        const position = await getCurrentPosition({
+          enableHighAccuracy: true,
+          timeout: 15000,
+          maximumAge: 10000,
+          retryAttempts: 1,
+        });
+        const { latitude, longitude } = position;
+        try {
+          if (Config.GOOGLE_MAPS_API_KEY) {
+            const results = await RNGeocoding.from(latitude, longitude);
+            if (results?.results?.length) {
+              const address = results.results[0];
+              const parts = (address.formatted_address || '').split(',').map(p => p.trim());
+              const cleaned = parts.filter(p => p && !/^\d+$/.test(p));
+              const city = cleaned[0] || 'Current location';
+              const region = cleaned[1] || '';
+              setLocationName(region ? `${city}, ${region}` : city);
             } else {
               setLocationName(`Lat ${latitude.toFixed(3)}, Lng ${longitude.toFixed(3)}`);
             }
-          } catch (err) {
-            console.error('Geocoding error:', err);
+          } else {
             setLocationName(`Lat ${latitude.toFixed(3)}, Lng ${longitude.toFixed(3)}`);
-          } finally {
-            setLocationLoading(false);
           }
-        },
-        _error => {
-          setLocationName('Location unavailable');
+        } catch (err) {
+          console.error('Geocoding error:', err);
+          setLocationName(`Lat ${latitude.toFixed(3)}, Lng ${longitude.toFixed(3)}`);
+        } finally {
           setLocationLoading(false);
-        },
-        { enableHighAccuracy: Platform.OS === 'android', timeout: 15000, maximumAge: 10000 },
-      );
+        }
+      } catch {
+        setLocationName('Location unavailable');
+        setLocationLoading(false);
+      }
     };
 
     fetchLocation();
@@ -206,7 +207,7 @@ export const TransportScreen: React.FC<TransportScreenProps> = ({ navigation }) 
             <TouchableOpacity
               className="rounded-xl p-4 flex-row items-center justify-between"
               activeOpacity={0.8}
-              onPress={() => console.log('Road issue report coming soon')}
+              onPress={() => navigation && navigation.navigate('ReportRoadIssueScreen')}
               style={styles.reportCard}
             >
               <View className="flex-row items-center flex-1">
@@ -228,7 +229,7 @@ export const TransportScreen: React.FC<TransportScreenProps> = ({ navigation }) 
             <TouchableOpacity
               className="rounded-xl p-4 flex-row items-center justify-between"
               activeOpacity={0.8}
-              onPress={() => navigation && navigation.navigate('MapScreen', {})}
+              onPress={() => navigation && navigation.navigate('IncidentMapScreen')}
               style={styles.toolCard}
             >
               <View className="flex-row items-center flex-1">

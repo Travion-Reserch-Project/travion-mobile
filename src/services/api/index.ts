@@ -4,6 +4,7 @@ export { userService } from './UserService';
 export { chatService } from './ChatService';
 export { default as safetyService } from './SafetyService';
 export { default as incidentReportService } from './IncidentReportService';
+export { roadIssueService } from './RoadIssueService';
 export { aiService } from './AIService';
 export { locationService } from './LocationService';
 export { tourPlanService } from './TourPlanService';

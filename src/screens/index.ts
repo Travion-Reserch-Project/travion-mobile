@@ -5,6 +5,7 @@ export * from './auth/UserProfileSetupScreen';
 export * from './common/LoadingScreen';
 export * from './agent/ExploreScreen';
 export * from './transport/TripsScreen';
+export * from './transport/ReportRoadIssueScreen';
 export * from './transport/ChatbotScreen';
 export * from './auth/ProfileScreen';
 export * from './safety/AlertsScreen';

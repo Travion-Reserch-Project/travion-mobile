@@ -8,6 +8,7 @@ import Geolocation from 'react-native-geolocation-service';
 import { Platform, PermissionsAndroid } from 'react-native';
 import { NotificationService } from '@services/NotificationService';
 
+
 const FOREGROUND_LOCATION_INTERVAL_MS = 5 * 60 * 1000; // 5 minutes
 
 /**
@@ -74,6 +75,15 @@ const sendLocationUpdate = async () => {
     console.warn('[App] Foreground location update error:', error.message);
   }
 };
+
+// Configure geolocation to use Android LocationManager on Android.
+// This avoids crashes seen in Play Services listener cleanup on some devices/emulators.
+Geolocation.setRNConfiguration({
+  skipPermissionRequests: false,
+  authorizationLevel: 'whenInUse',
+  locationProvider: 'android',
+});
+
 
 function AppContent() {
   const { initializeAuth, clearAllData } = useAuthStore();

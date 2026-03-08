@@ -7,6 +7,7 @@ import {
   Animated,
   useWindowDimensions,
   ScrollView,
+  Platform,
 } from 'react-native';
 import FontAwesome5 from 'react-native-vector-icons/FontAwesome5';
 import MapView, { Marker, Circle, PROVIDER_GOOGLE } from 'react-native-maps';
@@ -15,8 +16,6 @@ import { getCurrentPosition, LocationCoords } from '@utils/geolocation';
 import Config from 'react-native-config';
 import SafetyService from '@services/api/SafetyService';
 
-// Initialize geocoding with API key
-RNGeocoding.init(Config.GOOGLE_MAPS_API_KEY as string);
 export interface SafetyAlert {
   id: string;
   title: string;
@@ -30,7 +29,8 @@ export interface SafetyAlert {
     | 'Money Theft'
     | 'Harassment'
     | 'Bag Snatching'
-    | 'Extortion';
+    | 'Extortion'
+    | 'Other';
 }
 
 interface SafetyAlertsProps {
@@ -131,6 +131,15 @@ export const SafetyAlerts: React.FC<SafetyAlertsProps> = ({
 
   // Animation for pulsing dot - must be declared before any conditional logic
   const pulseAnim = useRef(new Animated.Value(0)).current;
+  const hasValidUserLocation =
+    !!userLocation &&
+    Number.isFinite(userLocation.latitude) &&
+    Number.isFinite(userLocation.longitude);
+  const shouldUseGoogleProvider =
+    Platform.OS === 'android' &&
+    !!Config.GOOGLE_MAPS_API_KEY &&
+    Config.GOOGLE_MAPS_API_KEY !== 'YOUR_API_KEY';
+  const useLitePreviewMap = Platform.OS === 'android';
 
   // Get selected alert (or default if index out of range)
   const selectedAlert = filteredAlerts[selectedAlertIndex] || filteredAlerts[0] || defaultAlerts[0];
@@ -202,6 +211,64 @@ export const SafetyAlerts: React.FC<SafetyAlertsProps> = ({
     return { latitudeDelta: delta, longitudeDelta: delta };
   };
 
+  // Refresh location and safety predictions
+  const handleRefresh = useCallback(async () => {
+    try {
+      setLocationLoading(true);
+      setFetchingAlerts(true);
+      setSelectedAlertIndex(0);
+
+      const position = await getCurrentPosition({
+        timeout: 15000,
+        enableHighAccuracy: true,
+        retryAttempts: 2,
+      });
+
+      const { latitude, longitude } = position;
+      setUserLocation({ latitude, longitude });
+
+      const radius = getRiskRadius(currentRiskLevel);
+      const zoomLevel = getMapZoomLevel(radius);
+      setMapRegion({ latitude, longitude, ...zoomLevel });
+
+      await fetchSafetyPredictions(latitude, longitude);
+
+      try {
+        const results = await RNGeocoding.from(latitude, longitude);
+        if (results && results.results && results.results.length > 0) {
+          const address = results.results[0];
+          const locationString = address.formatted_address || 'Current Location';
+          const parts = locationString.split(',').map(p => p.trim());
+          const locationParts = parts
+            .map(p => p.replace(/\s*\d+\s*$/, '').trim())
+            .filter(p => {
+              if (/^\d+$/.test(p)) return false;
+              if (/^[A-Z]{2}$/.test(p)) return false;
+              if (p === '') return false;
+              return true;
+            });
+
+          let displayName = 'Current Location';
+          if (locationParts.length >= 2) {
+            displayName = `${locationParts[0]}, ${locationParts[1]}`;
+          } else if (locationParts.length === 1) {
+            displayName = locationParts[0];
+          }
+          setLocationName(displayName);
+        }
+      } catch (err) {
+        console.error('Reverse geocoding error on refresh:', err);
+      }
+
+      setLocationLoading(false);
+    } catch (error: any) {
+      console.error('[SafetyAlerts] Refresh error:', error);
+      setLocationName(error.message || 'Unable to get location');
+      setLocationLoading(false);
+      setFetchingAlerts(false);
+    }
+  }, [currentRiskLevel, fetchSafetyPredictions]);
+
   // Pulsing animation effect
   useEffect(() => {
     const pulse = Animated.loop(
@@ -242,13 +309,22 @@ export const SafetyAlerts: React.FC<SafetyAlertsProps> = ({
   useEffect(() => {
     const getLocationAndFetchAlerts = async () => {
       try {
+        // Initialize geocoding with proper error handling
+        if (Config.GOOGLE_MAPS_API_KEY && Config.GOOGLE_MAPS_API_KEY !== 'YOUR_API_KEY') {
+          try {
+            RNGeocoding.init(Config.GOOGLE_MAPS_API_KEY as string);
+          } catch (error) {
+            console.warn('Failed to initialize RNGeocoding:', error);
+          }
+        }
+
         console.log('[SafetyAlerts] Getting current position...');
 
         // Get current position using the utility (handles permissions internally)
         const position = await getCurrentPosition({
           timeout: 15000,
-          enableHighAccuracy: true,
-          retryAttempts: 2,
+          enableHighAccuracy: false,
+          retryAttempts: 1,
         });
 
         const { latitude, longitude } = position;
@@ -320,6 +396,8 @@ export const SafetyAlerts: React.FC<SafetyAlertsProps> = ({
         console.error('[SafetyAlerts] Location error:', error);
         // Show error message to user
         setLocationName(error.message || 'Unable to get location');
+        setAlerts(defaultAlerts);
+        setFetchingAlerts(false);
         setLocationLoading(false);
       }
     };
@@ -328,41 +406,45 @@ export const SafetyAlerts: React.FC<SafetyAlertsProps> = ({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []); // Run only once on mount
 
-  // const fetchAlerts = useCallback(async () => {
-  //   try {
-  //     const lat = userLocation?.latitude || DEFAULT_REGION.latitude;
-  //     const lon = userLocation?.longitude || DEFAULT_REGION.longitude;
-  //     const fetchedAlerts = await SafetyService.getSafetyPredictions(lat, lon);
-  //     setAlerts(fetchedAlerts ?? []);
-  //   } catch (err: any) {
-  //     console.error('Error fetching quick safety alerts:', err);
-  //   }
-  // }, [userLocation]);
-
   return (
     <View className="px-6">
       {/* Location Status */}
-      <View className="flex-row items-center mb-6">
-        <Text className="text-base font-gilroy-medium text-gray-700" numberOfLines={1}>
-          {locationLoading
-            ? 'Getting location...'
-            : fetchingAlerts
-            ? 'Loading predictions...'
-            : locationName}
-        </Text>
+      <View className="flex-row items-center justify-between mb-6">
+        <View className="flex-row items-center flex-1">
+          <Text
+            className="text-base font-gilroy-medium text-gray-700"
+            numberOfLines={1}
+            style={{ flexShrink: 1 }}
+          >
+            {locationLoading
+              ? 'Getting location...'
+              : fetchingAlerts
+              ? 'Loading predictions...'
+              : locationName}
+          </Text>
+          {!locationLoading && !fetchingAlerts && (
+            <View className="flex-row items-center ml-2">
+              <Animated.View
+                className="w-2 h-2 rounded-full mr-1"
+                style={{
+                  backgroundColor: pulseAnim.interpolate({
+                    inputRange: [0, 1],
+                    outputRange: ['#6EE7B7', '#10B981'],
+                  }),
+                }}
+              />
+              <Text className="text-base font-gilroy-medium text-gray-700">Live</Text>
+            </View>
+          )}
+        </View>
         {!locationLoading && !fetchingAlerts && (
-          <View className="flex-row items-center ml-2">
-            <Animated.View
-              className="w-2 h-2 rounded-full mr-1"
-              style={{
-                backgroundColor: pulseAnim.interpolate({
-                  inputRange: [0, 1],
-                  outputRange: ['#6EE7B7', '#10B981'], // Light green to normal green
-                }),
-              }}
-            />
-            <Text className="text-base font-gilroy-medium text-gray-700">Live</Text>
-          </View>
+          <TouchableOpacity
+            onPress={handleRefresh}
+            className="ml-3 w-8 h-8 rounded-full bg-gray-100 items-center justify-center"
+            activeOpacity={0.6}
+          >
+            <FontAwesome5 name="sync-alt" size={14} color="#6B7280" />
+          </TouchableOpacity>
         )}
       </View>
 
@@ -633,18 +715,36 @@ export const SafetyAlerts: React.FC<SafetyAlertsProps> = ({
               <ActivityIndicator size="large" color="#F97316" />
               <Text className="text-sm text-gray-600 mt-2">Loading your location...</Text>
             </View>
+          ) : !hasValidUserLocation ? (
+            <View className="flex-1 items-center justify-center bg-gray-100 px-4">
+              <FontAwesome5 name="map-marker-alt" size={24} color="#9CA3AF" />
+              <Text className="text-sm text-gray-600 mt-2 text-center">
+                Location unavailable. Showing alerts without live map preview.
+              </Text>
+            </View>
+          ) : useLitePreviewMap ? (
+            <View className="flex-1 items-center justify-center bg-gray-100 px-4">
+              <FontAwesome5 name="map" size={24} color="#6B7280" />
+              <Text className="text-sm text-gray-700 mt-2 text-center font-gilroy-medium">
+                Map preview is simplified on Android for stability.
+              </Text>
+              <Text className="text-xs text-gray-500 mt-1 text-center">
+                Tap below to view the full live safety map.
+              </Text>
+            </View>
           ) : (
             <MapView
               className="flex-1"
-              provider={Platform.OS === 'android' ? PROVIDER_GOOGLE : undefined}
+              provider={!useLitePreviewMap && shouldUseGoogleProvider ? PROVIDER_GOOGLE : undefined}
               initialRegion={mapRegion}
               scrollEnabled={false}
               zoomEnabled={false}
               pitchEnabled={false}
               rotateEnabled={false}
+              liteMode={useLitePreviewMap}
             >
               {/* Risk circle around current location */}
-              {userLocation && (
+              {hasValidUserLocation && userLocation && (
                 <>
                   <Circle
                     center={{

@@ -1,5 +1,6 @@
 import React from 'react';
-import { View, Text, SafeAreaView, StatusBar } from 'react-native';
+import { View, Text, StatusBar } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import FontAwesome5 from 'react-native-vector-icons/FontAwesome5';
 
 export const TripsScreen: React.FC = () => {

@@ -27,7 +27,7 @@ export interface GeolocationError {
 
 const DEFAULT_OPTIONS: Required<GeolocationOptions> = {
   timeout: 15000, // 15 seconds
-  maximumAge: 10000, // 10 seconds
+  maximumAge: 0, // force fresh location by default
   enableHighAccuracy: true,
   retryAttempts: 2,
   retryDelay: 1000, // 1 second
@@ -40,17 +40,19 @@ const DEFAULT_OPTIONS: Required<GeolocationOptions> = {
 export const requestLocationPermission = async (): Promise<boolean> => {
   try {
     if (Platform.OS === 'android') {
-      const granted = await PermissionsAndroid.request(
+      const granted = await PermissionsAndroid.requestMultiple([
         PermissionsAndroid.PERMISSIONS.ACCESS_FINE_LOCATION,
-        {
-          title: 'Location Permission',
-          message: 'This app needs access to your location for safety features.',
-          buttonNeutral: 'Ask Me Later',
-          buttonNegative: 'Cancel',
-          buttonPositive: 'OK',
-        },
-      );
-      return granted === PermissionsAndroid.RESULTS.GRANTED;
+        PermissionsAndroid.PERMISSIONS.ACCESS_COARSE_LOCATION,
+      ]);
+
+      const fineGranted =
+        granted[PermissionsAndroid.PERMISSIONS.ACCESS_FINE_LOCATION] ===
+        PermissionsAndroid.RESULTS.GRANTED;
+      const coarseGranted =
+        granted[PermissionsAndroid.PERMISSIONS.ACCESS_COARSE_LOCATION] ===
+        PermissionsAndroid.RESULTS.GRANTED;
+
+      return fineGranted || coarseGranted;
     }
     // For iOS, assume permission is granted if user hasn't denied in settings
     return true;
@@ -121,9 +123,17 @@ export const getCurrentPosition = async (
 
   // Attempt to get position with retries
   for (let attempt = 0; attempt <= config.retryAttempts; attempt++) {
+    const useHighAccuracy = attempt === 0 ? config.enableHighAccuracy : false;
+    const attemptTimeout = useHighAccuracy ? config.timeout : Math.max(config.timeout, 20000);
+    const attemptMaximumAge = useHighAccuracy ? config.maximumAge : 0;
+
     try {
       const position = await new Promise<LocationCoords>((resolve, reject) => {
-        console.log(`[Geolocation] Attempt ${attempt + 1}/${config.retryAttempts + 1}`);
+        console.log(
+          `[Geolocation] Attempt ${attempt + 1}/${config.retryAttempts + 1} (${
+            useHighAccuracy ? 'high' : 'low'
+          } accuracy)`,
+        );
 
         Geolocation.getCurrentPosition(
           pos => {
@@ -157,9 +167,9 @@ export const getCurrentPosition = async (
             } as GeolocationError);
           },
           {
-            timeout: config.timeout,
-            maximumAge: config.maximumAge,
-            enableHighAccuracy: config.enableHighAccuracy,
+            timeout: attemptTimeout,
+            maximumAge: attemptMaximumAge,
+            enableHighAccuracy: useHighAccuracy,
           },
         );
       });
@@ -167,6 +177,11 @@ export const getCurrentPosition = async (
       return position;
     } catch (error) {
       lastError = error as GeolocationError;
+
+      // Permission errors won't recover with retries
+      if (lastError.code === 1) {
+        break;
+      }
 
       // If this isn't the last attempt, wait before retrying
       if (attempt < config.retryAttempts) {
