@@ -1,6 +1,7 @@
 import { useEffect, useRef } from 'react';
 import { Toast } from 'react-native-toast-notifications';
 import { NotificationService, NotificationPayload } from '@services/NotificationService';
+import { UVLocationMonitorService } from '@services/UVLocationMonitorService';
 import { navigate } from '../navigation/navigationRef';
 
 export const useNotifications = () => {
@@ -78,6 +79,11 @@ export const useNotifications = () => {
         });
 
         isInitializedRef.current = true;
+
+        // Resume UV location monitoring if the user had it enabled
+        UVLocationMonitorService.syncWithPreference().catch(err =>
+          console.warn('[useNotifications] UV monitor sync failed:', err),
+        );
       } catch (error) {
         console.error('[useNotifications] Initialization error:', error);
         isInitializedRef.current = true;

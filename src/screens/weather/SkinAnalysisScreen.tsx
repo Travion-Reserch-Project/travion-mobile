@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import {
   View,
   Text,
@@ -8,14 +8,18 @@ import {
   Alert,
   ActivityIndicator,
   Platform,
+  Animated,
+  Dimensions,
+  StyleSheet,
 } from 'react-native';
 import FontAwesome from 'react-native-vector-icons/FontAwesome';
+import LinearGradient from 'react-native-linear-gradient';
 import { MainStackParamList } from '@navigation/MainNavigator';
 import { RouteProp, useNavigation, useRoute } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { launchCamera, launchImageLibrary, ImagePickerResponse } from 'react-native-image-picker';
 
-// Use the stack navigation type for this screen so navigate/goBack are scoped correctly
+const { width } = Dimensions.get('window');
 type NavigationProp = NativeStackNavigationProp<MainStackParamList, 'SkinAnalysis'>;
 type RouteProps = RouteProp<MainStackParamList, 'SkinAnalysis'>;
 
@@ -27,10 +31,40 @@ const SkinAnalysisScreen: React.FC = () => {
   const [selectedImage, setSelectedImage] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
 
+  const fadeIn = useRef(new Animated.Value(0)).current;
+  const slideUp = useRef(new Animated.Value(30)).current;
+  const imgScale = useRef(new Animated.Value(0.9)).current;
+  const imgFade = useRef(new Animated.Value(0)).current;
+  const btnSlide = useRef(new Animated.Value(40)).current;
+  const btnFade = useRef(new Animated.Value(0)).current;
+  const pulseAnim = useRef(new Animated.Value(1)).current;
+
+  useEffect(() => {
+    Animated.sequence([
+      Animated.parallel([
+        Animated.timing(fadeIn, { toValue: 1, duration: 400, useNativeDriver: true }),
+        Animated.spring(slideUp, { toValue: 0, tension: 50, friction: 8, useNativeDriver: true }),
+      ]),
+      Animated.parallel([
+        Animated.spring(imgScale, { toValue: 1, tension: 50, friction: 7, useNativeDriver: true }),
+        Animated.timing(imgFade, { toValue: 1, duration: 500, useNativeDriver: true }),
+      ]),
+      Animated.parallel([
+        Animated.spring(btnSlide, { toValue: 0, tension: 60, friction: 8, useNativeDriver: true }),
+        Animated.timing(btnFade, { toValue: 1, duration: 400, useNativeDriver: true }),
+      ]),
+    ]).start();
+
+    Animated.loop(
+      Animated.sequence([
+        Animated.timing(pulseAnim, { toValue: 1.04, duration: 1000, useNativeDriver: true }),
+        Animated.timing(pulseAnim, { toValue: 1, duration: 1000, useNativeDriver: true }),
+      ]),
+    ).start();
+  }, [fadeIn, slideUp, imgScale, imgFade, btnSlide, btnFade, pulseAnim]);
+
   const handleImageSelection = (response: ImagePickerResponse) => {
-    if (response.didCancel) {
-      return;
-    }
+    if (response.didCancel) return;
     if (response.errorCode) {
       Alert.alert('Error', response.errorMessage || 'Failed to select image');
       return;
@@ -41,25 +75,11 @@ const SkinAnalysisScreen: React.FC = () => {
   };
 
   const openGallery = () => {
-    launchImageLibrary(
-      {
-        mediaType: 'photo',
-        quality: 1,
-        selectionLimit: 1,
-      },
-      handleImageSelection,
-    );
+    launchImageLibrary({ mediaType: 'photo', quality: 1, selectionLimit: 1 }, handleImageSelection);
   };
 
   const openCamera = () => {
-    launchCamera(
-      {
-        mediaType: 'photo',
-        quality: 1,
-        saveToPhotos: true,
-      },
-      handleImageSelection,
-    );
+    launchCamera({ mediaType: 'photo', quality: 1, saveToPhotos: true }, handleImageSelection);
   };
 
   const analyzeSkin = async () => {
@@ -67,37 +87,22 @@ const SkinAnalysisScreen: React.FC = () => {
       Alert.alert('No Image', 'Please select an image first');
       return;
     }
-
     setIsLoading(true);
     try {
       const formData = new FormData();
       formData.append('file', {
-        uri: selectedImage,
-        type: 'image/jpeg',
-        name: 'skin_image.jpg',
+        uri: selectedImage, type: 'image/jpeg', name: 'skin_image.jpg',
       } as any);
 
-      // Use 10.0.2.2 for Android emulator to reach host machine
-      // For physical device, use your machine's actual IP address (e.g., 192.168.x.x)
-      const API_URL =
-        Platform.OS === 'android'
-          ? 'http://10.0.2.2:8002/api/skin/fitzpatrick_predict'
-          : 'http://localhost:8002/api/skin/fitzpatrick_predict';
+      const API_URL = Platform.OS === 'android'
+        ? 'http://10.0.2.2:8002/api/skin/fitzpatrick_predict'
+        : 'http://localhost:8002/api/skin/fitzpatrick_predict';
 
-      const response = await fetch(API_URL, {
-        method: 'POST',
-        body: formData,
-      });
-
-      if (!response.ok) {
-        throw new Error('Failed to analyze skin');
-      }
-
+      const response = await fetch(API_URL, { method: 'POST', body: formData });
+      if (!response.ok) throw new Error('Failed to analyze skin');
       const data = await response.json();
       navigation.navigate('SkinAnalysisResult', {
-        imageUrl: selectedImage,
-        skinType: data.predicted_skin_type,
-        age,
+        imageUrl: selectedImage, skinType: data.predicted_skin_type, age,
       });
     } catch (error) {
       Alert.alert('Error', 'Failed to analyze skin. Please try again.');
@@ -108,100 +113,168 @@ const SkinAnalysisScreen: React.FC = () => {
   };
 
   useEffect(() => {
-    if (imageUrl) {
-      setSelectedImage(imageUrl);
-    }
+    if (imageUrl) setSelectedImage(imageUrl);
   }, [imageUrl]);
 
   return (
-    <View className="flex-1 bg-white px-6">
-      <StatusBar barStyle="dark-content" backgroundColor="#ffffff" />
+    <View style={s.container}>
+      <StatusBar translucent backgroundColor="transparent" barStyle="dark-content" />
 
       {/* Header */}
-      <View className="flex-row items-center mt-10 mb-10">
+      <Animated.View style={[s.header, { opacity: fadeIn }]}>
         <TouchableOpacity
-          className="mr-4"
-          onPress={() =>
-            navigation.navigate('HealthProfileSetup', { imageUrl: selectedImage ?? '' })
-          }
+          style={s.backBtn}
+          onPress={() => navigation.navigate('HealthProfileSetup', { imageUrl: selectedImage ?? '' })}
         >
-          <FontAwesome name="arrow-left" size={18} color="#0f172a" />
+          <FontAwesome name="arrow-left" size={16} color="#0f172a" />
         </TouchableOpacity>
-        <Text className="text-lg font-bold text-slate-900">Skin Analysis</Text>
-      </View>
+        <Text style={s.headerTitle}>Skin Analysis</Text>
+        <View style={s.headerSpacer} />
+      </Animated.View>
 
       {/* Title */}
-      <Text className="text-3xl font-extrabold text-slate-900 text-center mb-3">
-        Let's check your{'\n'}sensitivity.
-      </Text>
-
-      <Text className="text-slate-500 text-center text-base mb-8 px-4">
-        Upload a clear image in good lighting,{'\n'}
-        without filters.
-      </Text>
+      <Animated.View style={[s.titleWrap, { opacity: fadeIn, transform: [{ translateY: slideUp }] }]}>
+        <Text style={s.title}>Let's check your{'\n'}sensitivity.</Text>
+        <Text style={s.subtitle}>Upload a clear image in good lighting,{'\n'}without filters.</Text>
+      </Animated.View>
 
       {/* Image Upload Area */}
-      <View className="items-center mb-10">
-        <View className="w-full h-80 rounded-3xl border-2 border-dashed border-orange-200 bg-orange-50 items-center justify-center overflow-hidden">
+      <Animated.View style={[s.imageSection, { opacity: imgFade, transform: [{ scale: imgScale }] }]}>
+        <View style={s.imageCard}>
           {selectedImage ? (
-            <Image source={{ uri: selectedImage }} className="w-full h-full" resizeMode="cover" />
+            <Image source={{ uri: selectedImage }} style={s.uploadedImage} resizeMode="cover" />
           ) : (
-            <>
-              <View className="w-24 h-24 rounded-full bg-white items-center justify-center shadow-sm mb-4">
-                <FontAwesome name="user" size={32} color="#f97316" />
+            <Animated.View style={[s.emptyState, { transform: [{ scale: pulseAnim }] }]}>
+              <View style={s.emptyIcon}>
+                <FontAwesome name="user" size={32} color="#F5840E" />
               </View>
-
-              <Text className="text-lg font-bold text-slate-900 mb-1">No Image Selected</Text>
-              <Text className="text-slate-500 text-sm">Use the buttons below to add a photo</Text>
-            </>
+              <Text style={s.emptyTitle}>No Image Selected</Text>
+              <Text style={s.emptyDesc}>Use the buttons below to add a photo</Text>
+            </Animated.View>
+          )}
+          {selectedImage && (
+            <View style={s.imageBadge}>
+              <FontAwesome name="check-circle" size={12} color="#22c55e" />
+              <Text style={s.imageBadgeText}>Photo Ready</Text>
+            </View>
           )}
         </View>
-      </View>
+      </Animated.View>
 
       {/* Camera / Gallery Buttons */}
-      <View className="flex-row justify-between mb-10">
-        <TouchableOpacity
-          className="flex-1 bg-white border border-slate-200 rounded-2xl py-5 mr-3 items-center"
-          onPress={openCamera}
-        >
-          <FontAwesome name="camera" size={22} color="#f97316" />
-          <Text className="mt-2 font-semibold text-slate-900">Camera</Text>
+      <Animated.View style={[s.btnRow, { opacity: btnFade, transform: [{ translateY: btnSlide }] }]}>
+        <TouchableOpacity style={s.optionBtn} onPress={openCamera}>
+          <View style={s.optionIcon}>
+            <FontAwesome name="camera" size={22} color="#F5840E" />
+          </View>
+          <Text style={s.optionLabel}>Camera</Text>
         </TouchableOpacity>
-
-        <TouchableOpacity
-          className="flex-1 bg-white border border-slate-200 rounded-2xl py-5 ml-3 items-center"
-          onPress={openGallery}
-        >
-          <FontAwesome name="image" size={22} color="#94a3b8" />
-          <Text className="mt-2 font-semibold text-slate-900">Gallery</Text>
+        <TouchableOpacity style={s.optionBtn} onPress={openGallery}>
+          <View style={[s.optionIcon, { backgroundColor: '#F1F5F9' }]}>
+            <FontAwesome name="image" size={22} color="#64748b" />
+          </View>
+          <Text style={s.optionLabel}>Gallery</Text>
         </TouchableOpacity>
-      </View>
+      </Animated.View>
 
       {/* CTA */}
-      <TouchableOpacity
-        className="bg-primary rounded-full px-10 py-5 flex-row justify-center items-center shadow-lg"
-        onPress={analyzeSkin}
-        disabled={isLoading}
-      >
-        {isLoading ? (
-          <ActivityIndicator color="#ffffff" size="small" />
-        ) : (
-          <>
-            <FontAwesome name="search" size={18} color="#ffffff" />
-            <Text className="text-white font-extrabold text-lg mr-3">Analyze Skin Type</Text>
-          </>
-        )}
-      </TouchableOpacity>
-
-      {/* Privacy Note */}
-      <View className="flex-row justify-center items-center">
-        <FontAwesome name="lock" size={12} color="#94a3b8" />
-        <Text className="ml-2 text-slate-500 text-xs">
-          Your photo is processed locally for privacy.
-        </Text>
+      <View style={s.ctaWrap}>
+        <TouchableOpacity activeOpacity={0.85} onPress={analyzeSkin} disabled={isLoading}>
+          <LinearGradient
+            colors={['#F5840E', '#ea580c']}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 0 }}
+            style={s.ctaBtn}
+          >
+            {isLoading ? (
+              <ActivityIndicator color="#ffffff" size="small" />
+            ) : (
+              <>
+                <FontAwesome name="search" size={16} color="#ffffff" />
+                <Text style={s.ctaText}>Analyze Skin Type</Text>
+                <View style={s.ctaArrow}>
+                  <FontAwesome name="arrow-right" size={12} color="#F5840E" />
+                </View>
+              </>
+            )}
+          </LinearGradient>
+        </TouchableOpacity>
+        <View style={s.privacyWrap}>
+          <FontAwesome name="lock" size={11} color="#94a3b8" />
+          <Text style={s.privacyText}>Your photo is processed locally for privacy.</Text>
+        </View>
       </View>
     </View>
   );
 };
+
+const s = StyleSheet.create({
+  container: { flex: 1, backgroundColor: '#ffffff' },
+  header: {
+    flexDirection: 'row', alignItems: 'center', paddingHorizontal: 20,
+    paddingTop: (StatusBar.currentHeight || 0) + 8, paddingBottom: 8,
+  },
+  backBtn: {
+    width: 40, height: 40, borderRadius: 20, backgroundColor: '#F3F4F6',
+    alignItems: 'center', justifyContent: 'center',
+  },
+  headerTitle: { flex: 1, textAlign: 'center', fontSize: 17, fontWeight: '700', color: '#0f172a' },
+  headerSpacer: { width: 40 },
+  titleWrap: { alignItems: 'center', paddingHorizontal: 20, paddingTop: 16, paddingBottom: 12 },
+  title: { fontSize: 28, fontWeight: '900', color: '#0f172a', textAlign: 'center', lineHeight: 34 },
+  subtitle: { fontSize: 14, color: '#64748b', textAlign: 'center', marginTop: 10, lineHeight: 20 },
+  imageSection: { alignItems: 'center', paddingHorizontal: 20, paddingTop: 8 },
+  imageCard: {
+    width: width - 40, height: 280, borderRadius: 28, overflow: 'hidden',
+    backgroundColor: '#FFF7ED', borderWidth: 2, borderStyle: 'dashed', borderColor: '#FDBA74',
+    shadowColor: '#000', shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.06, shadowRadius: 12, elevation: 3,
+  },
+  uploadedImage: { width: '100%', height: '100%' },
+  emptyState: { flex: 1, alignItems: 'center', justifyContent: 'center' },
+  emptyIcon: {
+    width: 72, height: 72, borderRadius: 36, backgroundColor: '#ffffff',
+    alignItems: 'center', justifyContent: 'center', marginBottom: 14,
+    shadowColor: '#000', shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.06, shadowRadius: 6, elevation: 2,
+  },
+  emptyTitle: { fontSize: 17, fontWeight: '700', color: '#0f172a', marginBottom: 4 },
+  emptyDesc: { fontSize: 13, color: '#94a3b8' },
+  imageBadge: {
+    position: 'absolute', bottom: 14, left: 14, flexDirection: 'row',
+    alignItems: 'center', backgroundColor: 'rgba(255,255,255,0.95)',
+    paddingHorizontal: 12, paddingVertical: 6, borderRadius: 20, gap: 6,
+  },
+  imageBadgeText: { fontSize: 12, fontWeight: '700', color: '#0f172a' },
+  btnRow: {
+    flexDirection: 'row', paddingHorizontal: 20, gap: 14, paddingTop: 20,
+  },
+  optionBtn: {
+    flex: 1, backgroundColor: '#ffffff', borderRadius: 20, paddingVertical: 20,
+    alignItems: 'center', borderWidth: 1, borderColor: '#E5E7EB',
+  },
+  optionIcon: {
+    width: 52, height: 52, borderRadius: 16, backgroundColor: '#FFF7ED',
+    alignItems: 'center', justifyContent: 'center', marginBottom: 8,
+  },
+  optionLabel: { fontSize: 14, fontWeight: '700', color: '#0f172a' },
+  ctaWrap: { marginTop: 'auto', paddingHorizontal: 20, paddingBottom: 32, alignItems: 'center' },
+  ctaBtn: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
+    height: 56, borderRadius: 28, width: width - 40, gap: 10,
+    shadowColor: '#F5840E', shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3, shadowRadius: 12, elevation: 6,
+  },
+  ctaText: { color: '#ffffff', fontSize: 17, fontWeight: '800' },
+  ctaArrow: {
+    width: 26, height: 26, borderRadius: 13, backgroundColor: '#ffffff',
+    alignItems: 'center', justifyContent: 'center',
+  },
+  privacyWrap: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
+    marginTop: 12, gap: 6,
+  },
+  privacyText: { fontSize: 12, color: '#94a3b8' },
+});
 
 export default SkinAnalysisScreen;
