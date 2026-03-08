@@ -17,13 +17,15 @@ import { BaseApiService } from './api/BaseApiService';
 const DEVICE_TOKEN_KEY = '@device_token';
 
 export interface NotificationPayload {
-  type: 'incident_alert' | 'system';
+  type: 'incident_alert' | 'system' | 'uv_health_alert';
   screen?: string;
   incidentId?: string;
   latitude?: number;
   longitude?: number;
   title?: string;
   body?: string;
+  uvIndex?: string;
+  riskLevel?: string;
 }
 
 const requestAndroidNotificationPermission = async (): Promise<boolean> => {
@@ -56,6 +58,15 @@ const createNotificationChannel = async (): Promise<void> => {
       id: 'default',
       name: 'Default Channel',
       importance: AndroidImportance.HIGH,
+    });
+
+    // Create dedicated UV health alerts channel
+    await notifee.createChannel({
+      id: 'uv_health_alerts',
+      name: 'UV Health Alerts',
+      description: 'Real-time UV exposure health alerts',
+      importance: AndroidImportance.HIGH,
+      sound: 'default',
     });
   } catch (error) {
     console.warn('[NotificationService] Failed to create notification channel:', error);
@@ -138,7 +149,9 @@ class NotificationServiceClass extends BaseApiService {
         const title = remoteMessage.notification?.title || 'New Message';
         const message = remoteMessage.notification?.body || 'You have a new notification';
         const notificationData: NotificationPayload = {
-          type: (remoteMessage.data?.type as 'incident_alert' | 'system') || 'system',
+          type:
+            (remoteMessage.data?.type as 'incident_alert' | 'system' | 'uv_health_alert') ||
+            'system',
           screen: remoteMessage.data?.screen as string | undefined,
           incidentId: remoteMessage.data?.incidentId as string | undefined,
           latitude: remoteMessage.data?.latitude
@@ -149,6 +162,8 @@ class NotificationServiceClass extends BaseApiService {
             : undefined,
           title,
           body: message,
+          uvIndex: remoteMessage.data?.uvIndex as string | undefined,
+          riskLevel: remoteMessage.data?.riskLevel as string | undefined,
         };
 
         // Display local notification
