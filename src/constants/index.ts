@@ -4,12 +4,13 @@ export const APP_NAME = 'Travion';
 export const APP_VERSION = '1.0.0';
 
 // API Configuration
-const DEV_MACHINE_IP = '10.202.187.170';
+const ANDROID_EMULATOR_HOST = '10.0.2.2';
 
 export const API_CONFIG = {
   BASE_URL: __DEV__
     ? Platform.OS === 'android'
-      ? `http://${DEV_MACHINE_IP}:3001`
+      ? // Android emulator must call host machine through 10.0.2.2
+        `http://${ANDROID_EMULATOR_HOST}:3001`
       : 'http://localhost:3001'
     : 'https://api.travion.online',
   API_VERSION: '/api/v1',
