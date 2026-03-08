@@ -17,17 +17,17 @@ import MaterialCommunityIcons from 'react-native-vector-icons/MaterialCommunityI
 import Ionicons from 'react-native-vector-icons/Ionicons';
 import LinearGradient from 'react-native-linear-gradient';
 import LottieView from 'lottie-react-native';
-import { aiService, locationService } from '../services/api';
-import { useAuthStore } from '../stores';
-import { haversineDistance, calculateMatchScore } from '../utils';
-import { TourPlanModal } from '../components/modals/TourPlanModal';
-import type { TravelPreferenceScores } from '../types';
+import { aiService, locationService } from '../../services/api';
+import { useAuthStore } from '../../stores';
+import { haversineDistance, calculateMatchScore } from '../../utils';
+import { TourPlanModal } from '../../components/modals/TourPlanModal';
+import type { TravelPreferenceScores } from '../../types';
 import type {
     SimpleCrowdPredictionResponse,
     SimpleGoldenHourResponse,
     SimpleDescriptionResponse,
-} from '../services/api/AIService';
-import type { LocationDetailsResponse } from '../services/api/LocationService';
+} from '../../services/api/AIService';
+import type { LocationDetailsResponse } from '../../services/api/LocationService';
 
 const { width, height } = Dimensions.get('window');
 const IMAGE_HEIGHT = height * 0.45;
@@ -35,7 +35,7 @@ const BOTTOM_BAR_HEIGHT = Platform.OS === 'ios' ? 100 : 85;
 const STATUS_BAR_HEIGHT = Platform.OS === 'ios' ? 50 : StatusBar.currentHeight || 24;
 
 // Loading animation
-const loadingAnimation = require('../assets/animations/onbord1.json');
+const loadingAnimation = require('../../assets/animations/onbord1.json');
 
 // App Theme Colors
 const THEME = {

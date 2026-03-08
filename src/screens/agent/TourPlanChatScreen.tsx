@@ -36,6 +36,8 @@ import {
   type ClarificationQuestion,
   type CulturalTip,
   type EventInfo,
+  type FinalItinerary,
+  type HotelSearchResult,
 } from '../../services/api';
 
 const { width } = Dimensions.get('window');
@@ -87,7 +89,7 @@ interface TourPlanChatScreenProps {
 
 interface ChatMessage {
   id: string;
-  role: 'user' | 'assistant' | 'plan' | 'clarification' | 'event';
+  role: 'user' | 'assistant' | 'plan' | 'clarification' | 'event' | 'weather_alert' | 'hotel_results';
   content: string;
   timestamp: Date;
   planData?: {
@@ -96,9 +98,13 @@ interface ChatMessage {
     warnings?: string[];
     tips?: string[];
     culturalTips?: CulturalTip[];
+    finalItinerary?: FinalItinerary;
+    weatherData?: Record<string, any>;
   };
   clarificationData?: ClarificationQuestion;
   events?: EventInfo[];
+  interruptReason?: string;
+  hotelResults?: HotelSearchResult[];
 }
 
 // Format timestamp like WhatsApp (HH:MM)
@@ -185,6 +191,130 @@ const EventBubble: React.FC<{ events: EventInfo[] }> = ({ events }) => {
             </View>
           </View>
         ))}
+      </View>
+    </Animated.View>
+  );
+};
+
+// Weather alert bubble (shown when constraint interrupt is weather-related)
+const WeatherAlertBubble: React.FC<{ message: ChatMessage }> = ({ message }) => {
+  const fadeAnim = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    Animated.timing(fadeAnim, {
+      toValue: 1,
+      duration: 300,
+      useNativeDriver: true,
+    }).start();
+  }, [fadeAnim]);
+
+  const reason = message.interruptReason || '';
+  const isRain = reason.includes('rain');
+  const isHeat = reason.includes('heat');
+  const isPoya = reason.includes('poya');
+
+  const getAlertConfig = () => {
+    if (isRain) return { icon: 'weather-pouring', color: '#3B82F6', label: 'Rain Alert' };
+    if (isHeat) return { icon: 'weather-sunny-alert', color: '#EF4444', label: 'Heat Alert' };
+    if (isPoya) return { icon: 'moon-waning-crescent', color: '#7C3AED', label: 'Poya Day Alert' };
+    return { icon: 'alert-circle', color: '#F59E0B', label: 'Weather Alert' };
+  };
+
+  const config = getAlertConfig();
+
+  return (
+    <Animated.View style={[styles.aiBubbleRow, { opacity: fadeAnim }]}>
+      <View style={[styles.weatherAlertBubble, { borderLeftColor: config.color }]}>
+        <View style={styles.weatherAlertHeader}>
+          <MaterialCommunityIcons name={config.icon} size={18} color={config.color} />
+          <Text style={[styles.weatherAlertLabel, { color: config.color }]}>{config.label}</Text>
+        </View>
+        <Text style={styles.weatherAlertText}>{message.content}</Text>
+        <Text style={styles.bubbleTime}>{formatTime(message.timestamp)}</Text>
+      </View>
+    </Animated.View>
+  );
+};
+
+// Hotel search results card
+const HotelSearchCard: React.FC<{ message: ChatMessage }> = ({ message }) => {
+  const fadeAnim = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    Animated.timing(fadeAnim, {
+      toValue: 1,
+      duration: 300,
+      useNativeDriver: true,
+    }).start();
+  }, [fadeAnim]);
+
+  if (!message.hotelResults || message.hotelResults.length === 0) return null;
+
+  const getTypeIcon = (type: string): string => {
+    if (type === 'restaurant') return 'food-fork-drink';
+    if (type === 'bar') return 'glass-cocktail';
+    return 'bed';
+  };
+
+  const getPriceColor = (price?: string): string => {
+    if (price === '$$$') return '#EF4444';
+    if (price === '$$') return '#F59E0B';
+    return '#10B981';
+  };
+
+  const renderStars = (rating?: number) => {
+    if (!rating) return null;
+    const fullStars = Math.floor(rating);
+    const stars = [];
+    for (let i = 0; i < 5; i++) {
+      stars.push(
+        <FontAwesome5
+          key={i}
+          name="star"
+          solid={i < fullStars}
+          size={10}
+          color={i < fullStars ? '#F59E0B' : THEME.gray[300]}
+          style={{ marginRight: 1 }}
+        />,
+      );
+    }
+    return <View style={{ flexDirection: 'row', marginTop: 2 }}>{stars}</View>;
+  };
+
+  return (
+    <Animated.View style={[styles.aiBubbleRow, { opacity: fadeAnim }]}>
+      <View style={styles.hotelSearchBubble}>
+        <View style={styles.hotelSearchHeader}>
+          <MaterialCommunityIcons name="magnify" size={16} color={THEME.primary} />
+          <Text style={styles.hotelSearchTitle}>
+            {message.hotelResults[0]?.type === 'restaurant' ? 'Restaurants' :
+             message.hotelResults[0]?.type === 'bar' ? 'Nightlife' : 'Hotels'} Found
+          </Text>
+        </View>
+        {message.hotelResults.map((result, index) => (
+          <View key={index} style={styles.hotelResultItem}>
+            <View style={styles.hotelResultIcon}>
+              <MaterialCommunityIcons
+                name={getTypeIcon(result.type)}
+                size={16}
+                color={THEME.primary}
+              />
+            </View>
+            <View style={styles.hotelResultContent}>
+              <View style={styles.hotelResultNameRow}>
+                <Text style={styles.hotelResultName} numberOfLines={1}>{result.name}</Text>
+                {result.price_range && (
+                  <Text style={[styles.hotelPriceBadge, { color: getPriceColor(result.price_range) }]}>
+                    {result.price_range}
+                  </Text>
+                )}
+              </View>
+              {renderStars(result.rating)}
+              <Text style={styles.hotelResultDesc} numberOfLines={2}>{result.description}</Text>
+            </View>
+          </View>
+        ))}
+        <Text style={styles.bubbleTime}>{formatTime(message.timestamp)}</Text>
       </View>
     </Animated.View>
   );
@@ -304,6 +434,8 @@ const MessageBubble: React.FC<{
           warnings={message.planData.warnings}
           tips={message.planData.tips}
           culturalTips={message.planData.culturalTips}
+          finalItinerary={message.planData.finalItinerary}
+          weatherData={message.planData.weatherData}
           onAccept={onAcceptPlan}
           onModify={onModifyPlan}
           isLoading={isAccepting}
@@ -398,10 +530,10 @@ export const TourPlanChatScreen: React.FC<TourPlanChatScreenProps> = ({ route, n
   const scrollViewRef = useRef<ScrollView>(null);
   const inputRef = useRef<TextInput>(null);
 
-  // Initial plan generation
+  // Initial plan generation - runs once on mount
   useEffect(() => {
     generateInitialPlan();
-  });
+  }, []);
 
   // Scroll to bottom on new messages
   useEffect(() => {
@@ -434,6 +566,25 @@ export const TourPlanChatScreen: React.FC<TourPlanChatScreenProps> = ({ route, n
       });
     }
 
+    // Show weather alert if constraint interrupt triggered
+    if (response.interruptReason) {
+      const alertText = response.interruptReason.includes('rain')
+        ? 'Heavy rain is predicted for some locations. The AI has flagged this for your review.'
+        : response.interruptReason.includes('heat')
+        ? 'Extreme heat conditions detected. Consider adjusting outdoor activities.'
+        : response.interruptReason.includes('poya')
+        ? 'A Poya day falls within your trip dates. Some restrictions may apply.'
+        : 'A weather or safety constraint has been detected for your trip.';
+
+      newMessages.push({
+        id: (Date.now() + 0.5).toString(),
+        role: 'weather_alert',
+        content: alertText,
+        timestamp: new Date(),
+        interruptReason: response.interruptReason,
+      });
+    }
+
     // Check if clarification is needed
     if (response.clarificationQuestion) {
       newMessages.push({
@@ -456,6 +607,8 @@ export const TourPlanChatScreen: React.FC<TourPlanChatScreenProps> = ({ route, n
           warnings: response.warnings,
           tips: response.tips,
           culturalTips: response.culturalTips,
+          finalItinerary: response.finalItinerary,
+          weatherData: response.weatherData,
         },
       });
     } else {
@@ -689,11 +842,57 @@ export const TourPlanChatScreen: React.FC<TourPlanChatScreenProps> = ({ route, n
     [threadId, isSending, selectedLocations, startDate, endDate, preferences],
   );
 
+  // Hotel search handler
+  const handleHotelSearch = useCallback(
+    async (searchQuery: string) => {
+      if (isSending) return;
+      setIsSending(true);
+
+      const userMessage: ChatMessage = {
+        id: Date.now().toString(),
+        role: 'user',
+        content: searchQuery,
+        timestamp: new Date(),
+      };
+      setMessages(prev => [...prev, userMessage]);
+
+      try {
+        const firstLocation = selectedLocations[0]?.name;
+        const response = await tourPlanService.searchHotels(searchQuery, firstLocation);
+
+        const resultsMessage: ChatMessage = {
+          id: (Date.now() + 1).toString(),
+          role: 'hotel_results',
+          content: `Found ${response.total_results} options`,
+          timestamp: new Date(),
+          hotelResults: response.results,
+        };
+        setMessages(prev => [...prev, resultsMessage]);
+      } catch (err: any) {
+        console.error('Hotel search failed:', err);
+        setMessages(prev => [
+          ...prev,
+          {
+            id: (Date.now() + 1).toString(),
+            role: 'assistant',
+            content: `Couldn't find results. Please try again.`,
+            timestamp: new Date(),
+          },
+        ]);
+      } finally {
+        setIsSending(false);
+      }
+    },
+    [isSending, selectedLocations],
+  );
+
   const quickReplies = [
     { text: 'More photo time', icon: 'camera' },
     { text: 'Avoid crowds', icon: 'users' },
     { text: 'Add food spots', icon: 'utensils' },
     { text: 'Start later', icon: 'clock' },
+    { text: 'Find hotels nearby', icon: 'hotel', isHotelSearch: true },
+    { text: 'Find restaurants', icon: 'utensils', isHotelSearch: true },
     { text: 'Add sunrise spot', icon: 'sun' },
     { text: 'More relaxation', icon: 'spa' },
   ];
@@ -763,6 +962,12 @@ export const TourPlanChatScreen: React.FC<TourPlanChatScreenProps> = ({ route, n
             if (message.role === 'event' && message.events) {
               return <EventBubble key={message.id} events={message.events} />;
             }
+            if (message.role === 'weather_alert') {
+              return <WeatherAlertBubble key={message.id} message={message} />;
+            }
+            if (message.role === 'hotel_results') {
+              return <HotelSearchCard key={message.id} message={message} />;
+            }
             if (message.role === 'clarification' && message.clarificationData) {
               return (
                 <ClarificationBubble
@@ -801,7 +1006,7 @@ export const TourPlanChatScreen: React.FC<TourPlanChatScreenProps> = ({ route, n
                   key={index}
                   text={qr.text}
                   icon={qr.icon}
-                  onPress={() => handleQuickReply(qr.text)}
+                  onPress={() => (qr as any).isHotelSearch ? handleHotelSearch(qr.text) : handleQuickReply(qr.text)}
                 />
               ))}
             </ScrollView>
@@ -1262,6 +1467,101 @@ const styles = StyleSheet.create({
   },
   sendButtonDisabled: {
     backgroundColor: THEME.gray[300],
+  },
+
+  // Weather Alert Bubble
+  weatherAlertBubble: {
+    backgroundColor: THEME.white,
+    borderRadius: 12,
+    borderLeftWidth: 4,
+    padding: 12,
+    maxWidth: width * 0.82,
+    elevation: 1,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.08,
+    shadowRadius: 2,
+  },
+  weatherAlertHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 6,
+  },
+  weatherAlertLabel: {
+    fontSize: 13,
+    fontFamily: 'Gilroy-Bold',
+    marginLeft: 6,
+  },
+  weatherAlertText: {
+    fontSize: 13.5,
+    fontFamily: 'Gilroy-Regular',
+    color: THEME.dark,
+    lineHeight: 19,
+  },
+
+  // Hotel Search Results
+  hotelSearchBubble: {
+    backgroundColor: THEME.white,
+    borderRadius: 12,
+    padding: 12,
+    maxWidth: width * 0.85,
+    elevation: 1,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.08,
+    shadowRadius: 2,
+  },
+  hotelSearchHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 10,
+  },
+  hotelSearchTitle: {
+    fontSize: 14,
+    fontFamily: 'Gilroy-Bold',
+    color: THEME.dark,
+    marginLeft: 6,
+  },
+  hotelResultItem: {
+    flexDirection: 'row',
+    paddingVertical: 8,
+    borderTopWidth: 1,
+    borderTopColor: THEME.gray[100],
+  },
+  hotelResultIcon: {
+    width: 32,
+    height: 32,
+    borderRadius: 8,
+    backgroundColor: '#FFF7ED',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 10,
+  },
+  hotelResultContent: {
+    flex: 1,
+  },
+  hotelResultNameRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  hotelResultName: {
+    fontSize: 13.5,
+    fontFamily: 'Gilroy-Bold',
+    color: THEME.dark,
+    flex: 1,
+  },
+  hotelPriceBadge: {
+    fontSize: 12,
+    fontFamily: 'Gilroy-Bold',
+    marginLeft: 6,
+  },
+  hotelResultDesc: {
+    fontSize: 12,
+    fontFamily: 'Gilroy-Regular',
+    color: THEME.gray[500],
+    marginTop: 3,
+    lineHeight: 16,
   },
 });
 

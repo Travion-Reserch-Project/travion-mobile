@@ -19,3 +19,4 @@ export * from './transport/TransportScreen';
 export * from './transport/ChatbotScreen';
 export * from './transport/TripsScreen';
 export * from './safety/IncidentMapScreen';
+export * from './agent/PreferencesOnboardingScreen';
