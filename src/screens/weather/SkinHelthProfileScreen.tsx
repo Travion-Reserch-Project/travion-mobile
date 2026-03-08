@@ -206,12 +206,17 @@ const SkinHelthProfileScreen: React.FC = () => {
 
             {/* Stats */}
             <View className="flex-row justify-between">
-              <View className="flex-1 bg-white rounded-2xl p-4 mr-3">
+              <View className="flex-1 bg-white rounded-2xl p-4 mr-2">
+                <Text className="text-xs text-slate-400 font-semibold mb-1">AGE</Text>
+                <Text className="text-lg font-extrabold text-slate-900">{age}</Text>
+              </View>
+
+              <View className="flex-1 bg-white rounded-2xl p-4 mx-2">
                 <Text className="text-xs text-slate-400 font-semibold mb-1">REC. SPF</Text>
                 <Text className="text-lg font-extrabold text-slate-900">{skinInfo.spf}</Text>
               </View>
 
-              <View className="flex-1 bg-white rounded-2xl p-4 ml-3">
+              <View className="flex-1 bg-white rounded-2xl p-4 ml-2">
                 <Text className="text-xs text-slate-400 font-semibold mb-1">MAX EXPOSURE</Text>
                 <Text className="text-lg font-extrabold text-slate-900">{skinInfo.exposure}</Text>
               </View>
