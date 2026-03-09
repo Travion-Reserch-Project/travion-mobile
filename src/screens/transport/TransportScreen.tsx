@@ -7,10 +7,12 @@ import {
   ActivityIndicator,
   TouchableOpacity,
   StyleSheet,
+  Platform,
 } from 'react-native';
 import FontAwesome5 from 'react-native-vector-icons/FontAwesome5';
 import RNGeocoding from 'react-native-geocoding';
 import Config from 'react-native-config';
+import MapView, { Marker, PROVIDER_GOOGLE } from 'react-native-maps';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import type { MainStackParamList } from '../../navigation/MainNavigator';
 import { getCurrentPosition } from '@utils';
@@ -22,6 +24,10 @@ interface TransportScreenProps {
 export const TransportScreen: React.FC<TransportScreenProps> = ({ navigation }) => {
   const [locationName, setLocationName] = useState<string>('Detecting location...');
   const [locationLoading, setLocationLoading] = useState<boolean>(true);
+  const [locationCoords, setLocationCoords] = useState<{
+    latitude: number;
+    longitude: number;
+  } | null>(null);
 
   // Initialize geocoding once
   useEffect(() => {
@@ -41,6 +47,7 @@ export const TransportScreen: React.FC<TransportScreenProps> = ({ navigation }) 
           retryAttempts: 1,
         });
         const { latitude, longitude } = position;
+        setLocationCoords({ latitude, longitude });
         try {
           if (Config.GOOGLE_MAPS_API_KEY) {
             const results = await RNGeocoding.from(latitude, longitude);
@@ -90,7 +97,12 @@ export const TransportScreen: React.FC<TransportScreenProps> = ({ navigation }) 
       <StatusBar barStyle="dark-content" backgroundColor="#FFFFFF" />
 
       <View className="bg-white px-6 pt-4 pb-5" style={styles.header}>
-        <Text className="text-2xl font-gilroy-bold text-gray-900">Transport</Text>
+        <View className="flex-row items-center justify-between">
+          <Text className="text-2xl font-gilroy-bold text-gray-900">Transport</Text>
+          <View className="px-3 py-1 rounded-full" style={styles.headerBadge}>
+            <Text className="text-[11px] font-gilroy-semibold text-emerald-800">LIVE</Text>
+          </View>
+        </View>
         <Text className="text-sm font-gilroy-regular text-gray-600 mt-1.5">
           Navigate Sri Lanka with ease
         </Text>
@@ -122,6 +134,35 @@ export const TransportScreen: React.FC<TransportScreenProps> = ({ navigation }) 
                   {locationName}
                 </Text>
               </View>
+
+              {locationCoords ? (
+                <View style={styles.mapContainer}>
+                  <MapView
+                    style={styles.mapPreview}
+                    provider={Platform.OS === 'android' ? PROVIDER_GOOGLE : undefined}
+                    initialRegion={{
+                      latitude: locationCoords.latitude,
+                      longitude: locationCoords.longitude,
+                      latitudeDelta: 0.02,
+                      longitudeDelta: 0.02,
+                    }}
+                    scrollEnabled={false}
+                    zoomEnabled={false}
+                    rotateEnabled={false}
+                    pitchEnabled={false}
+                    toolbarEnabled={false}
+                  >
+                    <Marker
+                      coordinate={{
+                        latitude: locationCoords.latitude,
+                        longitude: locationCoords.longitude,
+                      }}
+                      title="You are here"
+                    />
+                  </MapView>
+                </View>
+              ) : null}
+
               <View className="flex-row items-start mb-2">
                 <FontAwesome5
                   name={isPeakNow() ? 'exclamation-circle' : 'check-circle'}
@@ -142,51 +183,61 @@ export const TransportScreen: React.FC<TransportScreenProps> = ({ navigation }) 
           )}
         </View>
 
-        {/* Tools */}
+        {/* Smart commute */}
         <View className="rounded-2xl p-5 mb-5" style={styles.card}>
           <View className="flex-row items-center mb-4">
-            <View className="w-8 h-8 rounded-lg items-center justify-center bg-orange-100">
-              <FontAwesome5 name="tools" size={14} color="#F5840E" />
+            <View className="w-8 h-8 rounded-lg items-center justify-center bg-cyan-100">
+              <FontAwesome5 name="bolt" size={14} color="#0E7490" />
             </View>
-            <Text className="text-lg font-gilroy-bold text-gray-900 ml-3">Travel Tools</Text>
+            <Text className="text-lg font-gilroy-bold text-gray-900 ml-3">Smart commute</Text>
           </View>
+
+          <View className="rounded-xl p-4 mb-3" style={styles.smartCard}>
+            <Text className="text-sm font-gilroy-bold text-gray-900 mb-1">AI trip assistant</Text>
+            <Text className="text-xs font-gilroy-medium text-gray-700 leading-5">
+              Ask for the fastest route, public transport options, and travel tips for your area.
+            </Text>
+
+            <TouchableOpacity
+              className="rounded-xl mt-3 p-3.5 flex-row items-center justify-between"
+              activeOpacity={0.8}
+              onPress={() => navigation && navigation.navigate('ChatbotScreen')}
+              style={styles.accentButton}
+            >
+              <View className="flex-row items-center flex-1">
+                <View className="w-9 h-9 rounded-lg items-center justify-center bg-white/70">
+                  <FontAwesome5 name="robot" size={15} color="#0E7490" />
+                </View>
+                <View className="ml-3 flex-1">
+                  <Text className="text-sm font-gilroy-bold text-cyan-900 mb-0.5">
+                    Plan my trip
+                  </Text>
+                  <Text className="text-xs font-gilroy-medium text-cyan-700">
+                    Open AI transport chat
+                  </Text>
+                </View>
+              </View>
+              <FontAwesome5 name="chevron-right" size={15} color="#0E7490" />
+            </TouchableOpacity>
+          </View>
+
           <View className="space-y-3">
             <TouchableOpacity
               className="rounded-xl p-4 flex-row items-center justify-between"
               activeOpacity={0.8}
-              onPress={() => console.log('Fare guide coming soon')}
-              style={styles.toolCard}
+              onPress={() => navigation && navigation.navigate('ChatbotScreen')}
+              style={styles.accentGhost}
             >
               <View className="flex-row items-center flex-1">
-                <View className="w-11 h-11 rounded-xl items-center justify-center bg-orange-100">
-                  <FontAwesome5 name="tags" size={16} color="#F5840E" />
-                </View>
-                <View className="ml-3.5 flex-1">
-                  <Text className="text-sm font-gilroy-bold text-gray-900 mb-0.5">Fare guide</Text>
-                  <Text className="text-xs font-gilroy-medium text-gray-600">
-                    Metered tuk fares, airport taxis, buses
-                  </Text>
-                </View>
-              </View>
-              <FontAwesome5 name="chevron-right" size={15} color="#C4C4C4" />
-            </TouchableOpacity>
-
-            <TouchableOpacity
-              className="rounded-xl p-4 flex-row items-center justify-between"
-              activeOpacity={0.8}
-              onPress={() => console.log('Key contacts coming soon')}
-              style={styles.toolCard}
-            >
-              <View className="flex-row items-center flex-1">
-                <View className="w-11 h-11 rounded-xl items-center justify-center bg-orange-100">
-                  <FontAwesome5 name="phone-alt" size={16} color="#F5840E" />
+                <View className="w-11 h-11 rounded-xl items-center justify-center bg-blue-100">
+                  <FontAwesome5 name="history" size={16} color="#1D4ED8" />
                 </View>
                 <View className="ml-3.5 flex-1">
                   <Text className="text-sm font-gilroy-bold text-gray-900 mb-0.5">
-                    Key contacts
+                    Previous trips
                   </Text>
                   <Text className="text-xs font-gilroy-medium text-gray-600">
-                    Tourist police and emergencies
+                    Open your recent trip conversations
                   </Text>
                 </View>
               </View>
@@ -281,6 +332,37 @@ const styles = StyleSheet.create({
     backgroundColor: '#FFF9F5',
     borderWidth: 1,
     borderColor: '#FFE5D0',
+  },
+  mapContainer: {
+    borderRadius: 12,
+    overflow: 'hidden',
+    borderWidth: 1,
+    borderColor: '#FDE9D8',
+    marginBottom: 12,
+  },
+  mapPreview: {
+    width: '100%',
+    height: 148,
+  },
+  headerBadge: {
+    backgroundColor: '#D1FAE5',
+    borderWidth: 1,
+    borderColor: '#A7F3D0',
+  },
+  smartCard: {
+    backgroundColor: '#F0FDFF',
+    borderWidth: 1,
+    borderColor: '#BAE6FD',
+  },
+  accentButton: {
+    backgroundColor: '#A5F3FC',
+    borderWidth: 1,
+    borderColor: '#67E8F9',
+  },
+  accentGhost: {
+    backgroundColor: '#EFF6FF',
+    borderWidth: 1,
+    borderColor: '#DBEAFE',
   },
   toolCard: {
     backgroundColor: '#F9FAFB',
