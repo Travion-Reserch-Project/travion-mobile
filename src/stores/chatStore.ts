@@ -28,6 +28,8 @@ interface ChatState {
   setCurrentLocation: (locationName: string) => void;
   loadLocationSession: (locationName: string) => Promise<void>;
   sendMessage: (locationName: string, message: string) => Promise<void>;
+  /** Add a user bubble without calling the AI — used when planning mode takes over */
+  addUserMessageOnly: (locationName: string, message: string) => void;
   clearChat: (locationName: string) => Promise<void>;
   clearError: (locationName: string) => void;
 
@@ -186,6 +188,8 @@ export const useChatStore = create<ChatState>()(
               reasoningLoops: response.metadata?.reasoning_loops,
               documentsRetrieved: response.metadata?.documents_retrieved,
               webSearchUsed: response.metadata?.web_search_used,
+              sourceUrls: response.metadata?.source_urls,
+              kbSources: response.metadata?.kb_sources,
             },
           };
 
@@ -227,6 +231,26 @@ export const useChatStore = create<ChatState>()(
             },
           });
         }
+      },
+
+      addUserMessageOnly: (locationName: string, message: string) => {
+        const state = get();
+        const currentChat = state.locationChats[locationName] || createEmptyLocationChat();
+        const userMessage: ChatMessage = {
+          id: `user-${Date.now()}`,
+          role: 'user',
+          content: message,
+          timestamp: new Date(),
+        };
+        set({
+          locationChats: {
+            ...state.locationChats,
+            [locationName]: {
+              ...currentChat,
+              messages: [...currentChat.messages, userMessage],
+            },
+          },
+        });
       },
 
       clearChat: async (locationName: string) => {

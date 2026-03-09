@@ -194,9 +194,11 @@ class AIService extends BaseApiService {
    * Get simple crowd prediction by location name
    * POST /api/v1/ai/simple/crowd (Public - no auth required)
    */
-  async getSimpleCrowdPrediction(locationName: string): Promise<SimpleCrowdPredictionResponse> {
+  async getSimpleCrowdPrediction(locationName: string, date?: string): Promise<SimpleCrowdPredictionResponse> {
     try {
-      const response = await this.publicPost<any>('/simple/crowd', { location_name: locationName });
+      const body: Record<string, string> = { location_name: locationName };
+      if (date) body.date = date;
+      const response = await this.publicPost<any>('/simple/crowd', body);
 
       if (!response.success) {
         throw new Error(response.error || 'Crowd prediction failed');
@@ -220,11 +222,11 @@ class AIService extends BaseApiService {
    * Get simple golden hour by location name
    * POST /api/v1/ai/simple/golden-hour (Public - no auth required)
    */
-  async getSimpleGoldenHour(locationName: string): Promise<SimpleGoldenHourResponse> {
+  async getSimpleGoldenHour(locationName: string, date?: string): Promise<SimpleGoldenHourResponse> {
     try {
-      const response = await this.publicPost<any>('/simple/golden-hour', {
-        location_name: locationName,
-      });
+      const body: Record<string, string> = { location_name: locationName };
+      if (date) body.date = date;
+      const response = await this.publicPost<any>('/simple/golden-hour', body);
 
       if (!response.success) {
         throw new Error(response.error || 'Golden hour request failed');

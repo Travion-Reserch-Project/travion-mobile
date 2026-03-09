@@ -85,11 +85,7 @@ export const TourPlanModal: React.FC<TourPlanModalProps> = ({
     onGeneratePlan,
 }) => {
     const [startDate, setStartDate] = useState<Date>(new Date());
-    const [endDate, setEndDate] = useState<Date>(() => {
-        const tomorrow = new Date();
-        tomorrow.setDate(tomorrow.getDate() + 1);
-        return tomorrow;
-    });
+    const [endDate, setEndDate] = useState<Date>(new Date());
     const [showStartDatePicker, setShowStartDatePicker] = useState(false);
     const [showEndDatePicker, setShowEndDatePicker] = useState(false);
     const [nearbyLocations, setNearbyLocations] = useState<SimpleRecommendationLocation[]>([]);
@@ -172,11 +168,9 @@ export const TourPlanModal: React.FC<TourPlanModalProps> = ({
     const handleStartDateConfirm = (date: Date) => {
         setStartDate(date);
         setShowStartDatePicker(false);
-        // If end date is before start date, update it
+        // If end date is before start date, update it to match start date
         if (date > endDate) {
-            const newEndDate = new Date(date);
-            newEndDate.setDate(newEndDate.getDate() + 1);
-            setEndDate(newEndDate);
+            setEndDate(new Date(date));
         }
     };
 
@@ -230,7 +224,7 @@ export const TourPlanModal: React.FC<TourPlanModalProps> = ({
     const getTripDuration = () => {
         const diffTime = Math.abs(endDate.getTime() - startDate.getTime());
         const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-        return diffDays;
+        return Math.max(1, diffDays);
     };
 
     const handleGeneratePlan = () => {
