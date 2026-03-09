@@ -77,61 +77,115 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ onAlertsPress, onProfile
           </View>
         </View>
 
-        {/* Quick Actions */}
+        {/* Explore Sri Lanka */}
         <View className="px-6 mt-6">
-          <Text className="text-xl font-gilroy-bold text-gray-900 mb-4">Quick Actions</Text>
+          <Text className="text-xl font-gilroy-bold text-gray-900 mb-2">Discover Sri Lanka</Text>
+          <Text className="text-sm font-gilroy-regular text-gray-600 mb-4">
+            The Pearl of the Indian Ocean
+          </Text>
 
-          <View className="flex-row justify-between">
+          <View className="flex-row justify-between mb-4">
             <View className="flex-1 bg-white rounded-2xl p-6 mr-3 items-center shadow-sm">
-              <View className="w-16 h-16 bg-blue-100 rounded-full items-center justify-center mb-3">
-                <FontAwesome5 name="plane" size={24} color="#3B82F6" />
+              <View className="w-16 h-16 bg-amber-100 rounded-full items-center justify-center mb-3">
+                <FontAwesome5 name="mountain" size={24} color="#D97706" />
               </View>
               <Text className="text-sm font-gilroy-bold text-gray-900 text-center">
-                Book Flight
+                Ancient Wonders
+              </Text>
+              <Text className="text-xs font-gilroy-regular text-gray-500 text-center mt-1">
+                8 UNESCO Sites
               </Text>
             </View>
 
             <View className="flex-1 bg-white rounded-2xl p-6 mx-1.5 items-center shadow-sm">
-              <View className="w-16 h-16 bg-green-100 rounded-full items-center justify-center mb-3">
-                <FontAwesome5 name="hotel" size={24} color="#10B981" />
+              <View className="w-16 h-16 bg-emerald-100 rounded-full items-center justify-center mb-3">
+                <FontAwesome5 name="leaf" size={24} color="#059669" />
               </View>
               <Text className="text-sm font-gilroy-bold text-gray-900 text-center">
-                Find Hotels
+                Tea Country
+              </Text>
+              <Text className="text-xs font-gilroy-regular text-gray-500 text-center mt-1">
+                Hill Estates
               </Text>
             </View>
 
             <View className="flex-1 bg-white rounded-2xl p-6 ml-3 items-center shadow-sm">
-              <View className="w-16 h-16 bg-yellow-100 rounded-full items-center justify-center mb-3">
-                <FontAwesome5 name="car" size={24} color="#F59E0B" />
+              <View className="w-16 h-16 bg-blue-100 rounded-full items-center justify-center mb-3">
+                <FontAwesome5 name="water" size={24} color="#0284C7" />
               </View>
-              <Text className="text-sm font-gilroy-bold text-gray-900 text-center">Rent Car</Text>
+              <Text className="text-sm font-gilroy-bold text-gray-900 text-center">
+                Beach Bliss
+              </Text>
+              <Text className="text-xs font-gilroy-regular text-gray-500 text-center mt-1">
+                Coastal Beauty
+              </Text>
             </View>
           </View>
         </View>
 
-        {/* Recommended Destinations */}
-        <View className="px-6 mt-8">
+        {/* Must-Visit Places */}
+        <View className="px-6 mt-6">
           <View className="flex-row items-center justify-between mb-4">
-            <Text className="text-xl font-gilroy-bold text-gray-900">Recommended for You</Text>
-            <Text className="text-sm font-gilroy-medium text-primary">See All</Text>
+            <Text className="text-xl font-gilroy-bold text-gray-900">Must-Visit Places</Text>
+            <Text className="text-sm font-gilroy-medium text-primary">Explore All</Text>
           </View>
 
           <ScrollView horizontal showsHorizontalScrollIndicator={false}>
             <View className="flex-row">
-              {/* Destination Card 1 */}
+              {/* Sigiriya */}
               <View className="w-72 bg-white rounded-2xl mr-4 shadow-sm overflow-hidden">
-                <View className="h-48 bg-gradient-to-br from-blue-400 to-purple-500 items-center justify-center">
-                  <FontAwesome5 name="mountain" size={48} color="white" />
+                <View className="h-48 overflow-hidden">
+                  <Image
+                    source={require('@assets/images/home/um-palacio-no-topo-da.jpg')}
+                    className="w-full h-full"
+                    resizeMode="cover"
+                  />
                 </View>
                 <View className="p-4">
                   <Text className="text-lg font-gilroy-bold text-gray-900 mb-1">
-                    Mountain Adventure
+                    Ancient Rock Fortress
                   </Text>
                   <Text className="text-sm font-gilroy-regular text-gray-600 mb-3">
-                    Explore breathtaking mountain views
+                    5th century marvel with stunning frescoes
                   </Text>
                   <View className="flex-row items-center justify-between">
-                    <Text className="text-lg font-gilroy-bold text-primary">$299</Text>
+                    <View className="flex-row items-center">
+                      <FontAwesome5 name="map-marker-alt" size={12} color="#F5840E" />
+                      <Text className="text-sm font-gilroy-medium text-gray-600 ml-1">
+                        Central Province
+                      </Text>
+                    </View>
+                    <View className="flex-row items-center">
+                      <FontAwesome5 name="star" size={12} color="#F59E0B" solid />
+                      <Text className="text-sm font-gilroy-medium text-gray-600 ml-1">4.9</Text>
+                    </View>
+                  </View>
+                </View>
+              </View>
+
+              {/* Ella */}
+              <View className="w-72 bg-white rounded-2xl mr-4 shadow-sm overflow-hidden">
+                <View className="h-48 overflow-hidden">
+                  <Image
+                    source={require('@assets/images/home/nine-arch-2-5.jpg')}
+                    className="w-full h-full"
+                    resizeMode="cover"
+                  />
+                </View>
+                <View className="p-4">
+                  <Text className="text-lg font-gilroy-bold text-gray-900 mb-1">
+                    Hill Country Gem
+                  </Text>
+                  <Text className="text-sm font-gilroy-regular text-gray-600 mb-3">
+                    Scenic train rides & Nine Arch Bridge
+                  </Text>
+                  <View className="flex-row items-center justify-between">
+                    <View className="flex-row items-center">
+                      <FontAwesome5 name="map-marker-alt" size={12} color="#F5840E" />
+                      <Text className="text-sm font-gilroy-medium text-gray-600 ml-1">
+                        Badulla District
+                      </Text>
+                    </View>
                     <View className="flex-row items-center">
                       <FontAwesome5 name="star" size={12} color="#F59E0B" solid />
                       <Text className="text-sm font-gilroy-medium text-gray-600 ml-1">4.8</Text>
@@ -140,20 +194,29 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ onAlertsPress, onProfile
                 </View>
               </View>
 
-              {/* Destination Card 2 */}
+              {/* Galle Fort */}
               <View className="w-72 bg-white rounded-2xl mr-4 shadow-sm overflow-hidden">
-                <View className="h-48 bg-gradient-to-br from-green-400 to-blue-500 items-center justify-center">
-                  <FontAwesome5 name="umbrella-beach" size={48} color="white" />
+                <View className="h-48 overflow-hidden">
+                  <Image
+                    source={require('@assets/images/home/Galle-fort-02-1.jpg')}
+                    className="w-full h-full"
+                    resizeMode="cover"
+                  />
                 </View>
                 <View className="p-4">
                   <Text className="text-lg font-gilroy-bold text-gray-900 mb-1">
-                    Beach Paradise
+                    Colonial Heritage
                   </Text>
                   <Text className="text-sm font-gilroy-regular text-gray-600 mb-3">
-                    Relax on pristine beaches
+                    16th century Dutch fort by the ocean
                   </Text>
                   <View className="flex-row items-center justify-between">
-                    <Text className="text-lg font-gilroy-bold text-primary">$399</Text>
+                    <View className="flex-row items-center">
+                      <FontAwesome5 name="map-marker-alt" size={12} color="#F5840E" />
+                      <Text className="text-sm font-gilroy-medium text-gray-600 ml-1">
+                        Southern Coast
+                      </Text>
+                    </View>
                     <View className="flex-row items-center">
                       <FontAwesome5 name="star" size={12} color="#F59E0B" solid />
                       <Text className="text-sm font-gilroy-medium text-gray-600 ml-1">4.9</Text>
@@ -161,8 +224,95 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ onAlertsPress, onProfile
                   </View>
                 </View>
               </View>
+
+              {/* Yala National Park */}
+              <View className="w-72 bg-white rounded-2xl mr-4 shadow-sm overflow-hidden">
+                <View className="h-48 overflow-hidden">
+                  <Image
+                    source={require('@assets/images/home/sri-lanka-elephants.jpg')}
+                    className="w-full h-full"
+                    resizeMode="cover"
+                  />
+                </View>
+                <View className="p-4">
+                  <Text className="text-lg font-gilroy-bold text-gray-900 mb-1">
+                    Wildlife Paradise
+                  </Text>
+                  <Text className="text-sm font-gilroy-regular text-gray-600 mb-3">
+                    Leopards, elephants & exotic birds
+                  </Text>
+                  <View className="flex-row items-center justify-between">
+                    <View className="flex-row items-center">
+                      <FontAwesome5 name="map-marker-alt" size={12} color="#F5840E" />
+                      <Text className="text-sm font-gilroy-medium text-gray-600 ml-1">
+                        Southern Province
+                      </Text>
+                    </View>
+                    <View className="flex-row items-center">
+                      <FontAwesome5 name="star" size={12} color="#F59E0B" solid />
+                      <Text className="text-sm font-gilroy-medium text-gray-600 ml-1">4.7</Text>
+                    </View>
+                  </View>
+                </View>
+              </View>
             </View>
           </ScrollView>
+        </View>
+
+        {/* Cultural Experiences */}
+        <View className="px-6 mt-6">
+          <Text className="text-xl font-gilroy-bold text-gray-900 mb-4">
+            Experience Sri Lankan Culture
+          </Text>
+
+          <View className="bg-gradient-to-br from-orange-50 to-amber-50 rounded-2xl p-5 shadow-sm mb-4">
+            <View className="flex-row items-start">
+              <View className="w-14 h-14 bg-primary rounded-2xl items-center justify-center">
+                <FontAwesome5 name="om" size={24} color="white" />
+              </View>
+              <View className="flex-1 ml-4">
+                <Text className="text-lg font-gilroy-bold text-gray-900 mb-1">
+                  Temple of the Tooth
+                </Text>
+                <Text className="text-sm font-gilroy-regular text-gray-600 mb-2">
+                  Sacred Buddhist temple in Kandy, home to the relic of Buddha's tooth
+                </Text>
+                <View className="flex-row items-center">
+                  <FontAwesome5 name="clock" size={12} color="#9CA3AF" />
+                  <Text className="text-xs font-gilroy-regular text-gray-500 ml-2">
+                    Daily ceremonies at 5:30 AM, 9:30 AM & 6:30 PM
+                  </Text>
+                </View>
+              </View>
+            </View>
+          </View>
+
+          <View className="bg-gradient-to-br from-green-50 to-emerald-50 rounded-2xl p-5 shadow-sm">
+            <View className="flex-row items-start">
+              <View className="w-14 h-14 bg-emerald-600 rounded-2xl items-center justify-center">
+                <FontAwesome5 name="utensils" size={24} color="white" />
+              </View>
+              <View className="flex-1 ml-4">
+                <Text className="text-lg font-gilroy-bold text-gray-900 mb-1">
+                  Authentic Sri Lankan Cuisine
+                </Text>
+                <Text className="text-sm font-gilroy-regular text-gray-600 mb-2">
+                  Rice & curry, hoppers, kottu - a fusion of flavors and spices
+                </Text>
+                <View className="flex-row items-center flex-wrap">
+                  <View className="bg-white px-3 py-1 rounded-full mr-2 mb-2">
+                    <Text className="text-xs font-gilroy-medium text-gray-700">🌶️ Spicy</Text>
+                  </View>
+                  <View className="bg-white px-3 py-1 rounded-full mr-2 mb-2">
+                    <Text className="text-xs font-gilroy-medium text-gray-700">🥥 Coconut</Text>
+                  </View>
+                  <View className="bg-white px-3 py-1 rounded-full mb-2">
+                    <Text className="text-xs font-gilroy-medium text-gray-700">🍛 Curry</Text>
+                  </View>
+                </View>
+              </View>
+            </View>
+          </View>
         </View>
 
         {/* Recent Activity */}
