@@ -398,7 +398,9 @@ const ClarificationBubble: React.FC<{
 // WhatsApp-style message bubble
 const MessageBubble: React.FC<{
   message: ChatMessage;
-}> = ({ message }) => {
+  onSave?: () => void;
+  isSaving?: boolean;
+}> = ({ message, onSave, isSaving }) => {
   const isUser = message.role === 'user';
   const isPlan = message.role === 'plan';
   const fadeAnim = useRef(new Animated.Value(0)).current;
@@ -442,6 +444,31 @@ const MessageBubble: React.FC<{
           <View style={styles.assistantBubble}>
             <Markdown style={markdownStyles}>{message.content}</Markdown>
           </View>
+        )}
+        {/* Save Tour Plan button */}
+        {onSave && (
+          <TouchableOpacity
+            style={[styles.savePlanButton, isSaving && styles.savePlanButtonDisabled]}
+            onPress={onSave}
+            activeOpacity={0.85}
+            disabled={isSaving}
+          >
+            <LinearGradient
+              colors={['#F5840E', '#C2410C']}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 0 }}
+              style={styles.savePlanButtonGradient}
+            >
+              {isSaving ? (
+                <ActivityIndicator size="small" color="#fff" />
+              ) : (
+                <Ionicons name="bookmark" size={18} color="#fff" />
+              )}
+              <Text style={styles.savePlanButtonText}>
+                {isSaving ? 'Saving...' : 'Save Tour Plan'}
+              </Text>
+            </LinearGradient>
+          </TouchableOpacity>
         )}
       </Animated.View>
     );
@@ -1141,6 +1168,8 @@ export const TourPlanChatScreen: React.FC<TourPlanChatScreenProps> = ({ route, n
               <MessageBubble
                 key={message.id}
                 message={message}
+                onSave={message.role === 'plan' ? handleAcceptPlan : undefined}
+                isSaving={message.role === 'plan' ? isAccepting : undefined}
               />
             );
           })}
@@ -1422,6 +1451,28 @@ const styles = StyleSheet.create({
   // Plan
   planBubbleContainer: {
     marginVertical: 8,
+  },
+  savePlanButton: {
+    marginTop: 12,
+    borderRadius: 12,
+    overflow: 'hidden',
+  },
+  savePlanButtonDisabled: {
+    opacity: 0.7,
+  },
+  savePlanButtonGradient: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 14,
+    paddingHorizontal: 24,
+    gap: 8,
+  },
+  savePlanButtonText: {
+    fontSize: 15,
+    fontFamily: 'Gilroy-Bold',
+    color: '#fff',
+    letterSpacing: 0.3,
   },
 
   // Events

@@ -1,4 +1,4 @@
-import React, { useCallback, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import { View } from 'react-native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { HomeScreen, SafetyScreen, TransportScreen } from '@screens';
@@ -26,6 +26,17 @@ export const MainAppScreen: React.FC<Props> = ({ route, navigation }) => {
     }
     setActiveTab(tab);
   }, []);
+
+  // Dynamically update the native screen container background
+  // so the SafeAreaView padding zone matches the active tab's color
+  useEffect(() => {
+    navigation.setOptions({
+      contentStyle: {
+        flex: 1,
+        backgroundColor: activeTab === 'guide' ? '#F5840E' : '#FFFFFF',
+      },
+    });
+  }, [activeTab, navigation]);
 
   const renderScreen = () => {
     switch (activeTab) {
@@ -81,7 +92,7 @@ export const MainAppScreen: React.FC<Props> = ({ route, navigation }) => {
   };
 
   return (
-    <View className="flex-1 bg-white">
+    <View style={{ flex: 1, backgroundColor: activeTab === 'guide' ? '#F5840E' : '#FFFFFF' }}>
       <View className="flex-1">
         {renderScreen()}
         <BottomTabBar activeTab={activeTab} onTabPress={handleTabPress} />

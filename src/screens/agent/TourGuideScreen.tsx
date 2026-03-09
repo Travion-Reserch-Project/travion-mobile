@@ -15,6 +15,8 @@ import {
   Image,
   TextInput,
   Keyboard,
+  Dimensions,
+  NativeModules,
 } from 'react-native';
 import Geocoder from 'react-native-geocoding';
 import FontAwesome5 from 'react-native-vector-icons/FontAwesome5';
@@ -35,50 +37,77 @@ import { haversineDistance, calculateMatchScore, getCurrentPosition } from '@uti
 // Initialize Google Maps Geocoding
 Geocoder.init(GOOGLE_MAPS_API_KEY, { language: 'en' });
 
+const { width: SCREEN_WIDTH } = Dimensions.get('window');
+const STATUSBAR_HEIGHT = Platform.OS === 'ios' ? 44 : (NativeModules.StatusBarManager?.HEIGHT ?? StatusBar.currentHeight ?? 24);
+
 // Default placeholder image
 const PLACEHOLDER_IMAGE = 'https://images.unsplash.com/photo-1506905925346-21bda4d32df4?w=400';
 
 // Animations
 const loadingAnimation = require('@assets/animations/onbord1.json');
+const botAnimation = require('@assets/animations/onbord2.json');
 
 // Category colors and icons
 const CATEGORY_CONFIG: Record<
   string,
-  { color: string; bgColor: string; icon: string; iconFamily: string }
+  { color: string; bgColor: string; icon: string; iconFamily: string; emoji: string }
 > = {
   history: {
     color: '#8B5CF6',
     bgColor: '#F3E8FF',
     icon: 'landmark',
     iconFamily: 'fa5',
+    emoji: '🏛️',
   },
   adventure: {
     color: '#F59E0B',
     bgColor: '#FEF3C7',
     icon: 'hiking',
     iconFamily: 'fa5',
+    emoji: '🧗',
   },
   nature: {
     color: '#10B981',
     bgColor: '#D1FAE5',
     icon: 'leaf',
     iconFamily: 'fa5',
+    emoji: '🌿',
   },
   relaxation: {
     color: '#3B82F6',
     bgColor: '#DBEAFE',
     icon: 'spa',
     iconFamily: 'fa5',
+    emoji: '🧘',
   },
 };
 
 // Crowd level colors
-const CROWD_COLORS: Record<string, { color: string; bg: string }> = {
-  LOW: { color: '#10B981', bg: '#D1FAE5' },
-  MODERATE: { color: '#F59E0B', bg: '#FEF3C7' },
-  HIGH: { color: '#EF4444', bg: '#FEE2E2' },
-  EXTREME: { color: '#DC2626', bg: '#FEE2E2' },
+const CROWD_COLORS: Record<string, { color: string; bg: string; label: string }> = {
+  LOW: { color: '#10B981', bg: '#D1FAE5', label: 'Not Crowded' },
+  MODERATE: { color: '#F59E0B', bg: '#FEF3C7', label: 'Moderate' },
+  HIGH: { color: '#EF4444', bg: '#FEE2E2', label: 'Busy' },
+  EXTREME: { color: '#DC2626', bg: '#FEE2E2', label: 'Very Busy' },
 };
+
+// Recommendation level helper
+const getRecommendationLevel = (score: number): { level: string; color: string; bgColor: string; icon: string } => {
+  if (score >= 0.7) {
+    return { level: 'Highly Recommended', color: '#059669', bgColor: '#D1FAE5', icon: 'star' };
+  }
+  if (score >= 0.5) {
+    return { level: 'Recommended', color: '#D97706', bgColor: '#FEF3C7', icon: 'thumbs-up' };
+  }
+  return { level: 'Worth Visiting', color: '#6B7280', bgColor: '#F3F4F6', icon: 'info-circle' };
+};
+
+// Sort options
+type SortOption = 'recommended' | 'distance' | 'crowd';
+const SORT_OPTIONS: { key: SortOption; label: string; icon: string }[] = [
+  { key: 'recommended', label: 'Best Match', icon: 'magic' },
+  { key: 'distance', label: 'Nearest', icon: 'route' },
+  { key: 'crowd', label: 'Less Crowded', icon: 'users' },
+];
 
 // Distance options for search radius
 const DISTANCE_OPTIONS = [10, 25, 50, 100, 250];
@@ -99,6 +128,9 @@ const LOCATION_TYPE_OPTIONS: LocationTypeOption[] = [
   { key: 'indoor', label: 'Indoor', icon: 'home', iconFamily: 'fa5' },
 ];
 
+// Real-time refresh interval (30 seconds)
+const REALTIME_REFRESH_INTERVAL = 30000;
+
 // Extended location with image
 interface RecommendationWithImage extends SimpleRecommendationLocation {
   imageUrl: string | null;
@@ -112,6 +144,39 @@ interface LocationCardProps {
   preferences: TravelPreferenceScores;
 }
 
+// Pulsing live dot component
+const LiveDot: React.FC<{ color?: string }> = ({ color = '#10B981' }) => {
+  const pulseAnim = useRef(new Animated.Value(1)).current;
+
+  useEffect(() => {
+    const pulse = Animated.loop(
+      Animated.sequence([
+        Animated.timing(pulseAnim, { toValue: 1.6, duration: 800, useNativeDriver: true }),
+        Animated.timing(pulseAnim, { toValue: 1, duration: 800, useNativeDriver: true }),
+      ]),
+    );
+    pulse.start();
+    return () => pulse.stop();
+  }, [pulseAnim]);
+
+  return (
+    <View style={{ width: 10, height: 10, alignItems: 'center', justifyContent: 'center' }}>
+      <Animated.View
+        style={{
+          position: 'absolute',
+          width: 10,
+          height: 10,
+          borderRadius: 5,
+          backgroundColor: color,
+          opacity: 0.3,
+          transform: [{ scale: pulseAnim }],
+        }}
+      />
+      <View style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: color }} />
+    </View>
+  );
+};
+
 const LocationCard: React.FC<LocationCardProps> = ({
   location,
   index,
@@ -123,6 +188,7 @@ const LocationCard: React.FC<LocationCardProps> = ({
   const [isLoadingCrowd, setIsLoadingCrowd] = useState(false);
   const [imageError, setImageError] = useState(false);
   const animatedValue = useRef(new Animated.Value(0)).current;
+  const scaleAnim = useRef(new Animated.Value(1)).current;
 
   // Determine primary category based on highest preference score match
   const getPrimaryCategory = (): string => {
@@ -138,13 +204,15 @@ const LocationCard: React.FC<LocationCardProps> = ({
 
   const primaryCategory = getPrimaryCategory();
   const categoryConfig = CATEGORY_CONFIG[primaryCategory];
+  const recommendation = getRecommendationLevel(location.similarity_score);
 
   useEffect(() => {
-    // Animate card entrance
-    Animated.timing(animatedValue, {
+    // Animate card entrance with spring
+    Animated.spring(animatedValue, {
       toValue: 1,
-      duration: 500,
-      delay: index * 100,
+      tension: 50,
+      friction: 8,
+      delay: index * 120,
       useNativeDriver: true,
     }).start();
 
@@ -165,9 +233,16 @@ const LocationCard: React.FC<LocationCardProps> = ({
     }
   };
 
+  const handlePressIn = () => {
+    Animated.spring(scaleAnim, { toValue: 0.97, useNativeDriver: true }).start();
+  };
+  const handlePressOut = () => {
+    Animated.spring(scaleAnim, { toValue: 1, friction: 3, useNativeDriver: true }).start();
+  };
+
   const translateY = animatedValue.interpolate({
     inputRange: [0, 1],
-    outputRange: [50, 0],
+    outputRange: [60, 0],
   });
 
   const opacity = animatedValue.interpolate({
@@ -175,64 +250,67 @@ const LocationCard: React.FC<LocationCardProps> = ({
     outputRange: [0, 1],
   });
 
-  const matchPercentage = Math.round(location.similarity_score * 100);
   const crowdColor = crowdData ? CROWD_COLORS[crowdData.crowd_status] : null;
 
   return (
     <Animated.View
       style={{
-        transform: [{ translateY }],
+        transform: [{ translateY }, { scale: scaleAnim }],
         opacity,
       }}
     >
-      <TouchableOpacity activeOpacity={0.9} onPress={onPress} className="mb-4 mx-4">
-        <View className="bg-white rounded-3xl overflow-hidden shadow-lg">
-          {/* Image Header */}
-          <View className="h-48 relative">
+      <TouchableOpacity
+        activeOpacity={1}
+        onPress={onPress}
+        onPressIn={handlePressIn}
+        onPressOut={handlePressOut}
+        style={{ marginBottom: 16, marginHorizontal: 16 }}
+      >
+        <View style={cardStyles.container}>
+          {/* Image Section */}
+          <View style={cardStyles.imageSection}>
             <Image
               source={{ uri: (!imageError && location.imageUrl) ? location.imageUrl : PLACEHOLDER_IMAGE }}
-              className="w-full h-full"
+              style={cardStyles.image}
               resizeMode="cover"
               onError={() => setImageError(true)}
             />
             {/* Gradient Overlay */}
-            <View className="absolute inset-0 bg-black/30" />
+            <View style={cardStyles.imageOverlay} />
 
-            {/* Rank Badge */}
-            <View className="absolute top-3 left-3 bg-primary px-3 py-1.5 rounded-full flex-row items-center">
-              <FontAwesome5 name="medal" size={12} color="white" />
-              <Text className="ml-1.5 text-sm font-gilroy-bold text-white">#{location.rank}</Text>
+            {/* Top Left - Rank */}
+            <View style={cardStyles.rankBadge}>
+              <Text style={cardStyles.rankText}>#{location.rank}</Text>
             </View>
 
-            {/* Match Badge */}
-            <View className="absolute top-3 right-3 px-3 py-1.5 rounded-full bg-white/90">
-              <Text className="text-sm font-gilroy-bold" style={{ color: categoryConfig.color }}>
-                {matchPercentage}% Match
+            {/* Top Right - Recommendation Level */}
+            <View style={[cardStyles.recBadge, { backgroundColor: recommendation.bgColor }]}>
+              <FontAwesome5 name={recommendation.icon} size={10} color={recommendation.color} solid />
+              <Text style={[cardStyles.recText, { color: recommendation.color }]}>
+                {recommendation.level}
               </Text>
             </View>
 
-            {/* Location Name on Image */}
-            <View className="absolute bottom-3 left-3 right-3">
-              <Text className="text-white text-xl font-gilroy-bold" numberOfLines={1}>
+            {/* Bottom - Name & Location Info */}
+            <View style={cardStyles.imageBottomContent}>
+              <Text style={cardStyles.locationName} numberOfLines={1}>
                 {location.name}
               </Text>
-              <View className="flex-row items-center mt-1">
-                <FontAwesome5 name="map-marker-alt" size={12} color="white" />
-                <Text className="ml-1.5 text-sm font-gilroy-medium text-white">
-                  {location.distance_km.toFixed(1)} km away
+              <View style={cardStyles.locationMeta}>
+                <FontAwesome5 name="map-marker-alt" size={11} color="#fff" />
+                <Text style={cardStyles.distanceText}>
+                  {location.distance_km.toFixed(1)} km
                 </Text>
-                <View className="ml-3 flex-row items-center bg-white/20 px-2 py-0.5 rounded-full">
+                <View style={cardStyles.typeBadge}>
                   {location.is_outdoor ? (
                     <>
-                      <MaterialCommunityIcons name="tree" size={12} color="#10B981" />
-                      <Text className="ml-1 text-xs font-gilroy-medium text-green-400">
-                        Outdoor
-                      </Text>
+                      <MaterialCommunityIcons name="tree" size={11} color="#34D399" />
+                      <Text style={[cardStyles.typeText, { color: '#34D399' }]}>Outdoor</Text>
                     </>
                   ) : (
                     <>
-                      <FontAwesome5 name="home" size={10} color="#60A5FA" />
-                      <Text className="ml-1 text-xs font-gilroy-medium text-blue-400">Indoor</Text>
+                      <FontAwesome5 name="home" size={9} color="#93C5FD" />
+                      <Text style={[cardStyles.typeText, { color: '#93C5FD' }]}>Indoor</Text>
                     </>
                   )}
                 </View>
@@ -240,10 +318,10 @@ const LocationCard: React.FC<LocationCardProps> = ({
             </View>
           </View>
 
-          {/* Content */}
-          <View className="p-4">
-            {/* Category Tags */}
-            <View className="flex-row flex-wrap gap-2 mb-3">
+          {/* Content Section */}
+          <View style={cardStyles.content}>
+            {/* Category Tags Row */}
+            <View style={cardStyles.tagsRow}>
               {Object.entries(location.preference_scores)
                 .filter(([_, score]) => score > 0.5)
                 .sort((a, b) => b[1] - a[1])
@@ -253,14 +331,10 @@ const LocationCard: React.FC<LocationCardProps> = ({
                   return (
                     <View
                       key={category}
-                      className="flex-row items-center px-2.5 py-1 rounded-full"
-                      style={{ backgroundColor: config.bgColor }}
+                      style={[cardStyles.tag, { backgroundColor: config.bgColor }]}
                     >
-                      <FontAwesome5 name={config.icon} size={10} color={config.color} />
-                      <Text
-                        className="ml-1 text-xs font-gilroy-medium capitalize"
-                        style={{ color: config.color }}
-                      >
+                      <Text style={cardStyles.tagEmoji}>{config.emoji}</Text>
+                      <Text style={[cardStyles.tagText, { color: config.color }]}>
                         {category}
                       </Text>
                     </View>
@@ -268,51 +342,53 @@ const LocationCard: React.FC<LocationCardProps> = ({
                 })}
             </View>
 
-            {/* Crowd Status */}
+            {/* Crowd + Best Time Row */}
             {isLoadingCrowd ? (
-              <View className="flex-row items-center mb-3">
-                <ActivityIndicator size="small" color={categoryConfig.color} />
-                <Text className="ml-2 text-sm text-gray-500 font-gilroy-regular">
-                  Checking crowd levels...
-                </Text>
+              <View style={cardStyles.crowdRow}>
+                <View style={cardStyles.crowdDotLoading}>
+                  <ActivityIndicator size="small" color={categoryConfig.color} />
+                </View>
+                <Text style={cardStyles.crowdLoadingText}>Live crowd data...</Text>
               </View>
             ) : crowdData ? (
-              <View
-                className="flex-row items-center px-3 py-2 rounded-xl mb-3"
-                style={{ backgroundColor: crowdColor?.bg }}
-              >
-                <MaterialCommunityIcons name="account-group" size={18} color={crowdColor?.color} />
-                <Text
-                  className="ml-2 text-sm font-gilroy-medium"
-                  style={{ color: crowdColor?.color }}
-                >
-                  {crowdData.crowd_status} crowds ({crowdData.crowd_percentage}%)
+              <View style={[cardStyles.crowdRow, { backgroundColor: crowdColor?.bg }]}>
+                <LiveDot color={crowdColor?.color} />
+                <Text style={[cardStyles.crowdLabel, { color: crowdColor?.color }]}>
+                  {crowdColor?.label}
                 </Text>
-                <Text className="ml-auto text-xs text-gray-500 font-gilroy-regular">
+                <View style={cardStyles.crowdDivider} />
+                <Ionicons name="time-outline" size={13} color="#6B7280" />
+                <Text style={cardStyles.bestTimeText}>
                   Best: {crowdData.optimal_times[0]?.time || 'N/A'}
                 </Text>
               </View>
             ) : null}
 
             {/* Action Buttons */}
-            <View className="flex-row gap-3 mt-2">
+            <View style={cardStyles.actionsRow}>
               <TouchableOpacity
-                className="flex-1 flex-row items-center justify-center py-3 rounded-xl"
-                style={{ backgroundColor: categoryConfig.bgColor }}
+                style={[cardStyles.exploreBtn, { backgroundColor: categoryConfig.bgColor }]}
                 onPress={onPress}
+                activeOpacity={0.8}
               >
-                <FontAwesome5 name="directions" size={14} color={categoryConfig.color} />
-                <Text className="ml-2 font-gilroy-bold" style={{ color: categoryConfig.color }}>
+                <FontAwesome5 name="compass" size={15} color={categoryConfig.color} />
+                <Text style={[cardStyles.exploreBtnText, { color: categoryConfig.color }]}>
                   Explore
                 </Text>
               </TouchableOpacity>
 
               <TouchableOpacity
-                className="flex-1 flex-row items-center justify-center py-3 rounded-xl bg-primary"
+                style={cardStyles.aiBtn}
                 onPress={onChatPress}
+                activeOpacity={0.8}
               >
-                <FontAwesome5 name="robot" size={14} color="white" />
-                <Text className="ml-2 font-gilroy-bold text-white">Ask AI</Text>
+                <LottieView
+                  source={botAnimation}
+                  autoPlay
+                  loop
+                  style={{ width: 22, height: 22 }}
+                />
+                <Text style={cardStyles.aiBtnText}>Ask AI</Text>
               </TouchableOpacity>
             </View>
           </View>
@@ -321,6 +397,188 @@ const LocationCard: React.FC<LocationCardProps> = ({
     </Animated.View>
   );
 };
+
+const cardStyles = StyleSheet.create({
+  container: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 24,
+    overflow: 'hidden',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.1,
+    shadowRadius: 16,
+    elevation: 8,
+  },
+  imageSection: {
+    height: 180,
+    position: 'relative',
+  },
+  image: {
+    width: '100%',
+    height: '100%',
+  },
+  imageOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'rgba(0,0,0,0.25)',
+  },
+  rankBadge: {
+    position: 'absolute',
+    top: 12,
+    left: 12,
+    backgroundColor: 'rgba(255,255,255,0.95)',
+    borderRadius: 20,
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+  },
+  rankText: {
+    fontSize: 12,
+    fontFamily: 'Gilroy-Bold',
+    color: '#F5840E',
+  },
+  recBadge: {
+    position: 'absolute',
+    top: 12,
+    right: 12,
+    flexDirection: 'row',
+    alignItems: 'center',
+    borderRadius: 20,
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    gap: 4,
+  },
+  recText: {
+    fontSize: 11,
+    fontFamily: 'Gilroy-Bold',
+  },
+  imageBottomContent: {
+    position: 'absolute',
+    bottom: 12,
+    left: 12,
+    right: 12,
+  },
+  locationName: {
+    color: '#fff',
+    fontSize: 20,
+    fontFamily: 'Gilroy-Bold',
+    textShadowColor: 'rgba(0,0,0,0.4)',
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 4,
+  },
+  locationMeta: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 4,
+    gap: 6,
+  },
+  distanceText: {
+    color: '#fff',
+    fontSize: 13,
+    fontFamily: 'Gilroy-Medium',
+  },
+  typeBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(255,255,255,0.2)',
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: 12,
+    gap: 4,
+  },
+  typeText: {
+    fontSize: 11,
+    fontFamily: 'Gilroy-Medium',
+  },
+  content: {
+    padding: 14,
+    gap: 10,
+  },
+  tagsRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 6,
+  },
+  tag: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 20,
+    gap: 4,
+  },
+  tagEmoji: {
+    fontSize: 12,
+  },
+  tagText: {
+    fontSize: 12,
+    fontFamily: 'Gilroy-SemiBold',
+    textTransform: 'capitalize',
+  },
+  crowdRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 14,
+    gap: 6,
+  },
+  crowdDotLoading: {
+    width: 20,
+    alignItems: 'center',
+  },
+  crowdLoadingText: {
+    fontSize: 12,
+    fontFamily: 'Gilroy-Regular',
+    color: '#9CA3AF',
+  },
+  crowdLabel: {
+    fontSize: 13,
+    fontFamily: 'Gilroy-SemiBold',
+  },
+  crowdDivider: {
+    width: 1,
+    height: 14,
+    backgroundColor: '#D1D5DB',
+    marginHorizontal: 4,
+  },
+  bestTimeText: {
+    fontSize: 12,
+    fontFamily: 'Gilroy-Regular',
+    color: '#6B7280',
+  },
+  actionsRow: {
+    flexDirection: 'row',
+    gap: 10,
+    marginTop: 2,
+  },
+  exploreBtn: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 12,
+    borderRadius: 16,
+    gap: 8,
+  },
+  exploreBtnText: {
+    fontSize: 14,
+    fontFamily: 'Gilroy-Bold',
+  },
+  aiBtn: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 12,
+    borderRadius: 16,
+    backgroundColor: '#F5840E',
+    gap: 6,
+  },
+  aiBtnText: {
+    fontSize: 14,
+    fontFamily: 'Gilroy-Bold',
+    color: '#fff',
+  },
+});
 
 interface TourGuideScreenProps {
   onChatbotPress?: () => void;
@@ -345,9 +603,13 @@ export const TourGuideScreen: React.FC<TourGuideScreenProps> = ({ onChatbotPress
   });
   const [error, setError] = useState<string | null>(null);
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
-  const [selectedDistance, setSelectedDistance] = useState<number>(50); // Default 50km
+  const [selectedDistance, setSelectedDistance] = useState<number>(10); // Default 10km
   const [selectedLocationType, setSelectedLocationType] = useState<LocationTypeFilter>('all');
   const [showFilters, setShowFilters] = useState(false);
+  const [sortBy, setSortBy] = useState<SortOption>('recommended');
+  const [isSearchFocused, setIsSearchFocused] = useState(false);
+  const searchBarAnim = useRef(new Animated.Value(0)).current;
+  const headerFadeAnim = useRef(new Animated.Value(0)).current;
 
   // Search state
   const [searchQuery, setSearchQuery] = useState('');
@@ -356,6 +618,7 @@ export const TourGuideScreen: React.FC<TourGuideScreenProps> = ({ onChatbotPress
   const [showSearchResults, setShowSearchResults] = useState(false);
   const searchTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const preferencesLoadedRef = useRef(false);
+  const realtimeIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const loadPreferences = async () => {
     try {
@@ -367,6 +630,40 @@ export const TourGuideScreen: React.FC<TourGuideScreenProps> = ({ onChatbotPress
       console.log('Using default preferences', prefError);
     }
   };
+
+  // Animate header on mount
+  useEffect(() => {
+    Animated.timing(headerFadeAnim, {
+      toValue: 1,
+      duration: 600,
+      useNativeDriver: true,
+    }).start();
+  }, [headerFadeAnim]);
+
+  // Animate search bar focus
+  useEffect(() => {
+    Animated.spring(searchBarAnim, {
+      toValue: isSearchFocused ? 1 : 0,
+      useNativeDriver: false,
+    }).start();
+  }, [isSearchFocused, searchBarAnim]);
+
+  // Real-time refresh for crowd data
+  useEffect(() => {
+    if (!isLoading && userLocation && recommendations.length > 0) {
+      realtimeIntervalRef.current = setInterval(() => {
+        if (userLocation) {
+          fetchRecommendations(userLocation.latitude, userLocation.longitude);
+        }
+      }, REALTIME_REFRESH_INTERVAL);
+    }
+    return () => {
+      if (realtimeIntervalRef.current) {
+        clearInterval(realtimeIntervalRef.current);
+      }
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isLoading, userLocation, recommendations.length]);
 
   // Handle search with debouncing
   const handleSearch = useCallback((query: string) => {
@@ -629,11 +926,17 @@ export const TourGuideScreen: React.FC<TourGuideScreenProps> = ({ onChatbotPress
     }
   };
 
-  // Filter recommendations by category (min_match_score and outdoor_only handled server-side)
-  const filteredRecommendations = recommendations.filter(loc => {
-    if (!selectedCategory) return true;
-    return loc.preference_scores[selectedCategory as keyof typeof loc.preference_scores] > 0.5;
-  });
+  // Filter and sort recommendations
+  const filteredRecommendations = recommendations
+    .filter(loc => {
+      if (!selectedCategory) return true;
+      return loc.preference_scores[selectedCategory as keyof typeof loc.preference_scores] > 0.5;
+    })
+    .sort((a, b) => {
+      if (sortBy === 'distance') return a.distance_km - b.distance_km;
+      if (sortBy === 'crowd') return a.similarity_score - b.similarity_score; // placeholder
+      return b.similarity_score - a.similarity_score; // recommended (default)
+    });
 
   const getGreeting = () => {
     const hour = new Date().getHours();
@@ -655,80 +958,69 @@ export const TourGuideScreen: React.FC<TourGuideScreenProps> = ({ onChatbotPress
   }, []);
 
   const renderHeader = () => (
-    <View style={[styles.header, styles.headerGradient]}>
-      {/* Greeting and AI Button */}
-      <View className="flex-row items-center justify-between px-6 pt-4 pb-3">
-        <View className="flex-1">
-          <Text style={{ color: 'rgba(255,255,255,0.9)' }} className="font-gilroy-medium text-sm">
-            {getGreeting()},
-          </Text>
-          <Text className="text-white font-gilroy-bold text-2xl mt-0.5">
-            {user?.userName || user?.name || 'Explorer'}
+    <Animated.View style={[styles.header, { opacity: headerFadeAnim }]}>
+      {/* Top Section - Greeting + AI Bot */}
+      <View style={styles.headerTop}>
+        <View style={{ flex: 1 }}>
+          <Text style={styles.greetingText}>{getGreeting()}</Text>
+          <Text style={styles.userName}>
+            {user?.userName || user?.name || 'Explorer'} ✨
           </Text>
         </View>
 
-        <TouchableOpacity
-          className="w-12 h-12 rounded-full items-center justify-center"
-          style={{ backgroundColor: 'rgba(255,255,255,0.25)' }}
-          onPress={onChatbotPress}
-        >
-          <FontAwesome5 name="robot" size={20} color="white" />
+        <TouchableOpacity style={styles.headerAiBtn} onPress={onChatbotPress} activeOpacity={0.8}>
+          <LottieView
+            source={botAnimation}
+            autoPlay
+            loop
+            style={{ width: 36, height: 36 }}
+          />
         </TouchableOpacity>
       </View>
 
-      {/* Current Location */}
+      {/* Location Row */}
       {userLocation && (
-        <View className="px-6 pb-3">
-          <View className="flex-row items-center">
-            <View
-              className="w-8 h-8 rounded-full items-center justify-center"
-              style={{ backgroundColor: 'rgba(255,255,255,0.2)' }}
-            >
-              <MaterialCommunityIcons name="map-marker" size={18} color="white" />
-            </View>
-            <View className="flex-1 ml-2">
-              <Text
-                style={{ color: 'rgba(255,255,255,0.8)' }}
-                className="font-gilroy-regular text-xs"
-              >
-                Your Location
-              </Text>
-              <Text className="text-white font-gilroy-medium text-sm mt-0.5">
-                {userLocation.address ||
-                  `${userLocation.latitude.toFixed(4)}, ${userLocation.longitude.toFixed(4)}`}
-              </Text>
-            </View>
-            <TouchableOpacity
-              className="w-8 h-8 rounded-full items-center justify-center"
-              style={{ backgroundColor: 'rgba(255,255,255,0.2)' }}
-              onPress={getCurrentLocation}
-            >
-              <Ionicons name="refresh" size={16} color="white" />
-            </TouchableOpacity>
+        <View style={styles.locationRow}>
+          <View style={styles.locationDot}>
+            <LiveDot color="#fff" />
           </View>
+          <View style={{ flex: 1, marginLeft: 8 }}>
+            <Text style={styles.locationLabel}>Current Location</Text>
+            <Text style={styles.locationValue} numberOfLines={1}>
+              {userLocation.address ||
+                `${userLocation.latitude.toFixed(4)}, ${userLocation.longitude.toFixed(4)}`}
+            </Text>
+          </View>
+          <TouchableOpacity style={styles.refreshLocationBtn} onPress={getCurrentLocation}>
+            <Ionicons name="locate" size={16} color="#fff" />
+          </TouchableOpacity>
         </View>
       )}
 
       {/* Search Bar */}
-      <View className="px-6 pb-4">
-        <View className="bg-white rounded-2xl flex-row items-center px-4 py-3.5 shadow-lg">
-          <Ionicons name="search" size={20} color="#9CA3AF" />
+      <View style={styles.searchContainer}>
+        <View style={[styles.searchBar, isSearchFocused && styles.searchBarFocused]}>
+          <Ionicons name="search" size={20} color={isSearchFocused ? '#F5840E' : '#9CA3AF'} />
           <TextInput
-            className="flex-1 ml-3 font-gilroy-medium text-base text-gray-900"
-            placeholder="Where do you want to go?"
+            style={styles.searchInput}
+            placeholder="Search destinations, activities..."
             placeholderTextColor="#9CA3AF"
             value={searchQuery}
             onChangeText={handleSearch}
+            onFocus={() => setIsSearchFocused(true)}
+            onBlur={() => setIsSearchFocused(false)}
             returnKeyType="search"
           />
           {searchQuery.length > 0 && (
-            <TouchableOpacity onPress={clearSearch} className="ml-2">
-              <Ionicons name="close-circle" size={20} color="#9CA3AF" />
+            <TouchableOpacity onPress={clearSearch} style={styles.searchClearBtn}>
+              <View style={styles.searchClearIcon}>
+                <Ionicons name="close" size={14} color="#fff" />
+              </View>
             </TouchableOpacity>
           )}
         </View>
       </View>
-    </View>
+    </Animated.View>
   );
 
   const renderSearchResults = () => {
@@ -736,101 +1028,102 @@ export const TourGuideScreen: React.FC<TourGuideScreenProps> = ({ onChatbotPress
 
     return (
       <View className="flex-1 bg-gray-50">
-        <View className="px-4 pt-4 pb-2 bg-white border-b border-gray-100">
-          <Text className="text-sm font-gilroy-medium text-gray-500">
-            {isSearching ? 'Searching...' : `${searchResults.length} locations found`}
+        <View style={styles.searchResultsHeader}>
+          <FontAwesome5 name="search-location" size={14} color="#F5840E" />
+          <Text style={styles.searchResultsCount}>
+            {isSearching ? 'Searching...' : `${searchResults.length} places found`}
           </Text>
         </View>
 
         <ScrollView className="flex-1" showsVerticalScrollIndicator={false}>
           {isSearching ? (
-            <View className="items-center justify-center py-12">
-              <ActivityIndicator size="large" color="#F5840E" />
-              <Text className="text-sm font-gilroy-regular text-gray-500 mt-3">
-                Searching locations...
+            <View style={styles.searchLoadingContainer}>
+              <LottieView source={loadingAnimation} autoPlay loop style={{ width: 120, height: 120 }} />
+              <Text style={styles.searchLoadingText}>
+                Finding places for you...
               </Text>
             </View>
           ) : searchResults.length > 0 ? (
-            <View className="py-2">
+            <View style={{ paddingTop: 8 }}>
               {searchResults.map((location, index) => (
                 <TouchableOpacity
                   key={`${location.name}-${index}`}
-                  className="bg-white mx-4 mb-3 rounded-2xl overflow-hidden shadow-sm"
+                  style={styles.searchResultCard}
                   activeOpacity={0.8}
                   onPress={() => handleSearchResultSelect(location)}
                 >
-                  <View className="flex-row items-center p-4">
-                    {/* Location Image */}
-                    <View className="w-20 h-20 rounded-xl overflow-hidden bg-gray-200">
-                      {location.imageUrls && location.imageUrls.length > 0 ? (
-                        <Image
-                          source={{ uri: location.imageUrls[0] }}
-                          className="w-full h-full"
-                          resizeMode="cover"
-                        />
-                      ) : (
-                        <View className="w-full h-full items-center justify-center bg-gray-100">
-                          <MaterialCommunityIcons name="image-off" size={24} color="#9CA3AF" />
+                  {/* Location Image */}
+                  <View style={styles.searchResultImage}>
+                    {location.imageUrls && location.imageUrls.length > 0 ? (
+                      <Image
+                        source={{ uri: location.imageUrls[0] }}
+                        style={{ width: '100%', height: '100%' }}
+                        resizeMode="cover"
+                      />
+                    ) : (
+                      <View style={styles.searchResultNoImage}>
+                        <MaterialCommunityIcons name="image-off" size={20} color="#9CA3AF" />
+                      </View>
+                    )}
+                  </View>
+
+                  {/* Location Info */}
+                  <View style={{ flex: 1, marginLeft: 14 }}>
+                    <Text style={styles.searchResultName} numberOfLines={1}>
+                      {location.name}
+                    </Text>
+                    <View style={styles.searchResultMeta}>
+                      {location.isOutdoor && (
+                        <View style={styles.searchResultBadge}>
+                          <Text style={{ fontSize: 10 }}>🌿</Text>
+                          <Text style={styles.searchResultBadgeText}>Outdoor</Text>
                         </View>
                       )}
-                    </View>
-
-                    {/* Location Info */}
-                    <View className="flex-1 ml-4">
-                      <Text className="text-base font-gilroy-bold text-gray-900" numberOfLines={1}>
-                        {location.name}
-                      </Text>
-                      <View className="flex-row items-center mt-1.5">
-                        <View className="flex-row items-center">
-                          {location.isOutdoor && (
-                            <View className="flex-row items-center mr-3">
-                              <MaterialCommunityIcons name="nature" size={14} color="#10B981" />
-                              <Text className="text-xs font-gilroy-medium text-green-600 ml-1">
-                                Outdoor
+                      {Object.entries(location.preferenceScores)
+                        .sort((a, b) => b[1] - a[1])
+                        .slice(0, 1)
+                        .map(([category, score]) => {
+                          if (score < 0.3) return null;
+                          const config = CATEGORY_CONFIG[category];
+                          return (
+                            <View key={category} style={[styles.searchResultBadge, { backgroundColor: config.bgColor }]}>
+                              <Text style={{ fontSize: 10 }}>{config.emoji}</Text>
+                              <Text style={[styles.searchResultBadgeText, { color: config.color }]}>
+                                {category}
                               </Text>
                             </View>
-                          )}
-                          {Object.entries(location.preferenceScores)
-                            .sort((a, b) => b[1] - a[1])
-                            .slice(0, 1)
-                            .map(([category, score]) => {
-                              if (score < 0.3) return null;
-                              const config = CATEGORY_CONFIG[category];
-                              return (
-                                <View key={category} className="flex-row items-center">
-                                  <FontAwesome5 name={config.icon} size={10} color={config.color} />
-                                  <Text
-                                    className="text-xs font-gilroy-medium capitalize ml-1"
-                                    style={{ color: config.color }}
-                                  >
-                                    {category}
-                                  </Text>
-                                </View>
-                              );
-                            })}
+                          );
+                        })}
+                    </View>
+                    {/* Recommendation level */}
+                    {(() => {
+                      const matchScore = calculateMatchScore(preferences, location.preferenceScores);
+                      const rec = getRecommendationLevel(matchScore);
+                      return (
+                        <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 4, gap: 4 }}>
+                          <FontAwesome5 name={rec.icon} size={9} color={rec.color} solid />
+                          <Text style={{ fontSize: 11, fontFamily: 'Gilroy-Medium', color: rec.color }}>
+                            {rec.level}
+                          </Text>
                         </View>
-                      </View>
-                    </View>
+                      );
+                    })()}
+                  </View>
 
-                    {/* Arrow Icon */}
-                    <View className="ml-2">
-                      <Ionicons name="chevron-forward" size={20} color="#9CA3AF" />
-                    </View>
+                  {/* Arrow */}
+                  <View style={styles.searchResultArrow}>
+                    <Ionicons name="chevron-forward" size={18} color="#D1D5DB" />
                   </View>
                 </TouchableOpacity>
               ))}
-              <View className="h-20" />
+              <View style={{ height: 80 }} />
             </View>
           ) : (
-            <View className="items-center justify-center py-12 px-8">
-              <View className="w-20 h-20 bg-gray-100 rounded-full items-center justify-center mb-4">
-                <Ionicons name="search-outline" size={40} color="#9CA3AF" />
-              </View>
-              <Text className="text-base font-gilroy-bold text-gray-900 text-center">
-                No locations found
-              </Text>
-              <Text className="text-sm font-gilroy-regular text-gray-500 text-center mt-2">
-                Try searching with a different keyword
+            <View style={styles.searchEmptyContainer}>
+              <LottieView source={botAnimation} autoPlay loop style={{ width: 100, height: 100 }} />
+              <Text style={styles.searchEmptyTitle}>No matches found</Text>
+              <Text style={styles.searchEmptySubtitle}>
+                Try a different keyword or browse AI picks below
               </Text>
             </View>
           )}
@@ -839,56 +1132,55 @@ export const TourGuideScreen: React.FC<TourGuideScreenProps> = ({ onChatbotPress
     );
   };
 
-  // Render smart filter panel with AI theme
+  // Render smart filter panel
   const renderSmartFilters = () => (
-    <View className="bg-white mx-4 rounded-2xl shadow-sm overflow-hidden mb-4">
+    <View style={styles.filterPanel}>
       {/* Filter Header with Toggle */}
       <TouchableOpacity
-        className="flex-row items-center justify-between p-4 border-b border-gray-100"
+        style={styles.filterHeader}
         onPress={() => setShowFilters(!showFilters)}
         activeOpacity={0.7}
       >
-        <View className="flex-row items-center">
-          <View
-            className="w-10 h-10 rounded-xl items-center justify-center"
-            style={{ backgroundColor: '#FFF3E0' }}
-          >
-            <FontAwesome5 name="sliders-h" size={16} color="#F5840E" />
+        <View style={styles.filterHeaderLeft}>
+          <View style={styles.filterIcon}>
+            <FontAwesome5 name="sliders-h" size={14} color="#F5840E" />
           </View>
-          <View className="ml-3">
-            <Text className="text-base font-gilroy-bold text-gray-900">Smart Filters</Text>
-            <Text className="text-xs font-gilroy-regular text-gray-500 mt-0.5">
+          <View style={{ marginLeft: 10 }}>
+            <Text style={styles.filterTitle}>Smart Filters</Text>
+            <Text style={styles.filterSubtitle}>
               {selectedDistance}km •{' '}
               {LOCATION_TYPE_OPTIONS.find(o => o.key === selectedLocationType)?.label}
               {selectedCategory ? ` • ${selectedCategory}` : ''}
             </Text>
           </View>
         </View>
-        <View className="flex-row items-center">
-          <View className="bg-primary/10 px-2.5 py-1 rounded-full mr-2">
-            <Text className="text-xs font-gilroy-bold text-primary">
-              {filteredRecommendations.length} results
+        <View style={styles.filterHeaderRight}>
+          <View style={styles.resultCountBadge}>
+            <Text style={styles.resultCountText}>
+              {filteredRecommendations.length}
             </Text>
           </View>
-          <Ionicons name={showFilters ? 'chevron-up' : 'chevron-down'} size={20} color="#9CA3AF" />
+          <Ionicons name={showFilters ? 'chevron-up' : 'chevron-down'} size={18} color="#9CA3AF" />
         </View>
       </TouchableOpacity>
 
       {/* Expandable Filter Content */}
       {showFilters && (
-        <View className="p-4">
-          {/* Location Type Filter (Indoor/Outdoor) */}
-          <View className="mb-4">
-            <View className="flex-row items-center mb-3">
-              <MaterialCommunityIcons name="map-marker-radius" size={16} color="#6B7280" />
-              <Text className="ml-2 text-sm font-gilroy-bold text-gray-700">Location Type</Text>
+        <View style={styles.filterContent}>
+          {/* Location Type Filter */}
+          <View style={{ marginBottom: 16 }}>
+            <View style={styles.filterSectionLabel}>
+              <MaterialCommunityIcons name="map-marker-radius" size={14} color="#6B7280" />
+              <Text style={styles.filterSectionTitle}>Location Type</Text>
             </View>
-            <View className="flex-row bg-gray-100 rounded-xl p-1">
+            <View style={styles.segmentedControl}>
               {LOCATION_TYPE_OPTIONS.map(option => (
                 <TouchableOpacity
                   key={option.key}
-                  className={`flex-1 flex-row items-center justify-center py-2.5 rounded-lg ${selectedLocationType === option.key ? 'bg-white shadow-sm' : ''
-                    }`}
+                  style={[
+                    styles.segmentedOption,
+                    selectedLocationType === option.key && styles.segmentedOptionActive,
+                  ]}
                   onPress={() => {
                     setSelectedLocationType(option.key);
                     if (userLocation) {
@@ -903,12 +1195,14 @@ export const TourGuideScreen: React.FC<TourGuideScreenProps> = ({ onChatbotPress
                 >
                   <FontAwesome5
                     name={option.icon}
-                    size={12}
+                    size={11}
                     color={selectedLocationType === option.key ? '#F5840E' : '#9CA3AF'}
                   />
                   <Text
-                    className={`ml-1.5 text-sm font-gilroy-medium ${selectedLocationType === option.key ? 'text-primary' : 'text-gray-500'
-                      }`}
+                    style={[
+                      styles.segmentedLabel,
+                      selectedLocationType === option.key && styles.segmentedLabelActive,
+                    ]}
                   >
                     {option.label}
                   </Text>
@@ -918,17 +1212,19 @@ export const TourGuideScreen: React.FC<TourGuideScreenProps> = ({ onChatbotPress
           </View>
 
           {/* Distance Filter */}
-          <View className="mb-4">
-            <View className="flex-row items-center mb-3">
-              <FontAwesome5 name="route" size={14} color="#6B7280" />
-              <Text className="ml-2 text-sm font-gilroy-bold text-gray-700">Search Radius</Text>
+          <View style={{ marginBottom: 16 }}>
+            <View style={styles.filterSectionLabel}>
+              <FontAwesome5 name="route" size={12} color="#6B7280" />
+              <Text style={styles.filterSectionTitle}>Search Radius</Text>
             </View>
-            <View className="flex-row flex-wrap gap-2">
+            <View style={styles.distanceRow}>
               {DISTANCE_OPTIONS.map(distance => (
                 <TouchableOpacity
                   key={distance}
-                  className={`px-4 py-2.5 rounded-xl ${selectedDistance === distance ? 'bg-primary' : 'bg-gray-100'
-                    }`}
+                  style={[
+                    styles.distanceChip,
+                    selectedDistance === distance && styles.distanceChipActive,
+                  ]}
                   onPress={() => {
                     setSelectedDistance(distance);
                     if (userLocation) {
@@ -937,8 +1233,10 @@ export const TourGuideScreen: React.FC<TourGuideScreenProps> = ({ onChatbotPress
                   }}
                 >
                   <Text
-                    className={`text-sm font-gilroy-medium ${selectedDistance === distance ? 'text-white' : 'text-gray-600'
-                      }`}
+                    style={[
+                      styles.distanceChipText,
+                      selectedDistance === distance && styles.distanceChipTextActive,
+                    ]}
                   >
                     {distance} km
                   </Text>
@@ -949,24 +1247,28 @@ export const TourGuideScreen: React.FC<TourGuideScreenProps> = ({ onChatbotPress
 
           {/* Category Filter */}
           <View>
-            <View className="flex-row items-center mb-3">
-              <Ionicons name="sparkles" size={16} color="#6B7280" />
-              <Text className="ml-2 text-sm font-gilroy-bold text-gray-700">Experience Type</Text>
+            <View style={styles.filterSectionLabel}>
+              <Ionicons name="sparkles" size={14} color="#6B7280" />
+              <Text style={styles.filterSectionTitle}>Experience Type</Text>
             </View>
             <ScrollView horizontal showsHorizontalScrollIndicator={false}>
               <TouchableOpacity
-                className={`mr-2 px-4 py-2.5 rounded-xl flex-row items-center ${selectedCategory === null ? 'bg-primary' : 'bg-gray-100'
-                  }`}
+                style={[
+                  styles.categoryChip,
+                  selectedCategory === null && styles.categoryChipActive,
+                ]}
                 onPress={() => setSelectedCategory(null)}
               >
                 <Ionicons
                   name="apps"
-                  size={14}
+                  size={13}
                   color={selectedCategory === null ? 'white' : '#6B7280'}
                 />
                 <Text
-                  className={`ml-1.5 text-sm font-gilroy-medium ${selectedCategory === null ? 'text-white' : 'text-gray-600'
-                    }`}
+                  style={[
+                    styles.categoryChipText,
+                    selectedCategory === null && styles.categoryChipTextActive,
+                  ]}
                 >
                   All
                 </Text>
@@ -975,20 +1277,20 @@ export const TourGuideScreen: React.FC<TourGuideScreenProps> = ({ onChatbotPress
               {Object.entries(CATEGORY_CONFIG).map(([key, config]) => (
                 <TouchableOpacity
                   key={key}
-                  className="mr-2 px-4 py-2.5 rounded-xl flex-row items-center"
-                  style={{
-                    backgroundColor: selectedCategory === key ? config.color : config.bgColor,
-                  }}
+                  style={[
+                    styles.categoryChip,
+                    {
+                      backgroundColor: selectedCategory === key ? config.color : config.bgColor,
+                    },
+                  ]}
                   onPress={() => setSelectedCategory(selectedCategory === key ? null : key)}
                 >
-                  <FontAwesome5
-                    name={config.icon}
-                    size={12}
-                    color={selectedCategory === key ? 'white' : config.color}
-                  />
+                  <Text style={{ fontSize: 12 }}>{config.emoji}</Text>
                   <Text
-                    className="ml-1.5 text-sm font-gilroy-medium capitalize"
-                    style={{ color: selectedCategory === key ? 'white' : config.color }}
+                    style={[
+                      styles.categoryChipText,
+                      { color: selectedCategory === key ? 'white' : config.color },
+                    ]}
                   >
                     {key}
                   </Text>
@@ -1003,16 +1305,18 @@ export const TourGuideScreen: React.FC<TourGuideScreenProps> = ({ onChatbotPress
 
   // Quick filter chips (always visible)
   const renderQuickFilterChips = () => (
-    <View className="py-3">
+    <View style={{ paddingVertical: 10 }}>
       <ScrollView
         horizontal
         showsHorizontalScrollIndicator={false}
-        contentContainerStyle={{ paddingHorizontal: 16 }}
+        contentContainerStyle={{ paddingHorizontal: 16, gap: 8 }}
       >
         {/* AI Recommended Chip */}
         <TouchableOpacity
-          className={`mr-2 px-4 py-2.5 rounded-full flex-row items-center ${selectedCategory === null ? 'bg-primary' : 'bg-white border border-gray-200'
-            }`}
+          style={[
+            styles.quickChip,
+            selectedCategory === null && styles.quickChipActive,
+          ]}
           onPress={() => setSelectedCategory(null)}
         >
           <FontAwesome5
@@ -1021,8 +1325,10 @@ export const TourGuideScreen: React.FC<TourGuideScreenProps> = ({ onChatbotPress
             color={selectedCategory === null ? 'white' : '#F5840E'}
           />
           <Text
-            className={`ml-2 text-sm font-gilroy-medium ${selectedCategory === null ? 'text-white' : 'text-primary'
-              }`}
+            style={[
+              styles.quickChipText,
+              selectedCategory === null && styles.quickChipTextActive,
+            ]}
           >
             AI Picks
           </Text>
@@ -1032,20 +1338,22 @@ export const TourGuideScreen: React.FC<TourGuideScreenProps> = ({ onChatbotPress
         {Object.entries(CATEGORY_CONFIG).map(([key, config]) => (
           <TouchableOpacity
             key={key}
-            className={`mr-2 px-4 py-2.5 rounded-full flex-row items-center ${selectedCategory === key ? '' : 'bg-white border border-gray-200'
-              }`}
-            style={selectedCategory === key ? { backgroundColor: config.color } : undefined}
+            style={[
+              styles.quickChip,
+              selectedCategory === key
+                ? { backgroundColor: config.color, borderColor: config.color }
+                : undefined,
+            ]}
             onPress={() => setSelectedCategory(selectedCategory === key ? null : key)}
           >
-            <FontAwesome5
-              name={config.icon}
-              size={12}
-              color={selectedCategory === key ? 'white' : config.color}
-            />
+            <Text style={{ fontSize: 14 }}>{config.emoji}</Text>
             <Text
-              className={`ml-2 text-sm font-gilroy-medium capitalize ${selectedCategory === key ? 'text-white' : ''
-                }`}
-              style={selectedCategory !== key ? { color: config.color } : undefined}
+              style={[
+                styles.quickChipText,
+                selectedCategory === key
+                  ? { color: '#fff' }
+                  : { color: config.color },
+              ]}
             >
               {key}
             </Text>
@@ -1055,87 +1363,91 @@ export const TourGuideScreen: React.FC<TourGuideScreenProps> = ({ onChatbotPress
     </View>
   );
 
+  // Sort options bar
+  const renderSortBar = () => (
+    <View style={styles.sortBar}>
+      {SORT_OPTIONS.map(option => (
+        <TouchableOpacity
+          key={option.key}
+          style={[styles.sortOption, sortBy === option.key && styles.sortOptionActive]}
+          onPress={() => setSortBy(option.key)}
+          activeOpacity={0.7}
+        >
+          <FontAwesome5
+            name={option.icon}
+            size={11}
+            color={sortBy === option.key ? '#F5840E' : '#9CA3AF'}
+          />
+          <Text style={[styles.sortLabel, sortBy === option.key && styles.sortLabelActive]}>
+            {option.label}
+          </Text>
+        </TouchableOpacity>
+      ))}
+    </View>
+  );
+
   const renderQuickStats = () => (
-    <View className="flex-row px-4 mb-4 gap-3">
-      <View className="flex-1 bg-white rounded-2xl p-4 shadow-sm">
-        <View className="flex-row items-center mb-2">
-          <View className="w-8 h-8 bg-purple-100 rounded-full items-center justify-center">
-            <FontAwesome5 name="map-marked-alt" size={14} color="#8B5CF6" />
-          </View>
-          <Text className="ml-2 text-2xl font-gilroy-bold text-gray-900">
-            {recommendations.length}
-          </Text>
+    <View style={styles.statsRow}>
+      <View style={styles.statCard}>
+        <View style={[styles.statIcon, { backgroundColor: '#F3E8FF' }]}>
+          <FontAwesome5 name="map-marked-alt" size={13} color="#8B5CF6" />
         </View>
-        <Text className="text-sm font-gilroy-regular text-gray-500">Places Found</Text>
+        <Text style={styles.statValue}>{recommendations.length}</Text>
+        <Text style={styles.statLabel}>Places</Text>
       </View>
 
-      <View className="flex-1 bg-white rounded-2xl p-4 shadow-sm">
-        <View className="flex-row items-center mb-2">
-          <View className="w-8 h-8 bg-green-100 rounded-full items-center justify-center">
-            <FontAwesome5 name="walking" size={14} color="#10B981" />
-          </View>
-          <Text className="ml-2 text-2xl font-gilroy-bold text-gray-900">
-            {recommendations.filter(r => r.distance_km < 10).length}
-          </Text>
+      <View style={styles.statCard}>
+        <View style={[styles.statIcon, { backgroundColor: '#D1FAE5' }]}>
+          <FontAwesome5 name="walking" size={13} color="#10B981" />
         </View>
-        <Text className="text-sm font-gilroy-regular text-gray-500">Within 10km</Text>
+        <Text style={styles.statValue}>
+          {recommendations.filter(r => r.distance_km < 10).length}
+        </Text>
+        <Text style={styles.statLabel}>Nearby</Text>
       </View>
 
-      <View className="flex-1 bg-white rounded-2xl p-4 shadow-sm">
-        <View className="flex-row items-center mb-2">
-          <View className="w-8 h-8 bg-orange-100 rounded-full items-center justify-center">
-            <FontAwesome5 name="fire" size={14} color="#F59E0B" />
-          </View>
-          <Text className="ml-2 text-2xl font-gilroy-bold text-gray-900">
-            {recommendations.filter(r => r.similarity_score > 0.7).length}
-          </Text>
+      <View style={styles.statCard}>
+        <View style={[styles.statIcon, { backgroundColor: '#D1FAE5' }]}>
+          <FontAwesome5 name="star" size={13} color="#059669" />
         </View>
-        <Text className="text-sm font-gilroy-regular text-gray-500">Top Matches</Text>
+        <Text style={styles.statValue}>
+          {recommendations.filter(r => r.similarity_score > 0.7).length}
+        </Text>
+        <Text style={styles.statLabel}>Top Picks</Text>
       </View>
     </View>
   );
 
   const renderAIAssistantBanner = () => (
-    <TouchableOpacity className="mx-4 mb-4" activeOpacity={0.9} onPress={onChatbotPress}>
-      <View className="rounded-3xl overflow-hidden" style={styles.aiBanner}>
-        {/* Decorative Elements */}
-        <View
-          className="absolute top-0 right-0 w-32 h-32 rounded-full opacity-10"
-          style={{ backgroundColor: 'white', transform: [{ translateX: 40 }, { translateY: -40 }] }}
-        />
-        <View
-          className="absolute bottom-0 left-0 w-24 h-24 rounded-full opacity-10"
-          style={{ backgroundColor: 'white', transform: [{ translateX: -30 }, { translateY: 30 }] }}
-        />
+    <TouchableOpacity style={styles.aiBannerContainer} activeOpacity={0.9} onPress={onChatbotPress}>
+      <View style={styles.aiBanner}>
+        {/* Decorative circles */}
+        <View style={styles.aiBannerDecor1} />
+        <View style={styles.aiBannerDecor2} />
 
-        <View className="p-5 flex-row items-center">
-          <View
-            className="w-16 h-16 rounded-2xl items-center justify-center"
-            style={{ backgroundColor: 'rgba(255,255,255,0.2)' }}
-          >
+        <View style={styles.aiBannerContent}>
+          <View style={styles.aiBannerLottie}>
             <LottieView
-              source={require('@assets/animations/onbord1.json')}
+              source={loadingAnimation}
               autoPlay
               loop
               style={{ width: 50, height: 50 }}
             />
           </View>
-          <View className="flex-1 ml-4">
-            <View className="flex-row items-center">
-              <Text className="text-white font-gilroy-bold text-lg">Your AI Travel Companion</Text>
-              <View className="ml-2 bg-white/20 px-2 py-0.5 rounded-full">
-                <Text className="text-white text-xs font-gilroy-medium">SMART</Text>
+          <View style={{ flex: 1, marginLeft: 14 }}>
+            <View style={styles.aiBannerTitleRow}>
+              <Text style={styles.aiBannerTitle}>AI Travel Companion</Text>
+              <View style={styles.aiBannerBadge}>
+                <LiveDot color="#fff" />
+                <Text style={styles.aiBannerBadgeText}>LIVE</Text>
               </View>
             </View>
-            <Text
-              style={{ color: 'rgba(255,255,255,0.85)' }}
-              className="font-gilroy-regular text-sm mt-1"
-            >
-              Ask anything • Plan trips • Get local insights
+            <Text style={styles.aiBannerSubtitle}>
+              Ask anything · Plan trips · Local insights
             </Text>
           </View>
-          <View className="w-10 h-10 bg-white/20 rounded-full items-center justify-center">
-            <FontAwesome5 name="comments" size={16} color="white" />
+          <View style={styles.aiBannerArrow}>
+            <Ionicons name="arrow-forward" size={18} color="#fff" />
           </View>
         </View>
       </View>
@@ -1143,53 +1455,70 @@ export const TourGuideScreen: React.FC<TourGuideScreenProps> = ({ onChatbotPress
   );
 
   const renderLoadingState = () => (
-    <View className="flex-1 items-center justify-center px-6">
-      <LottieView source={loadingAnimation} autoPlay loop style={{ width: 200, height: 200 }} />
-      <Text className="text-xl font-gilroy-bold text-gray-900 mt-4 text-center">
-        Discovering Amazing Places...
-      </Text>
-      <Text className="text-base font-gilroy-regular text-gray-500 mt-2 text-center">
-        Your AI guide is finding the perfect spots based on your preferences
+    <View style={[styles.centeredState, { backgroundColor: '#FFFFFF' }]}>
+      <LottieView source={loadingAnimation} autoPlay loop style={{ width: 180, height: 180 }} />
+      <Text style={styles.stateTitle}>Discovering Amazing Places...</Text>
+      <Text style={styles.stateSubtitle}>
+        Your AI guide is curating personalized recommendations
       </Text>
     </View>
   );
 
   const renderErrorState = () => (
-    <View className="flex-1 items-center justify-center px-6">
-      <View className="w-24 h-24 bg-red-100 rounded-full items-center justify-center mb-6">
-        <FontAwesome5 name="exclamation-triangle" size={40} color="#EF4444" />
+    <View style={styles.centeredState}>
+      <View style={styles.errorIcon}>
+        <FontAwesome5 name="exclamation-triangle" size={36} color="#EF4444" />
       </View>
-      <Text className="text-xl font-gilroy-bold text-gray-900 text-center">
-        Oops! Something went wrong
-      </Text>
-      <Text className="text-base font-gilroy-regular text-gray-500 mt-2 text-center">{error}</Text>
-      <TouchableOpacity className="mt-6 bg-primary px-8 py-3 rounded-full" onPress={handleRefresh}>
-        <Text className="text-white font-gilroy-bold">Try Again</Text>
+      <Text style={styles.stateTitle}>Oops! Something went wrong</Text>
+      <Text style={styles.stateSubtitle}>{error}</Text>
+      <TouchableOpacity style={styles.retryBtn} onPress={handleRefresh}>
+        <Ionicons name="refresh" size={16} color="#fff" />
+        <Text style={styles.retryBtnText}>Try Again</Text>
       </TouchableOpacity>
     </View>
   );
 
   const renderEmptyState = () => (
-    <View className="flex-1 items-center justify-center px-6 py-12">
-      <View className="w-24 h-24 bg-gray-100 rounded-full items-center justify-center mb-6">
-        <FontAwesome5 name="map-marked-alt" size={40} color="#9CA3AF" />
-      </View>
-      <Text className="text-xl font-gilroy-bold text-gray-900 text-center">No Places Found</Text>
-      <Text className="text-base font-gilroy-regular text-gray-500 mt-2 text-center">
+    <View style={styles.centeredState}>
+      <LottieView source={botAnimation} autoPlay loop style={{ width: 140, height: 140 }} />
+      <Text style={styles.stateTitle}>No Places Found</Text>
+      <Text style={styles.stateSubtitle}>
         Try adjusting your filters or expanding the search area
       </Text>
       <TouchableOpacity
-        className="mt-6 bg-primary px-8 py-3 rounded-full"
+        style={styles.retryBtn}
         onPress={() => setSelectedCategory(null)}
       >
-        <Text className="text-white font-gilroy-bold">Clear Filters</Text>
+        <Ionicons name="options" size={16} color="#fff" />
+        <Text style={styles.retryBtnText}>Clear Filters</Text>
+      </TouchableOpacity>
+    </View>
+  );
+
+  // Section header for recommendations
+  const renderSectionHeader = () => (
+    <View style={styles.sectionHeader}>
+      <View style={styles.sectionHeaderLeft}>
+        <View style={styles.sectionIcon}>
+          <FontAwesome5 name="brain" size={14} color="#F5840E" />
+        </View>
+        <View>
+          <View style={styles.sectionTitleRow}>
+            <Text style={styles.sectionTitle}>AI Recommendations</Text>
+            <LiveDot color="#10B981" />
+          </View>
+          <Text style={styles.sectionSubtitle}>Updated in real-time</Text>
+        </View>
+      </View>
+      <TouchableOpacity style={styles.sectionRefreshBtn} onPress={handleRefresh}>
+        <Ionicons name="refresh" size={16} color="#6B7280" />
       </TouchableOpacity>
     </View>
   );
 
   return (
-    <View className="flex-1 bg-gray-50">
-      <StatusBar barStyle="light-content" backgroundColor="#F5840E" />
+    <View style={{ flex: 1, backgroundColor: '#F5840E' }}>
+      <StatusBar barStyle="light-content" backgroundColor="#F5840E" translucent />
 
       {renderHeader()}
 
@@ -1202,7 +1531,7 @@ export const TourGuideScreen: React.FC<TourGuideScreenProps> = ({ onChatbotPress
         renderErrorState()
       ) : (
         <ScrollView
-          className="flex-1"
+          style={{ flex: 1, backgroundColor: '#F9FAFB' }}
           showsVerticalScrollIndicator={false}
           refreshControl={
             <RefreshControl
@@ -1215,32 +1544,10 @@ export const TourGuideScreen: React.FC<TourGuideScreenProps> = ({ onChatbotPress
         >
           {renderQuickFilterChips()}
           {renderSmartFilters()}
+          {renderSortBar()}
           {renderQuickStats()}
           {renderAIAssistantBanner()}
-
-          {/* Section Header */}
-          <View className="flex-row items-center justify-between px-4 mb-4 mt-2">
-            <View className="flex-row items-center">
-              <View className="w-10 h-10 bg-primary/10 rounded-xl items-center justify-center mr-3">
-                <FontAwesome5 name="brain" size={16} color="#F5840E" />
-              </View>
-              <View>
-                <View className="flex-row items-center">
-                  <Text className="text-lg font-gilroy-bold text-gray-900">AI Recommendations</Text>
-                  <View className="ml-2 w-2 h-2 bg-green-500 rounded-full" />
-                </View>
-                <Text className="text-xs font-gilroy-regular text-gray-500 mt-0.5">
-                  Personalized for your preferences
-                </Text>
-              </View>
-            </View>
-            <TouchableOpacity
-              className="w-10 h-10 bg-gray-100 rounded-xl items-center justify-center"
-              onPress={handleRefresh}
-            >
-              <Ionicons name="refresh" size={18} color="#6B7280" />
-            </TouchableOpacity>
-          </View>
+          {renderSectionHeader()}
 
           {/* Recommendations List */}
           {filteredRecommendations.length > 0
@@ -1257,7 +1564,7 @@ export const TourGuideScreen: React.FC<TourGuideScreenProps> = ({ onChatbotPress
             : renderEmptyState()}
 
           {/* Bottom Spacing */}
-          <View className="h-24" />
+          <View style={{ height: 100 }} />
         </ScrollView>
       )}
     </View>
@@ -1265,23 +1572,659 @@ export const TourGuideScreen: React.FC<TourGuideScreenProps> = ({ onChatbotPress
 };
 
 const styles = StyleSheet.create({
+  // Header
   header: {
-    position: 'relative',
-    paddingTop: Platform.OS === 'ios' ? 50 : 10,
-    borderBottomLeftRadius: 30,
-    borderBottomRightRadius: 30,
+    backgroundColor: '#F5840E',
+    paddingTop: 4,
+    borderBottomLeftRadius: 28,
+    borderBottomRightRadius: 28,
     overflow: 'hidden',
   },
-  headerGradient: {
+  headerTop: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 20,
+    paddingTop: 10,
+    paddingBottom: 6,
+  },
+  greetingText: {
+    color: 'rgba(255,255,255,0.85)',
+    fontFamily: 'Gilroy-Medium',
+    fontSize: 13,
+  },
+  userName: {
+    color: '#fff',
+    fontFamily: 'Gilroy-Bold',
+    fontSize: 22,
+    marginTop: 2,
+  },
+  headerAiBtn: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    backgroundColor: 'rgba(255,255,255,0.2)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  locationRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 20,
+    paddingBottom: 8,
+  },
+  locationDot: {
+    width: 30,
+    height: 30,
+    borderRadius: 15,
+    backgroundColor: 'rgba(255,255,255,0.2)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  locationLabel: {
+    color: 'rgba(255,255,255,0.7)',
+    fontFamily: 'Gilroy-Regular',
+    fontSize: 11,
+  },
+  locationValue: {
+    color: '#fff',
+    fontFamily: 'Gilroy-Medium',
+    fontSize: 13,
+    marginTop: 1,
+  },
+  refreshLocationBtn: {
+    width: 30,
+    height: 30,
+    borderRadius: 15,
+    backgroundColor: 'rgba(255,255,255,0.2)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+
+  // Search
+  searchContainer: {
+    paddingHorizontal: 20,
+    paddingBottom: 16,
+  },
+  searchBar: {
+    backgroundColor: '#fff',
+    borderRadius: 20,
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 16,
+    paddingVertical: Platform.OS === 'ios' ? 14 : 10,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.1,
+    shadowRadius: 12,
+    elevation: 6,
+    borderWidth: 2,
+    borderColor: 'transparent',
+  },
+  searchBarFocused: {
+    borderColor: '#F5840E',
+    shadowOpacity: 0.15,
+  },
+  searchInput: {
+    flex: 1,
+    marginLeft: 10,
+    fontFamily: 'Gilroy-Medium',
+    fontSize: 15,
+    color: '#1F2937',
+    padding: 0,
+  },
+  searchClearBtn: {
+    marginLeft: 8,
+  },
+  searchClearIcon: {
+    width: 22,
+    height: 22,
+    borderRadius: 11,
+    backgroundColor: '#D1D5DB',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+
+  // Search Results
+  searchResultsHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    paddingHorizontal: 20,
+    paddingTop: 14,
+    paddingBottom: 8,
+    backgroundColor: '#fff',
+    borderBottomWidth: 1,
+    borderBottomColor: '#F3F4F6',
+  },
+  searchResultsCount: {
+    fontSize: 13,
+    fontFamily: 'Gilroy-Medium',
+    color: '#6B7280',
+  },
+  searchLoadingContainer: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 40,
+  },
+  searchLoadingText: {
+    fontSize: 14,
+    fontFamily: 'Gilroy-Medium',
+    color: '#9CA3AF',
+    marginTop: 4,
+  },
+  searchResultCard: {
+    backgroundColor: '#fff',
+    marginHorizontal: 16,
+    marginBottom: 10,
+    borderRadius: 18,
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 14,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.06,
+    shadowRadius: 8,
+    elevation: 3,
+  },
+  searchResultImage: {
+    width: 64,
+    height: 64,
+    borderRadius: 14,
+    overflow: 'hidden',
+    backgroundColor: '#F3F4F6',
+  },
+  searchResultNoImage: {
+    width: '100%',
+    height: '100%',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#F3F4F6',
+  },
+  searchResultName: {
+    fontSize: 15,
+    fontFamily: 'Gilroy-Bold',
+    color: '#1F2937',
+  },
+  searchResultMeta: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 6,
+    gap: 6,
+  },
+  searchResultBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#D1FAE5',
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 8,
+    gap: 3,
+  },
+  searchResultBadgeText: {
+    fontSize: 10,
+    fontFamily: 'Gilroy-SemiBold',
+    color: '#065F46',
+    textTransform: 'capitalize',
+  },
+  searchResultArrow: {
+    marginLeft: 8,
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    backgroundColor: '#F3F4F6',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  searchEmptyContainer: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 40,
+    paddingHorizontal: 32,
+  },
+  searchEmptyTitle: {
+    fontSize: 16,
+    fontFamily: 'Gilroy-Bold',
+    color: '#1F2937',
+    textAlign: 'center',
+    marginTop: 8,
+  },
+  searchEmptySubtitle: {
+    fontSize: 13,
+    fontFamily: 'Gilroy-Regular',
+    color: '#9CA3AF',
+    textAlign: 'center',
+    marginTop: 4,
+  },
+
+  // Filter panel
+  filterPanel: {
+    backgroundColor: '#fff',
+    marginHorizontal: 16,
+    borderRadius: 20,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.06,
+    shadowRadius: 10,
+    elevation: 3,
+    overflow: 'hidden',
+    marginBottom: 12,
+  },
+  filterHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    padding: 14,
+    borderBottomWidth: 1,
+    borderBottomColor: '#F3F4F6',
+  },
+  filterHeaderLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  filterIcon: {
+    width: 36,
+    height: 36,
+    borderRadius: 12,
+    backgroundColor: '#FFF3E0',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  filterTitle: {
+    fontSize: 15,
+    fontFamily: 'Gilroy-Bold',
+    color: '#1F2937',
+  },
+  filterSubtitle: {
+    fontSize: 11,
+    fontFamily: 'Gilroy-Regular',
+    color: '#9CA3AF',
+    marginTop: 1,
+  },
+  filterHeaderRight: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  resultCountBadge: {
+    backgroundColor: '#FFF3E0',
+    borderRadius: 12,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+  },
+  resultCountText: {
+    fontSize: 12,
+    fontFamily: 'Gilroy-Bold',
+    color: '#F5840E',
+  },
+  filterContent: {
+    padding: 14,
+  },
+  filterSectionLabel: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 10,
+    gap: 6,
+  },
+  filterSectionTitle: {
+    fontSize: 13,
+    fontFamily: 'Gilroy-Bold',
+    color: '#4B5563',
+  },
+  segmentedControl: {
+    flexDirection: 'row',
+    backgroundColor: '#F3F4F6',
+    borderRadius: 14,
+    padding: 3,
+  },
+  segmentedOption: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 9,
+    borderRadius: 11,
+    gap: 5,
+  },
+  segmentedOptionActive: {
+    backgroundColor: '#fff',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.08,
+    shadowRadius: 4,
+    elevation: 2,
+  },
+  segmentedLabel: {
+    fontSize: 12,
+    fontFamily: 'Gilroy-Medium',
+    color: '#9CA3AF',
+  },
+  segmentedLabelActive: {
+    color: '#F5840E',
+    fontFamily: 'Gilroy-Bold',
+  },
+  distanceRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+  },
+  distanceChip: {
+    paddingHorizontal: 16,
+    paddingVertical: 9,
+    borderRadius: 14,
+    backgroundColor: '#F3F4F6',
+  },
+  distanceChipActive: {
     backgroundColor: '#F5840E',
   },
+  distanceChipText: {
+    fontSize: 13,
+    fontFamily: 'Gilroy-Medium',
+    color: '#4B5563',
+  },
+  distanceChipTextActive: {
+    color: '#fff',
+    fontFamily: 'Gilroy-Bold',
+  },
+  categoryChip: {
+    marginRight: 8,
+    paddingHorizontal: 14,
+    paddingVertical: 9,
+    borderRadius: 14,
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#F3F4F6',
+    gap: 5,
+  },
+  categoryChipActive: {
+    backgroundColor: '#F5840E',
+  },
+  categoryChipText: {
+    fontSize: 13,
+    fontFamily: 'Gilroy-Medium',
+    color: '#4B5563',
+    textTransform: 'capitalize',
+  },
+  categoryChipTextActive: {
+    color: '#fff',
+  },
+
+  // Quick filter chips
+  quickChip: {
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    borderRadius: 24,
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#fff',
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+    gap: 6,
+  },
+  quickChipActive: {
+    backgroundColor: '#F5840E',
+    borderColor: '#F5840E',
+  },
+  quickChipText: {
+    fontSize: 13,
+    fontFamily: 'Gilroy-Medium',
+    color: '#F5840E',
+    textTransform: 'capitalize',
+  },
+  quickChipTextActive: {
+    color: '#fff',
+  },
+
+  // Sort bar
+  sortBar: {
+    flexDirection: 'row',
+    marginHorizontal: 16,
+    backgroundColor: '#fff',
+    borderRadius: 16,
+    padding: 4,
+    marginBottom: 12,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.04,
+    shadowRadius: 6,
+    elevation: 2,
+  },
+  sortOption: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 9,
+    borderRadius: 12,
+    gap: 5,
+  },
+  sortOptionActive: {
+    backgroundColor: '#FFF3E0',
+  },
+  sortLabel: {
+    fontSize: 12,
+    fontFamily: 'Gilroy-Medium',
+    color: '#9CA3AF',
+  },
+  sortLabelActive: {
+    color: '#F5840E',
+    fontFamily: 'Gilroy-Bold',
+  },
+
+  // Stats
+  statsRow: {
+    flexDirection: 'row',
+    paddingHorizontal: 16,
+    marginBottom: 12,
+    gap: 10,
+  },
+  statCard: {
+    flex: 1,
+    backgroundColor: '#fff',
+    borderRadius: 18,
+    padding: 14,
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 8,
+    elevation: 2,
+  },
+  statIcon: {
+    width: 32,
+    height: 32,
+    borderRadius: 10,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 6,
+  },
+  statValue: {
+    fontSize: 20,
+    fontFamily: 'Gilroy-Bold',
+    color: '#1F2937',
+  },
+  statLabel: {
+    fontSize: 11,
+    fontFamily: 'Gilroy-Regular',
+    color: '#9CA3AF',
+    marginTop: 2,
+  },
+
+  // AI Banner
+  aiBannerContainer: {
+    marginHorizontal: 16,
+    marginBottom: 16,
+  },
   aiBanner: {
-    backgroundColor: '#6366F1', // Indigo color for AI theme
+    backgroundColor: '#6366F1',
+    borderRadius: 24,
+    overflow: 'hidden',
     shadowColor: '#6366F1',
     shadowOffset: { width: 0, height: 8 },
     shadowOpacity: 0.3,
     shadowRadius: 16,
     elevation: 8,
+  },
+  aiBannerDecor1: {
+    position: 'absolute',
+    top: -30,
+    right: -30,
+    width: 100,
+    height: 100,
+    borderRadius: 50,
+    backgroundColor: 'rgba(255,255,255,0.08)',
+  },
+  aiBannerDecor2: {
+    position: 'absolute',
+    bottom: -20,
+    left: -20,
+    width: 80,
+    height: 80,
+    borderRadius: 40,
+    backgroundColor: 'rgba(255,255,255,0.06)',
+  },
+  aiBannerContent: {
+    padding: 18,
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  aiBannerLottie: {
+    width: 52,
+    height: 52,
+    borderRadius: 16,
+    backgroundColor: 'rgba(255,255,255,0.15)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  aiBannerTitleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  aiBannerTitle: {
+    color: '#fff',
+    fontFamily: 'Gilroy-Bold',
+    fontSize: 16,
+  },
+  aiBannerBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(255,255,255,0.2)',
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 12,
+    gap: 4,
+  },
+  aiBannerBadgeText: {
+    color: '#fff',
+    fontFamily: 'Gilroy-Bold',
+    fontSize: 10,
+  },
+  aiBannerSubtitle: {
+    color: 'rgba(255,255,255,0.8)',
+    fontFamily: 'Gilroy-Regular',
+    fontSize: 13,
+    marginTop: 3,
+  },
+  aiBannerArrow: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: 'rgba(255,255,255,0.2)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+
+  // Section Header
+  sectionHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 16,
+    marginBottom: 14,
+  },
+  sectionHeaderLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+  },
+  sectionIcon: {
+    width: 38,
+    height: 38,
+    borderRadius: 12,
+    backgroundColor: '#FFF3E0',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  sectionTitleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  sectionTitle: {
+    fontSize: 16,
+    fontFamily: 'Gilroy-Bold',
+    color: '#1F2937',
+  },
+  sectionSubtitle: {
+    fontSize: 11,
+    fontFamily: 'Gilroy-Regular',
+    color: '#9CA3AF',
+    marginTop: 1,
+  },
+  sectionRefreshBtn: {
+    width: 36,
+    height: 36,
+    borderRadius: 12,
+    backgroundColor: '#F3F4F6',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+
+  // States
+  centeredState: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 24,
+    paddingVertical: 40,
+  },
+  stateTitle: {
+    fontSize: 18,
+    fontFamily: 'Gilroy-Bold',
+    color: '#1F2937',
+    textAlign: 'center',
+    marginTop: 12,
+  },
+  stateSubtitle: {
+    fontSize: 14,
+    fontFamily: 'Gilroy-Regular',
+    color: '#9CA3AF',
+    textAlign: 'center',
+    marginTop: 6,
+  },
+  errorIcon: {
+    width: 80,
+    height: 80,
+    borderRadius: 40,
+    backgroundColor: '#FEE2E2',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  retryBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#F5840E',
+    paddingHorizontal: 24,
+    paddingVertical: 12,
+    borderRadius: 24,
+    marginTop: 16,
+    gap: 8,
+  },
+  retryBtnText: {
+    color: '#fff',
+    fontFamily: 'Gilroy-Bold',
+    fontSize: 14,
   },
 });
 
