@@ -90,6 +90,10 @@ const RouteCard: React.FC<{
     }
   };
 
+  const getTransportLabel = (type: string) => {
+    return type.toLowerCase() === 'car' ? 'taxi' : type;
+  };
+
   return (
     <View className="mx-3 mb-2 rounded-2xl bg-white shadow-sm overflow-hidden">
       {index === 0 && (
@@ -112,7 +116,7 @@ const RouteCard: React.FC<{
           <Text className="text-2xl mr-2">{getTransportIcon(route.transport_type)}</Text>
           <View className="flex-1">
             <Text className="text-base font-gilroy-bold text-gray-900" numberOfLines={1}>
-              {route.transport_type}
+              {getTransportLabel(route.transport_type)}
             </Text>
             <Text className="text-xs font-gilroy-medium text-gray-600" numberOfLines={1}>
               {route.operator_name}
