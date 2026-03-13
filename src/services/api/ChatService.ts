@@ -1,13 +1,8 @@
 import axios from 'axios';
-import { Platform } from 'react-native';
 import { AuthUtils } from '@utils/auth';
+import { API_CONFIG } from '@constants';
 
-// Use Android emulator loopback so http://localhost calls reach the host machine
-const CHAT_API_BASE_URL = Platform.select({
-  ios: 'http://localhost:3001/api/v1',
-  android: 'http://10.0.2.2:3001/api/v1',
-  default: 'http://localhost:3001/api/v1',
-});
+const CHAT_API_BASE_URL = `${API_CONFIG.BASE_URL}${API_CONFIG.API_VERSION}`;
 
 // ============= OLD ENDPOINT TYPES =============
 export interface TransportRecommendation {
