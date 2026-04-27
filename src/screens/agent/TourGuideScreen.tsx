@@ -128,9 +128,6 @@ const LOCATION_TYPE_OPTIONS: LocationTypeOption[] = [
   { key: 'indoor', label: 'Indoor', icon: 'home', iconFamily: 'fa5' },
 ];
 
-// Real-time refresh interval (30 seconds)
-const REALTIME_REFRESH_INTERVAL = 30000;
-
 // Extended location with image
 interface RecommendationWithImage extends SimpleRecommendationLocation {
   imageUrl: string | null;
@@ -618,7 +615,7 @@ export const TourGuideScreen: React.FC<TourGuideScreenProps> = ({ onChatbotPress
   const [showSearchResults, setShowSearchResults] = useState(false);
   const searchTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const preferencesLoadedRef = useRef(false);
-  const realtimeIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const lastFetchedLocationRef = useRef<{ latitude: number; longitude: number } | null>(null);
 
   const loadPreferences = async () => {
     try {
@@ -648,22 +645,17 @@ export const TourGuideScreen: React.FC<TourGuideScreenProps> = ({ onChatbotPress
     }).start();
   }, [isSearchFocused, searchBarAnim]);
 
-  // Real-time refresh for crowd data
+  // Reload recommendations when location changes significantly (> 0.5 km)
   useEffect(() => {
-    if (!isLoading && userLocation && recommendations.length > 0) {
-      realtimeIntervalRef.current = setInterval(() => {
-        if (userLocation) {
-          fetchRecommendations(userLocation.latitude, userLocation.longitude);
-        }
-      }, REALTIME_REFRESH_INTERVAL);
+    if (!userLocation) return;
+    const prev = lastFetchedLocationRef.current;
+    if (!prev) return; // initial fetch is handled by requestLocationPermission
+    const dist = haversineDistance(prev.latitude, prev.longitude, userLocation.latitude, userLocation.longitude);
+    if (dist > 0.5) {
+      fetchRecommendations(userLocation.latitude, userLocation.longitude);
     }
-    return () => {
-      if (realtimeIntervalRef.current) {
-        clearInterval(realtimeIntervalRef.current);
-      }
-    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isLoading, userLocation, recommendations.length]);
+  }, [userLocation]);
 
   // Handle search with debouncing
   const handleSearch = useCallback((query: string) => {
@@ -859,6 +851,7 @@ export const TourGuideScreen: React.FC<TourGuideScreenProps> = ({ onChatbotPress
     try {
       setIsLoading(true);
       setError(null);
+      lastFetchedLocationRef.current = { latitude: lat, longitude: lng };
 
       // Use override if provided, otherwise use state value
       const maxDistance = distanceOverride ?? selectedDistance;

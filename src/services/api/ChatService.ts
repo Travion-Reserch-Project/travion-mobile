@@ -495,4 +495,260 @@ const chatService = {
   },
 };
 
-export { chatService };
+// ============= TOUR GUIDE CHAT TYPES (AI Agent Engine) =============
+
+export interface GuideSession {
+  sessionId: string;
+  title: string;
+  status: 'active' | 'closed' | 'archived';
+  messageCount: number;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface ImageSearchResult {
+  image_id: string;
+  location_name: string;
+  description: string;
+  image_url: string;
+  similarity_score: number;
+  tags: string;
+  coordinates?: { lat: number; lng: number };
+}
+
+export interface GuideMessageMetadata {
+  reasoning_loops?: number;
+  documents_retrieved?: number;
+  web_search_used?: boolean;
+  target_location?: string;
+  has_image_query?: boolean;
+  sources?: {
+    kb_sources?: string[];
+    source_urls?: Array<{ title: string; url: string }>;
+  };
+  [key: string]: any;
+}
+
+export interface ItinerarySlot {
+  time: string;
+  location: string;
+  activity: string;
+  duration_minutes: number;
+  crowd_prediction: number;
+  lighting_quality: string;
+  notes?: string;
+  day?: number;
+  order?: number;
+  icon?: string;
+  highlight?: boolean;
+  ai_insight?: string;
+  cultural_tip?: string;
+  ethical_note?: string;
+  best_photo_time?: string;
+}
+
+export interface ConstraintViolation {
+  constraint_type: string;
+  description: string;
+  severity: 'low' | 'medium' | 'high' | 'critical';
+  suggestion: string;
+}
+
+export interface GuideMessageResponse {
+  success: boolean;
+  data: {
+    sessionId: string;
+    response: string;
+    intent: string | null;
+    itinerary: ItinerarySlot[] | null;
+    constraints: ConstraintViolation[] | null;
+    metadata: GuideMessageMetadata;
+    messageCount: number;
+    imageResults?: ImageSearchResult[] | null;
+    imageValidationMessage?: string | null;
+  };
+}
+
+export interface GuideHistoryMessage {
+  id: string;
+  role: 'user' | 'assistant';
+  content: string;
+  timestamp: string;
+  metadata?: GuideMessageMetadata;
+}
+
+export interface GuideSessionsResponse {
+  success: boolean;
+  data: {
+    sessions: GuideSession[];
+    total: number;
+  };
+}
+
+export interface GuideHistoryResponse {
+  success: boolean;
+  data: {
+    messages: GuideHistoryMessage[];
+    total: number;
+  };
+}
+
+// ============= TOUR GUIDE CHAT SERVICE METHODS =============
+
+const tourGuideChatService = {
+  /** Quick chat — auto-creates session + sends message in one call */
+  async quickChat(
+    message: string,
+    sessionId?: string,
+    imageBase64?: string,
+  ): Promise<GuideMessageResponse> {
+    const tokens = await AuthUtils.getStoredTokens();
+    const accessToken = tokens?.accessToken;
+    if (!accessToken) {
+      return { success: false, data: { sessionId: '', response: 'Not authenticated.', intent: null, itinerary: null, constraints: null, metadata: {}, messageCount: 0 } };
+    }
+
+    const payload: any = { message };
+    if (sessionId) {
+      payload.sessionId = sessionId;
+    }
+    if (imageBase64) {
+      payload.imageBase64 = imageBase64;
+    }
+
+    const response = await axios.post<GuideMessageResponse>(
+      `${CHAT_API_BASE_URL}/chat/quick`,
+      payload,
+      {
+        timeout: 120000,
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${accessToken}`,
+        },
+      },
+    );
+    return response.data;
+  },
+
+  /** Create a new tour guide session */
+  async createSession(
+    title?: string,
+  ): Promise<{ success: boolean; data: GuideSession }> {
+    const tokens = await AuthUtils.getStoredTokens();
+    const accessToken = tokens?.accessToken;
+    if (!accessToken) {
+      throw new Error('Not authenticated');
+    }
+
+    const response = await axios.post(
+      `${CHAT_API_BASE_URL}/chat/sessions`,
+      { title: title || 'Tour Guide Chat' },
+      {
+        timeout: 15000,
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${accessToken}`,
+        },
+      },
+    );
+    return response.data;
+  },
+
+  /** Send a message to an existing session */
+  async sendMessage(
+    sessionId: string,
+    message: string,
+    imageBase64?: string,
+  ): Promise<GuideMessageResponse> {
+    const tokens = await AuthUtils.getStoredTokens();
+    const accessToken = tokens?.accessToken;
+    if (!accessToken) {
+      return { success: false, data: { sessionId, response: 'Not authenticated.', intent: null, itinerary: null, constraints: null, metadata: {}, messageCount: 0 } };
+    }
+
+    const payload: any = { message };
+    if (imageBase64) {
+      payload.imageBase64 = imageBase64;
+    }
+
+    const response = await axios.post<GuideMessageResponse>(
+      `${CHAT_API_BASE_URL}/chat/sessions/${encodeURIComponent(sessionId)}/messages`,
+      payload,
+      {
+        timeout: 120000,
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${accessToken}`,
+        },
+      },
+    );
+    return response.data;
+  },
+
+  /** Get list of past sessions */
+  async getSessions(
+    status?: 'active' | 'closed' | 'archived',
+  ): Promise<GuideSessionsResponse> {
+    const tokens = await AuthUtils.getStoredTokens();
+    const accessToken = tokens?.accessToken;
+    if (!accessToken) {
+      throw new Error('Not authenticated');
+    }
+
+    const params: any = { limit: 20 };
+    if (status) {
+      params.status = status;
+    }
+
+    const response = await axios.get<GuideSessionsResponse>(
+      `${CHAT_API_BASE_URL}/chat/sessions`,
+      {
+        params,
+        timeout: 15000,
+        headers: { Authorization: `Bearer ${accessToken}` },
+      },
+    );
+    return response.data;
+  },
+
+  /** Get messages from a session */
+  async getHistory(
+    sessionId: string,
+    limit: number = 50,
+  ): Promise<GuideHistoryResponse> {
+    const tokens = await AuthUtils.getStoredTokens();
+    const accessToken = tokens?.accessToken;
+    if (!accessToken) {
+      throw new Error('Not authenticated');
+    }
+
+    const response = await axios.get<GuideHistoryResponse>(
+      `${CHAT_API_BASE_URL}/chat/sessions/${encodeURIComponent(sessionId)}/messages`,
+      {
+        params: { limit },
+        timeout: 15000,
+        headers: { Authorization: `Bearer ${accessToken}` },
+      },
+    );
+    return response.data;
+  },
+
+  /** Delete a session */
+  async deleteSession(sessionId: string): Promise<void> {
+    const tokens = await AuthUtils.getStoredTokens();
+    const accessToken = tokens?.accessToken;
+    if (!accessToken) {
+      throw new Error('Not authenticated');
+    }
+
+    await axios.delete(
+      `${CHAT_API_BASE_URL}/chat/sessions/${encodeURIComponent(sessionId)}`,
+      {
+        timeout: 15000,
+        headers: { Authorization: `Bearer ${accessToken}` },
+      },
+    );
+  },
+};
+
+export { chatService, tourGuideChatService };

@@ -28,6 +28,7 @@ import FaceCaptureScreen from '@screens/weather/FaceCaptureScreen';
 import { LocationDetailsScreen } from '@screens/agent/LocationDetailsScreen';
 import { LocationChatScreen } from '@screens/agent/LocationChatScreen';
 import { TourPlanChatScreen } from '@screens/agent/TourPlanChatScreen';
+import { TourGuideChatScreen } from '@screens/agent/TourGuideChatScreen';
 
 const welcomeBackAnimation = require('@assets/animations/success.json');
 
@@ -91,6 +92,7 @@ export type MainStackParamList = {
     endDate: string;
     preferences?: string[];
   };
+  TourGuideChat: undefined;
 };
 
 const Stack = createNativeStackNavigator<MainStackParamList>();
@@ -187,6 +189,7 @@ export const MainNavigator: React.FC = () => {
           <Stack.Screen name="LocationDetails" component={LocationDetailsScreen} />
           <Stack.Screen name="LocationChat" component={LocationChatScreen} />
           <Stack.Screen name="TourPlanChat" component={TourPlanChatScreen} />
+          <Stack.Screen name="TourGuideChat" component={TourGuideChatScreen} />
         </>
       ) : (
         <>
