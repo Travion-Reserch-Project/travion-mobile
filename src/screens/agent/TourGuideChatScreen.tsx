@@ -40,7 +40,20 @@ import type {
   ItinerarySlot,
   ConstraintViolation,
   ImageSearchResult,
+  ClarificationQuestion,
+  CulturalTip,
+  FinalItinerary,
+  SelectionCard,
+  StepResult,
+  WeatherPromptOption,
+  GuideMessageResponse,
 } from '../../services/api/ChatService';
+import { tourPlanService } from '../../services/api/TourPlanService';
+import InlineClarificationBubble from '../../components/chat/InlineClarificationBubble';
+import InlineHitlBubble from '../../components/chat/InlineHitlBubble';
+import WeatherAlertBubble from '../../components/chat/WeatherAlertBubble';
+import AgentProgressIndicator from '../../components/chat/AgentProgressIndicator';
+import InlineTourPlanCard from '../../components/chat/InlineTourPlanCard';
 
 const { width } = Dimensions.get('window');
 const botAnimation = require('@assets/animations/onbord2.json');
@@ -78,6 +91,13 @@ const C = {
 // ─────────────────────────────────────────────
 // TYPES
 // ─────────────────────────────────────────────
+type PlanningBubbleKind =
+  | 'agentProgress'
+  | 'clarification'
+  | 'hitlSelection'
+  | 'weatherPrompt'
+  | 'planCard';
+
 interface ChatMessage {
   id: string;
   content: string;
@@ -88,9 +108,25 @@ interface ChatMessage {
   itinerary?: ItinerarySlot[] | null;
   constraints?: ConstraintViolation[] | null;
   intent?: string | null;
-  imageUri?: string | null;
+  imageUri?: string | null;      // ImageKit CDN URL (permanent, used for history)
+  imageBase64?: string | null;   // Raw base64 for instant in-session display
   imageResults?: ImageSearchResult[] | null;
   imageValidationMessage?: string | null;
+  // Tour-planning artifacts — chosen by `bubbleKind` to pick a renderer
+  bubbleKind?: PlanningBubbleKind;
+  agentSteps?: StepResult[] | null;
+  agentActive?: boolean;
+  clarificationQuestion?: ClarificationQuestion | null;
+  clarificationAnswered?: string | null;
+  selectionCards?: SelectionCard[] | null;
+  selectionPromptText?: string | null;
+  selectionAnswered?: { cardId: string; label?: string } | null;
+  weatherPromptMessage?: string | null;
+  weatherPromptOptions?: WeatherPromptOption[] | null;
+  weatherChoice?: string | null;
+  finalItinerary?: FinalItinerary | null;
+  culturalTips?: CulturalTip[] | null;
+  matchScore?: number | null;
 }
 
 // ─────────────────────────────────────────────
@@ -353,18 +389,20 @@ const MessageBubble: React.FC<{ message: ChatMessage }> = ({ message }) => {
 
   const meta = message.metadata;
   const hasMetadata = !isUser && !!meta && !!(meta.documents_retrieved || meta.web_search_used || meta.reasoning_loops || meta.has_image_query);
-  const imageResults = message.imageResults;
-  const hasImages = imageResults && imageResults.length > 0;
 
   if (isUser) {
     return (
       <Animated.View style={[s.userRow, { opacity: fadeAnim, transform: [{ translateX: slideAnim }] }]}>
         <View style={s.userBubble}>
           <View style={s.userTail} />
-          {/* Show image thumbnail if user attached one */}
-          {message.imageUri && (
-            <Image source={{ uri: message.imageUri }} style={s.userImageThumb} resizeMode="cover" />
-          )}
+          {/* Show image: prefer base64 (instant, no permission issues) then fall back to CDN URL */}
+          {(message.imageBase64 || message.imageUri) ? (
+            <Image
+              source={{ uri: message.imageBase64 ? `data:image/jpeg;base64,${message.imageBase64}` : message.imageUri! }}
+              style={s.userImageThumb}
+              resizeMode="cover"
+            />
+          ) : null}
           <Text style={s.userText}>{message.content}</Text>
           <View style={s.userFooter}>
             <Text style={s.timeUser}>{formatTime(message.timestamp)}</Text>
@@ -392,22 +430,6 @@ const MessageBubble: React.FC<{ message: ChatMessage }> = ({ message }) => {
 
         {/* Main response markdown */}
         <Markdown style={MD_STYLES}>{message.content}</Markdown>
-
-        {/* Image search results */}
-        {hasImages && (
-          <View style={s.imgResultsContainer}>
-            <View style={s.imgResultsHeader}>
-              <Ionicons name="images-outline" size={14} color={C.primary} />
-              <Text style={s.imgResultsTitle}>Visual Matches</Text>
-              <Text style={s.imgResultsCount}>{imageResults!.length} found</Text>
-            </View>
-            <ScrollView horizontal showsHorizontalScrollIndicator={false} style={s.imgResultsScroll}>
-              {imageResults!.map((img, i) => (
-                <ImageResultCard key={img.image_id || `img-${i}`} result={img} />
-              ))}
-            </ScrollView>
-          </View>
-        )}
 
         {/* Constraint warnings */}
         {message.constraints && message.constraints.length > 0 && (
@@ -606,6 +628,16 @@ export const TourGuideChatScreen: React.FC = () => {
   const [sessions, setSessions] = useState<GuideSession[]>([]);
   const [loadingSessions, setLoadingSessions] = useState(false);
 
+  // Tour-planning state
+  const [planningMode, setPlanningMode] = useState(false);
+  const [pendingResume, setPendingResume] = useState<{
+    kind: 'selection' | 'weather';
+    bubbleMsgId: string;
+  } | null>(null);
+  const [resumeBusy, setResumeBusy] = useState(false);
+  const [savingPlanId, setSavingPlanId] = useState<string | null>(null);
+  const streamHandleRef = useRef<{ abort: () => void } | null>(null);
+
   // Scroll to bottom
   useEffect(() => {
     setTimeout(() => scrollRef.current?.scrollToEnd({ animated: true }), 120);
@@ -626,23 +658,67 @@ export const TourGuideChatScreen: React.FC = () => {
     }
   }, []);
 
-  // Load messages from a past session
+  // Load messages from a past session — re-render planning bubbles from
+  // metadata persisted by the backend so a finalized plan or HITL turn
+  // shows up the same way on reload.
   const loadSession = useCallback(async (session: GuideSession) => {
     try {
       setShowHistory(false);
       setSessionId(session.sessionId);
       setIsTyping(true);
+      setPlanningMode(false);
 
       const res = await tourGuideChatService.getHistory(session.sessionId, 50);
       if (res.success && res.data) {
-        const loaded: ChatMessage[] = (res.data.messages || []).map((msg: any) => ({
-          id: msg.id,
-          content: msg.content,
-          role: msg.role,
-          timestamp: new Date(msg.timestamp),
-          metadata: msg.metadata,
-        }));
+        let sawPlanning = false;
+        const loaded: ChatMessage[] = (res.data.messages || []).map((msg: any) => {
+          const meta = msg.metadata || {};
+          const finalItinerary = meta.final_itinerary || null;
+          const clarification = meta.clarification_question || null;
+          const selectionCards = meta.selection_cards || null;
+          const weatherOptions = meta.weather_prompt_options || null;
+          const stepResults = meta.step_results || null;
+
+          let bubbleKind: PlanningBubbleKind | undefined;
+          if (msg.role === 'assistant') {
+            if (finalItinerary && finalItinerary.stops?.length) bubbleKind = 'planCard';
+            else if (clarification) bubbleKind = 'clarification';
+            else if (selectionCards && selectionCards.length) bubbleKind = 'hitlSelection';
+            else if (weatherOptions && weatherOptions.length) bubbleKind = 'weatherPrompt';
+          }
+          if (bubbleKind) sawPlanning = true;
+
+          return {
+            id: msg.id,
+            content: msg.content,
+            role: msg.role,
+            timestamp: new Date(msg.timestamp),
+            metadata: meta,
+            imageUri: msg.imageUrl || null,
+            imageResults: meta.image_results || null,
+            itinerary: meta.itinerary || null,
+            constraints: meta.constraints || null,
+            intent: meta.intent || null,
+            bubbleKind,
+            agentSteps: bubbleKind === 'planCard' ? null : stepResults,
+            agentActive: false,
+            clarificationQuestion: clarification,
+            // Once history is reloaded, clarification answers are not actionable —
+            // mark them as answered to lock the chips visually.
+            clarificationAnswered: clarification ? '' : null,
+            selectionCards,
+            selectionPromptText: meta.prompt_text || null,
+            selectionAnswered: null,
+            weatherPromptMessage: meta.weather_prompt_message || null,
+            weatherPromptOptions: weatherOptions,
+            weatherChoice: null,
+            finalItinerary,
+            culturalTips: meta.cultural_tips || null,
+            matchScore: meta?.metadata?.match_score ?? null,
+          } as ChatMessage;
+        });
         setMessages(loaded);
+        if (sawPlanning) setPlanningMode(true);
       }
     } catch (err) {
       console.error('Failed to load session:', err);
@@ -653,11 +729,18 @@ export const TourGuideChatScreen: React.FC = () => {
 
   // Start new conversation
   const startNewChat = useCallback(() => {
+    streamHandleRef.current?.abort();
+    streamHandleRef.current = null;
     setSessionId(null);
     setMessages([]);
     setShowHistory(false);
     setAttachedImageUri(null);
     attachedImageBase64Ref.current = null;
+    attachedImageDisplayUriRef.current = null;
+    setPlanningMode(false);
+    setPendingResume(null);
+    setResumeBusy(false);
+    setSavingPlanId(null);
   }, []);
 
   // Delete session
@@ -678,6 +761,8 @@ export const TourGuideChatScreen: React.FC = () => {
   // ─────────────────────────────────────────
   // base64 for the pending attachment (stored alongside the URI for sending)
   const attachedImageBase64Ref = useRef<string | null>(null);
+  // data: URI for immediate display in the chat bubble before ImageKit URL arrives
+  const attachedImageDisplayUriRef = useRef<string | null>(null);
 
   const handleImagePicked = useCallback((response: ImagePickerResponse) => {
     setShowAttachMenu(false);
@@ -711,85 +796,453 @@ export const TourGuideChatScreen: React.FC = () => {
   }, [handleImagePicked]);
 
   // ─────────────────────────────────────────
-  // SEND MESSAGE
+  // RESPONSE → BUBBLE INGESTION
   // ─────────────────────────────────────────
-  const handleSend = useCallback(async (text?: string) => {
-    const textToSend = (text ?? inputText).trim();
-    if ((!textToSend && !attachedImageUri) || isTyping) return;
+  // Convert a backend response (sync or stream-complete) into one or more
+  // assistant chat bubbles based on which planning artifacts came back.
+  const ingestServerResponse = useCallback(
+    (data: GuideMessageResponse['data'], userMsgId?: string) => {
+      // Persist session id
+      if (data.sessionId && !sessionId) setSessionId(data.sessionId);
 
-    const messageText = textToSend || (attachedImageUri ? 'Where is this place?' : '');
-    const currentImageUri = attachedImageUri;
-    const currentImageBase64 = attachedImageBase64Ref.current ?? undefined;
-
-    const userMsg: ChatMessage = {
-      id: `u-${Date.now()}`,
-      content: messageText,
-      role: 'user',
-      timestamp: new Date(),
-      status: 'sent',
-      imageUri: currentImageUri,
-    };
-    setMessages(prev => [...prev, userMsg]);
-    setInputText('');
-    setAttachedImageUri(null);
-    attachedImageBase64Ref.current = null;
-    setIsTyping(true);
-
-    try {
-      const imageBase64 = currentImageBase64;
-
-      let response;
-      if (sessionId) {
-        response = await tourGuideChatService.sendMessage(sessionId, messageText, imageBase64);
-      } else {
-        response = await tourGuideChatService.quickChat(messageText, undefined, imageBase64);
+      // Swap in ImageKit URL on the user message we just sent
+      if (data.userImageUrl && userMsgId) {
+        setMessages(prev =>
+          prev.map(m =>
+            m.id === userMsgId
+              ? { ...m, imageUri: data.userImageUrl!, imageBase64: null }
+              : m,
+          ),
+        );
       }
 
-      if (response.success && response.data) {
-        const data = response.data;
+      const isPlanning =
+        data.intent === 'trip_planning' ||
+        !!data.finalItinerary ||
+        !!data.clarificationQuestion ||
+        (data.pendingUserSelection && (data.selectionCards?.length || 0) > 0) ||
+        (data.weatherInterrupt && (data.weatherPromptOptions?.length || 0) > 0);
+      if (isPlanning) setPlanningMode(true);
 
-        // Persist the session ID
-        if (data.sessionId && !sessionId) {
-          setSessionId(data.sessionId);
-        }
+      const newBubbles: ChatMessage[] = [];
+      const baseId = `a-${Date.now()}`;
 
-        const botMsg: ChatMessage = {
-          id: `a-${Date.now()}`,
+      // Priority order: clarification → HITL → weather → final plan → text
+      if (data.clarificationQuestion) {
+        newBubbles.push({
+          id: `${baseId}-c`,
+          content: data.clarificationQuestion.question,
+          role: 'assistant',
+          timestamp: new Date(),
+          intent: data.intent ?? null,
+          metadata: data.metadata,
+          bubbleKind: 'clarification',
+          clarificationQuestion: data.clarificationQuestion,
+          clarificationAnswered: null,
+        });
+      } else if (data.pendingUserSelection && data.selectionCards?.length) {
+        const id = `${baseId}-h`;
+        newBubbles.push({
+          id,
+          content: data.promptText || 'Pick one to continue',
+          role: 'assistant',
+          timestamp: new Date(),
+          intent: data.intent ?? null,
+          metadata: data.metadata,
+          bubbleKind: 'hitlSelection',
+          selectionCards: data.selectionCards,
+          selectionPromptText: data.promptText ?? null,
+          selectionAnswered: null,
+        });
+        setPendingResume({ kind: 'selection', bubbleMsgId: id });
+      } else if (data.weatherInterrupt && data.weatherPromptOptions?.length) {
+        const id = `${baseId}-w`;
+        newBubbles.push({
+          id,
+          content: data.weatherPromptMessage || 'Weather decision needed',
+          role: 'assistant',
+          timestamp: new Date(),
+          intent: data.intent ?? null,
+          metadata: data.metadata,
+          bubbleKind: 'weatherPrompt',
+          weatherPromptMessage: data.weatherPromptMessage ?? null,
+          weatherPromptOptions: data.weatherPromptOptions,
+          weatherChoice: null,
+        });
+        setPendingResume({ kind: 'weather', bubbleMsgId: id });
+      } else if (data.finalItinerary && data.finalItinerary.stops?.length) {
+        newBubbles.push({
+          id: `${baseId}-p`,
+          content: data.response || 'Your tour plan is ready.',
+          role: 'assistant',
+          timestamp: new Date(),
+          intent: data.intent ?? null,
+          metadata: data.metadata,
+          bubbleKind: 'planCard',
+          finalItinerary: data.finalItinerary,
+          culturalTips: data.culturalTips ?? null,
+          matchScore: (data.metadata as any)?.match_score ?? null,
+          itinerary: data.itinerary ?? null,
+          constraints: data.constraints ?? null,
+          // Show step results above the plan card so the user can see how it
+          // was assembled.
+          agentSteps: data.stepResults ?? null,
+          agentActive: false,
+        });
+      } else {
+        newBubbles.push({
+          id: `${baseId}-t`,
           content: data.response || "I couldn't generate a response. Please try again.",
           role: 'assistant',
           timestamp: new Date(),
-          metadata: data.metadata || {},
+          intent: data.intent ?? null,
+          metadata: data.metadata,
           itinerary: data.itinerary,
           constraints: data.constraints,
-          intent: data.intent,
           imageResults: data.imageResults,
           imageValidationMessage: data.imageValidationMessage,
-        };
-        setMessages(prev => [...prev, botMsg]);
-      } else {
-        setMessages(prev => [
-          ...prev,
-          {
-            id: `a-${Date.now()}`,
-            content: 'Something went wrong. Please try again.',
-            role: 'assistant',
-            timestamp: new Date(),
-          },
-        ]);
+        });
       }
-    } catch (err: any) {
-      console.error('Chat error:', err);
-      const errorText = err?.response?.status === 401
-        ? 'Authentication failed. Please log in again.'
-        : 'Network error. Please check your connection and try again.';
+
+      // Replace the live "agentProgress" bubble (if any) with the final
+      // bubbles, otherwise append.
+      setMessages(prev => {
+        const idx = prev.findIndex(m => m.bubbleKind === 'agentProgress' && m.agentActive);
+        if (idx === -1) return [...prev, ...newBubbles];
+        const next = [...prev];
+        next.splice(idx, 1, ...newBubbles);
+        return next;
+      });
+    },
+    [sessionId],
+  );
+
+  // ─────────────────────────────────────────
+  // SEND MESSAGE  (streaming with sync fallback inside ChatService)
+  // ─────────────────────────────────────────
+  const handleSend = useCallback(
+    async (text?: string) => {
+      const textToSend = (text ?? inputText).trim();
+      if ((!textToSend && !attachedImageUri) || isTyping || resumeBusy) return;
+
+      const messageText =
+        textToSend || (attachedImageUri ? 'Where is this place?' : '');
+      const currentImageBase64 = attachedImageBase64Ref.current ?? undefined;
+
+      const userMsg: ChatMessage = {
+        id: `u-${Date.now()}`,
+        content: messageText,
+        role: 'user',
+        timestamp: new Date(),
+        status: 'sent',
+        imageBase64: currentImageBase64 ?? null,
+        imageUri: null,
+      };
+
+      const progressMsgId = `a-progress-${Date.now()}`;
+      const progressMsg: ChatMessage = {
+        id: progressMsgId,
+        content: '',
+        role: 'assistant',
+        timestamp: new Date(),
+        bubbleKind: 'agentProgress',
+        agentSteps: [],
+        agentActive: true,
+      };
+
+      setMessages(prev => [...prev, userMsg, progressMsg]);
+      setInputText('');
+      setAttachedImageUri(null);
+      attachedImageBase64Ref.current = null;
+      attachedImageDisplayUriRef.current = null;
+      setIsTyping(true);
+
+      // If we don't have a sessionId yet, fall back to sync quickChat (which
+      // creates one). Streaming uses sessionId-scoped routes.
+      if (!sessionId) {
+        try {
+          const resp = await tourGuideChatService.quickChat(
+            messageText,
+            undefined,
+            currentImageBase64,
+          );
+          if (resp.success && resp.data) {
+            ingestServerResponse(resp.data, userMsg.id);
+          } else {
+            setMessages(prev =>
+              prev.filter(m => m.id !== progressMsgId).concat({
+                id: `a-${Date.now()}`,
+                content: 'Something went wrong. Please try again.',
+                role: 'assistant',
+                timestamp: new Date(),
+              }),
+            );
+          }
+        } catch (err: any) {
+          const errorText =
+            err?.response?.status === 401
+              ? 'Authentication failed. Please log in again.'
+              : 'Network error. Please check your connection and try again.';
+          setMessages(prev =>
+            prev.filter(m => m.id !== progressMsgId).concat({
+              id: `a-${Date.now()}`,
+              content: errorText,
+              role: 'assistant',
+              timestamp: new Date(),
+            }),
+          );
+        } finally {
+          setIsTyping(false);
+        }
+        return;
+      }
+
+      // Streaming path
+      streamHandleRef.current?.abort();
+      streamHandleRef.current = tourGuideChatService.sendMessageStream(
+        sessionId,
+        messageText,
+        {
+          onStep: step => {
+            setMessages(prev =>
+              prev.map(m =>
+                m.id === progressMsgId
+                  ? {
+                      ...m,
+                      agentSteps: [...(m.agentSteps || []), step],
+                      agentActive: true,
+                    }
+                  : m,
+              ),
+            );
+          },
+          onComplete: data => {
+            ingestServerResponse(data, userMsg.id);
+            setIsTyping(false);
+            streamHandleRef.current = null;
+          },
+          onError: err => {
+            console.error('Stream error:', err);
+            const status = (err as any)?.response?.status;
+            const errorText =
+              status === 401
+                ? 'Authentication failed. Please log in again.'
+                : 'Something went wrong while planning. Please try again.';
+            setMessages(prev =>
+              prev.filter(m => m.id !== progressMsgId).concat({
+                id: `a-${Date.now()}`,
+                content: errorText,
+                role: 'assistant',
+                timestamp: new Date(),
+              }),
+            );
+            setIsTyping(false);
+            streamHandleRef.current = null;
+          },
+        },
+        currentImageBase64,
+      );
+    },
+    [
+      inputText,
+      isTyping,
+      sessionId,
+      attachedImageUri,
+      resumeBusy,
+      ingestServerResponse,
+    ],
+  );
+
+  // ─────────────────────────────────────────
+  // RESUME HANDLERS (clarification, HITL, weather)
+  // ─────────────────────────────────────────
+  const handleClarificationAnswer = useCallback(
+    (msgId: string, label: string) => {
+      // Lock the chips visually and fire the answer as a normal user message
+      setMessages(prev =>
+        prev.map(m =>
+          m.id === msgId ? { ...m, clarificationAnswered: label } : m,
+        ),
+      );
+      handleSend(label);
+    },
+    [handleSend],
+  );
+
+  const handleHitlSelect = useCallback(
+    async (msgId: string, cardId: string, label?: string) => {
+      if (!sessionId) return;
+      setResumeBusy(true);
+      setMessages(prev =>
+        prev.map(m =>
+          m.id === msgId
+            ? { ...m, selectionAnswered: { cardId, label } }
+            : m,
+        ),
+      );
+      // Append a synthetic user message so the chat reads naturally
       setMessages(prev => [
         ...prev,
-        { id: `a-${Date.now()}`, content: errorText, role: 'assistant', timestamp: new Date() },
+        {
+          id: `u-sel-${Date.now()}`,
+          content: label ? `Selected: ${label}` : `Selected option`,
+          role: 'user',
+          timestamp: new Date(),
+          status: 'sent',
+        },
       ]);
-    } finally {
-      setIsTyping(false);
-    }
-  }, [inputText, isTyping, sessionId, attachedImageUri]);
+      // Drop in a fresh progress bubble while the agent re-runs
+      const progressMsgId = `a-progress-${Date.now()}`;
+      setMessages(prev => [
+        ...prev,
+        {
+          id: progressMsgId,
+          content: '',
+          role: 'assistant',
+          timestamp: new Date(),
+          bubbleKind: 'agentProgress',
+          agentSteps: [],
+          agentActive: true,
+        },
+      ]);
+
+      try {
+        const resp = await tourGuideChatService.resumeSelection(
+          sessionId,
+          cardId,
+          label,
+        );
+        if (resp.success && resp.data) {
+          ingestServerResponse(resp.data);
+        }
+      } catch (err) {
+        console.error('Resume selection failed:', err);
+        setMessages(prev =>
+          prev.filter(m => m.id !== progressMsgId).concat({
+            id: `a-${Date.now()}`,
+            content: 'Could not apply your selection. Please try again.',
+            role: 'assistant',
+            timestamp: new Date(),
+          }),
+        );
+      } finally {
+        setResumeBusy(false);
+        setPendingResume(null);
+      }
+    },
+    [sessionId, ingestServerResponse],
+  );
+
+  const handleHitlSkip = useCallback(
+    (msgId: string) => {
+      setMessages(prev =>
+        prev.map(m =>
+          m.id === msgId
+            ? { ...m, selectionAnswered: { cardId: '', label: 'Skipped' } }
+            : m,
+        ),
+      );
+      setPendingResume(null);
+      handleSend('Skip selection — use your default ranking.');
+    },
+    [handleSend],
+  );
+
+  const handleWeatherChoice = useCallback(
+    async (
+      msgId: string,
+      choice: 'switch_indoor' | 'reschedule' | 'keep',
+      label: string,
+    ) => {
+      if (!sessionId) return;
+      setResumeBusy(true);
+      setMessages(prev =>
+        prev.map(m =>
+          m.id === msgId ? { ...m, weatherChoice: choice } : m,
+        ),
+      );
+      setMessages(prev => [
+        ...prev,
+        {
+          id: `u-wx-${Date.now()}`,
+          content: label,
+          role: 'user',
+          timestamp: new Date(),
+          status: 'sent',
+        },
+      ]);
+      const progressMsgId = `a-progress-${Date.now()}`;
+      setMessages(prev => [
+        ...prev,
+        {
+          id: progressMsgId,
+          content: '',
+          role: 'assistant',
+          timestamp: new Date(),
+          bubbleKind: 'agentProgress',
+          agentSteps: [],
+          agentActive: true,
+        },
+      ]);
+
+      try {
+        const resp = await tourGuideChatService.resumeWeather(sessionId, choice);
+        if (resp.success && resp.data) ingestServerResponse(resp.data);
+      } catch (err) {
+        console.error('Resume weather failed:', err);
+      } finally {
+        setResumeBusy(false);
+        setPendingResume(null);
+      }
+    },
+    [sessionId, ingestServerResponse],
+  );
+
+  // Save plan → uses the existing TourPlanService.acceptPlan
+  const handleSavePlan = useCallback(
+    async (msg: ChatMessage) => {
+      if (!msg.finalItinerary || !sessionId) return;
+      setSavingPlanId(msg.id);
+      try {
+        const itinerarySlots = (msg.finalItinerary.stops || []).map((stop, i) => ({
+          time: stop.time,
+          location: stop.location,
+          activity: stop.activity,
+          duration_minutes: stop.duration_minutes,
+          crowd_prediction: stop.crowd_prediction,
+          lighting_quality: stop.lighting_quality,
+          notes: stop.notes,
+          day: stop.day,
+          order: i,
+          icon: stop.icon,
+          highlight: stop.highlight,
+          ai_insight: stop.ai_insight,
+          cultural_tip: stop.cultural_tip,
+          ethical_note: stop.ethical_note,
+          best_photo_time: stop.best_photo_time,
+        }));
+        const tripTitle = msg.finalItinerary.summary?.slice(0, 80) || 'Travion Tour Plan';
+        await tourPlanService.acceptPlan({
+          threadId: sessionId,
+          title: tripTitle,
+          description: msg.finalItinerary.summary,
+          itinerary: itinerarySlots as any,
+        });
+        Alert.alert('Saved', 'Your tour plan has been saved to My Trips.');
+      } catch (err: any) {
+        console.error('Save plan failed:', err);
+        Alert.alert('Could not save', err?.message || 'Please try again later.');
+      } finally {
+        setSavingPlanId(null);
+      }
+    },
+    [sessionId],
+  );
+
+  const handleRefinePlan = useCallback(() => {
+    inputRef.current?.focus();
+    setInputText('');
+  }, []);
 
   const canSend = (inputText.trim().length > 0 || !!attachedImageUri) && !isTyping;
   const showSuggestions = messages.length === 0;
@@ -821,7 +1274,13 @@ export const TourGuideChatScreen: React.FC = () => {
           <View style={s.headerStatusRow}>
             <MaterialCommunityIcons name="lightning-bolt" size={11} color="rgba(255,255,255,0.85)" />
             <Text style={s.headerStatus}>
-              {isTyping ? 'thinking...' : 'AI Travel Guide · Online'}
+              {isTyping
+                ? planningMode
+                  ? 'Planning your trip…'
+                  : 'thinking...'
+                : planningMode
+                  ? 'Planning mode · ready'
+                  : 'AI Travel Guide · Online'}
             </Text>
           </View>
         </View>
@@ -856,10 +1315,85 @@ export const TourGuideChatScreen: React.FC = () => {
           <DateSeparator date={new Date()} />
 
           {/* Messages */}
-          {messages.map(msg => <MessageBubble key={msg.id} message={msg} />)}
+          {messages.map(msg => {
+            // Dispatch to the right renderer based on bubbleKind so
+            // planning bubbles (clarification, HITL, weather, plan card)
+            // render alongside regular text bubbles.
+            if (msg.bubbleKind === 'agentProgress') {
+              return (
+                <AgentProgressIndicator
+                  key={msg.id}
+                  steps={msg.agentSteps || []}
+                  active={!!msg.agentActive}
+                />
+              );
+            }
+            if (msg.bubbleKind === 'clarification' && msg.clarificationQuestion) {
+              return (
+                <InlineClarificationBubble
+                  key={msg.id}
+                  question={msg.clarificationQuestion}
+                  selectedLabel={msg.clarificationAnswered ?? null}
+                  disabled={!!msg.clarificationAnswered || isTyping}
+                  onSelect={label => handleClarificationAnswer(msg.id, label)}
+                />
+              );
+            }
+            if (msg.bubbleKind === 'hitlSelection' && msg.selectionCards?.length) {
+              return (
+                <InlineHitlBubble
+                  key={msg.id}
+                  cards={msg.selectionCards}
+                  promptText={msg.selectionPromptText}
+                  disabled={!!msg.selectionAnswered || resumeBusy}
+                  loading={resumeBusy && pendingResume?.bubbleMsgId === msg.id}
+                  onSelect={(cardId, label) => handleHitlSelect(msg.id, cardId, label)}
+                  onSkip={() => handleHitlSkip(msg.id)}
+                />
+              );
+            }
+            if (msg.bubbleKind === 'weatherPrompt' && msg.weatherPromptOptions?.length) {
+              return (
+                <WeatherAlertBubble
+                  key={msg.id}
+                  message={msg.weatherPromptMessage || 'Weather alert'}
+                  options={msg.weatherPromptOptions}
+                  selectedId={msg.weatherChoice}
+                  disabled={!!msg.weatherChoice || resumeBusy}
+                  onChoose={(choice, label) =>
+                    handleWeatherChoice(msg.id, choice, label)
+                  }
+                />
+              );
+            }
+            if (msg.bubbleKind === 'planCard' && msg.finalItinerary) {
+              return (
+                <View key={msg.id}>
+                  {msg.agentSteps && msg.agentSteps.length > 0 && (
+                    <AgentProgressIndicator
+                      steps={msg.agentSteps}
+                      active={false}
+                    />
+                  )}
+                  <InlineTourPlanCard
+                    finalItinerary={msg.finalItinerary}
+                    culturalTips={msg.culturalTips}
+                    matchScore={msg.matchScore ?? undefined}
+                    isSaving={savingPlanId === msg.id}
+                    onSave={() => handleSavePlan(msg)}
+                    onRefine={handleRefinePlan}
+                  />
+                </View>
+              );
+            }
+            return <MessageBubble key={msg.id} message={msg} />;
+          })}
 
-          {/* Typing indicator */}
-          {isTyping && <TypingIndicator />}
+          {/* Typing indicator (only show when no live progress bubble) */}
+          {isTyping &&
+            !messages.some(
+              m => m.bubbleKind === 'agentProgress' && m.agentActive,
+            ) && <TypingIndicator />}
 
           {/* Quick suggestions */}
           {showSuggestions && !isTyping && (

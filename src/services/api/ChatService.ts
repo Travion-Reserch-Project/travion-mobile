@@ -497,6 +497,28 @@ const chatService = {
 
 // ============= TOUR GUIDE CHAT TYPES (AI Agent Engine) =============
 
+import type {
+  ClarificationQuestion,
+  CulturalTip,
+  FinalItinerary,
+  SelectionCard,
+  StepResult,
+  WeatherPromptOption,
+} from './TourPlanService';
+
+export type {
+  ClarificationQuestion,
+  ClarificationOption,
+  CulturalTip,
+  FinalItinerary,
+  FinalItineraryStop,
+  RouteCoordinate,
+  ContextualNote,
+  SelectionCard,
+  StepResult,
+  WeatherPromptOption,
+} from './TourPlanService';
+
 export interface GuideSession {
   sessionId: string;
   title: string;
@@ -566,6 +588,20 @@ export interface GuideMessageResponse {
     messageCount: number;
     imageResults?: ImageSearchResult[] | null;
     imageValidationMessage?: string | null;
+    userImageUrl?: string | null;
+    // Tour-planning artifacts (returned when intent === 'trip_planning' or
+    // when the agent paused for HITL / weather decisions).
+    threadId?: string | null;
+    clarificationQuestion?: ClarificationQuestion | null;
+    culturalTips?: CulturalTip[] | null;
+    finalItinerary?: FinalItinerary | null;
+    pendingUserSelection?: boolean | null;
+    selectionCards?: SelectionCard[] | null;
+    promptText?: string | null;
+    weatherInterrupt?: boolean | null;
+    weatherPromptMessage?: string | null;
+    weatherPromptOptions?: WeatherPromptOption[] | null;
+    stepResults?: StepResult[] | null;
   };
 }
 
@@ -574,6 +610,7 @@ export interface GuideHistoryMessage {
   role: 'user' | 'assistant';
   content: string;
   timestamp: string;
+  imageUrl?: string | null;
   metadata?: GuideMessageMetadata;
 }
 
@@ -749,6 +786,255 @@ const tourGuideChatService = {
       },
     );
   },
+
+  /** Resume a paused planning agent after the user picks a HITL selection card. */
+  async resumeSelection(
+    sessionId: string,
+    selectedCandidateId: string,
+    label?: string,
+  ): Promise<GuideMessageResponse> {
+    const tokens = await AuthUtils.getStoredTokens();
+    const accessToken = tokens?.accessToken;
+    if (!accessToken) {
+      return {
+        success: false,
+        data: {
+          sessionId,
+          response: 'Not authenticated.',
+          intent: null,
+          itinerary: null,
+          constraints: null,
+          metadata: {},
+          messageCount: 0,
+        },
+      };
+    }
+    const response = await axios.post<GuideMessageResponse>(
+      `${CHAT_API_BASE_URL}/chat/sessions/${encodeURIComponent(sessionId)}/resume-selection`,
+      { selectedCandidateId, label },
+      {
+        timeout: 180000,
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${accessToken}`,
+        },
+      },
+    );
+    return response.data;
+  },
+
+  /** Resume a paused planning agent after the user makes a weather decision. */
+  async resumeWeather(
+    sessionId: string,
+    choice: 'switch_indoor' | 'reschedule' | 'keep',
+  ): Promise<GuideMessageResponse> {
+    const tokens = await AuthUtils.getStoredTokens();
+    const accessToken = tokens?.accessToken;
+    if (!accessToken) {
+      return {
+        success: false,
+        data: {
+          sessionId,
+          response: 'Not authenticated.',
+          intent: null,
+          itinerary: null,
+          constraints: null,
+          metadata: {},
+          messageCount: 0,
+        },
+      };
+    }
+    const response = await axios.post<GuideMessageResponse>(
+      `${CHAT_API_BASE_URL}/chat/sessions/${encodeURIComponent(sessionId)}/resume-weather`,
+      { choice },
+      {
+        timeout: 180000,
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${accessToken}`,
+        },
+      },
+    );
+    return response.data;
+  },
+
+  /**
+   * Stream a chat message via Server-Sent Events.
+   *
+   * Emits per-node step events while the agent is running and a final
+   * `complete` event with the full response payload. The mobile UI uses
+   * step events to render a live agent progress indicator.
+   *
+   * Returns an `abort` function the caller can invoke to cancel the stream.
+   * Falls back to `sendMessage` if SSE streaming fails (network, missing
+   * support, etc.).
+   */
+  sendMessageStream(
+    sessionId: string,
+    message: string,
+    callbacks: {
+      onStep?: (step: StepResult) => void;
+      onComplete?: (data: GuideMessageResponse['data']) => void;
+      onError?: (error: any) => void;
+    },
+    imageBase64?: string,
+  ): { abort: () => void } {
+    const url = `${CHAT_API_BASE_URL}/chat/sessions/${encodeURIComponent(
+      sessionId,
+    )}/messages/stream`;
+
+    let aborted = false;
+    let xhr: XMLHttpRequest | null = null;
+    let buffer = '';
+    let lastResult: any = null;
+    let processedLength = 0;
+
+    const handleFrames = (chunk: string) => {
+      buffer += chunk;
+      // SSE frames are delimited by a blank line ("\n\n").
+      const frames = buffer.split('\n\n');
+      buffer = frames.pop() ?? '';
+      for (const frame of frames) {
+        const dataLine = frame
+          .split('\n')
+          .find(l => l.startsWith('data: '));
+        if (!dataLine) continue;
+        try {
+          const payload = JSON.parse(dataLine.slice(6));
+          if (payload?.type === 'step' && payload.step) {
+            callbacks.onStep?.(payload.step);
+          } else if (payload?.type === 'complete') {
+            lastResult = payload.result;
+          } else if (payload?.type === 'error') {
+            callbacks.onError?.(new Error(payload.error || 'Streaming error'));
+          }
+        } catch (err) {
+          // Ignore malformed frames
+        }
+      }
+    };
+
+    const fallback = async () => {
+      try {
+        const data = await tourGuideChatService.sendMessage(
+          sessionId,
+          message,
+          imageBase64,
+        );
+        if (!aborted) {
+          callbacks.onComplete?.(data.data);
+        }
+      } catch (e) {
+        if (!aborted) callbacks.onError?.(e);
+      }
+    };
+
+    (async () => {
+      try {
+        const tokens = await AuthUtils.getStoredTokens();
+        const accessToken = tokens?.accessToken;
+        if (!accessToken) {
+          callbacks.onError?.(new Error('Not authenticated'));
+          return;
+        }
+
+        xhr = new XMLHttpRequest();
+        xhr.open('POST', url, true);
+        xhr.setRequestHeader('Content-Type', 'application/json');
+        xhr.setRequestHeader('Accept', 'text/event-stream');
+        xhr.setRequestHeader('Authorization', `Bearer ${accessToken}`);
+        xhr.timeout = 180000;
+
+        xhr.onreadystatechange = () => {
+          if (!xhr || aborted) return;
+          // readyState 3 = LOADING (chunks arriving)
+          if (xhr.readyState === 3 || xhr.readyState === 4) {
+            const text = xhr.responseText || '';
+            const newChunk = text.slice(processedLength);
+            processedLength = text.length;
+            if (newChunk) handleFrames(newChunk);
+
+            if (xhr.readyState === 4) {
+              if (xhr.status >= 200 && xhr.status < 300) {
+                if (lastResult) {
+                  // The backend emits the complete frame in the AI engine's
+                  // shape (snake_case). Normalize to GuideMessageResponse.data.
+                  const data = mapStreamCompleteToGuideData(lastResult, sessionId);
+                  callbacks.onComplete?.(data);
+                } else {
+                  // No complete frame received — fall back to sync request.
+                  fallback();
+                }
+              } else if (xhr.status === 0) {
+                // Network error / aborted — only treat as error if not aborted
+                if (!aborted) fallback();
+              } else {
+                callbacks.onError?.(
+                  new Error(`Stream failed with status ${xhr.status}`),
+                );
+              }
+            }
+          }
+        };
+
+        xhr.onerror = () => {
+          if (!aborted) fallback();
+        };
+        xhr.ontimeout = () => {
+          if (!aborted) callbacks.onError?.(new Error('Stream timed out'));
+        };
+
+        const payload: any = { message };
+        if (imageBase64) payload.imageBase64 = imageBase64;
+        xhr.send(JSON.stringify(payload));
+      } catch (err) {
+        if (!aborted) fallback();
+      }
+    })();
+
+    return {
+      abort: () => {
+        aborted = true;
+        try { xhr?.abort(); } catch {}
+      },
+    };
+  },
 };
+
+// Map an AI-engine 'complete' frame (snake_case) to the camelCase shape
+// the chat screen expects on `GuideMessageResponse.data`.
+function mapStreamCompleteToGuideData(
+  result: any,
+  sessionId: string,
+): GuideMessageResponse['data'] {
+  return {
+    sessionId,
+    response: result?.final_response || result?.response || '',
+    intent: result?.intent ?? null,
+    itinerary: result?.itinerary ?? null,
+    constraints: result?.constraint_violations ?? null,
+    metadata: {
+      reasoning_loops: result?.reasoning_loops ?? 0,
+      documents_retrieved: result?.documents_retrieved ?? 0,
+      web_search_used: result?.web_search_used ?? false,
+      has_image_query: result?.has_image_query ?? false,
+    },
+    messageCount: 0,
+    imageResults: result?.image_search_results ?? null,
+    imageValidationMessage: result?.image_validation_message ?? null,
+    userImageUrl: null,
+    threadId: sessionId,
+    clarificationQuestion: result?.clarification_question ?? null,
+    culturalTips: result?.cultural_tips ?? null,
+    finalItinerary: result?.final_itinerary ?? null,
+    pendingUserSelection: result?.pending_user_selection ?? null,
+    selectionCards: result?.selection_cards ?? null,
+    promptText: result?.prompt_text ?? null,
+    weatherInterrupt: result?.weather_interrupt ?? null,
+    weatherPromptMessage: result?.weather_prompt_message ?? null,
+    weatherPromptOptions: result?.weather_prompt_options ?? null,
+    stepResults: result?.step_results ?? null,
+  };
+}
 
 export { chatService, tourGuideChatService };

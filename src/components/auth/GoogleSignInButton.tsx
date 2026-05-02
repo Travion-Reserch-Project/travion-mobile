@@ -95,6 +95,9 @@ export const GoogleSignInButton: React.FC<GoogleSignInButtonProps> = ({
         errorMessage = 'Sign-in is already in progress.';
       } else if (error.code === statusCodes.PLAY_SERVICES_NOT_AVAILABLE) {
         errorMessage = 'Google Play Services not available.';
+      } else if (error.code === '7' || error.message?.includes('NETWORK_ERROR')) {
+        errorMessage = 'Network error. Please check your internet connection and try again.';
+        console.error('NETWORK_ERROR: Ensure device has internet access and Google Play Services can reach Google servers');
       } else if (error.code === '12501' || error.message?.includes('DEVELOPER_ERROR')) {
         errorMessage = 'Configuration error. Please check Google Console setup.';
         console.error('DEVELOPER_ERROR: Check SHA-1 fingerprint in Google Console');
