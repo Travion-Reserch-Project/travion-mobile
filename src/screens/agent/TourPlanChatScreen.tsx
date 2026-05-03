@@ -27,6 +27,7 @@ import LinearGradient from 'react-native-linear-gradient';
 import Markdown from 'react-native-markdown-display';
 import SelectionPrompt from '../../components/chat/SelectionPrompt';
 import TimelineItinerary from '../../components/chat/TimelineItinerary';
+import TourPlanMapView from '../../components/chat/TourPlanMapView';
 import { useInterruptResume } from '../../hooks/useInterruptResume';
 import { ApiError } from '../../services/api/client';
 import {
@@ -436,8 +437,10 @@ const MessageBubble: React.FC<{
   if (isPlan && message.planData) {
     return (
       <Animated.View style={[styles.planBubbleContainer, { opacity: fadeAnim }]}>
-        {/* Minimalist timeline itinerary */}
-        {message.planData.finalItinerary ? (
+        {/* Embedded map view with stops grouped by time-of-day */}
+        {message.planData.finalItinerary && message.planData.finalItinerary.stops?.length > 0 ? (
+          <TourPlanMapView finalItinerary={message.planData.finalItinerary} />
+        ) : message.planData.finalItinerary ? (
           <TimelineItinerary itinerary={message.planData.finalItinerary} />
         ) : (
           /* Fallback: show plan summary as markdown when finalItinerary is missing */
