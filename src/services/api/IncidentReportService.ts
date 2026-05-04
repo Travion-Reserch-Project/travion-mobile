@@ -46,8 +46,8 @@ export interface IncidentReportResponse {
   error?: string;
 }
 
-export interface IncidentReportsListResponse {
-  success: boolean;
+export interface IncidentReportsListResponse { // Response format for list endpoints with pagination
+  success: boolean; 
   data?: IncidentReport[];
   pagination?: {
     total: number;
@@ -69,9 +69,9 @@ export interface IncidentStatisticsResponse {
   error?: string;
 }
 
-export class IncidentReportService extends BaseApiService {
-  constructor() {
-    super('/incidents');
+export class IncidentReportService extends BaseApiService { // This service handles all API calls related to incident reporting and retrieval
+  constructor() { //Sets base URL: /api/v1/incidents
+    super('/incidents'); // So all calls become: /api/v1/incidents/report, /api/v1/incidents/nearby, etc.
   }
 
   /**
@@ -80,9 +80,9 @@ export class IncidentReportService extends BaseApiService {
    */
   async createReport(reportData: IncidentReportInput): Promise<IncidentReportResponse> {
     try {
-      const response = await this.unauthenticatedPost<IncidentReportResponse>(
-        '/report',
-        reportData,
+      const response = await this.unauthenticatedPost<IncidentReportResponse>( //
+        '/report', //Sends request to backend: POST /api/v1/incidents/report
+        reportData, //Request body contains all incident details (type, location, time, description, etc.)
       );
 
       if (response.success && response.data) {
@@ -107,9 +107,9 @@ export class IncidentReportService extends BaseApiService {
    */
   async getReportById(reportId: string): Promise<IncidentReportResponse> {
     try {
-      const response = await this.authenticatedGet<IncidentReportResponse>(`/${reportId}`);
+      const response = await this.authenticatedGet<IncidentReportResponse>(`/${reportId}`); //Sends request to backend: GET /api/v1/incidents/{reportId}
 
-      if (response.success && response.data) {
+      if (response.success && response.data) { // If report is found and response is successful, return the incident report data
         return response.data;
       }
 
@@ -131,7 +131,7 @@ export class IncidentReportService extends BaseApiService {
    */
   async getUserReports(limit = 10, skip = 0): Promise<IncidentReportsListResponse> {
     try {
-      const response = await this.authenticatedGet<IncidentReportsListResponse>(
+      const response = await this.authenticatedGet<IncidentReportsListResponse>( //Sends request to backend: GET /api/v1/incidents/user/reports?limit={limit}&skip={skip}
         `/user/reports?limit=${limit}&skip=${skip}`,
       );
 
@@ -159,10 +159,10 @@ export class IncidentReportService extends BaseApiService {
     latitude: number,
     longitude: number,
     radius = 5,
-    limit = 10,
+    limit = 10, // Default radius is 5 km, default limit is 10 reports
   ): Promise<IncidentReportsListResponse> {
     try {
-      const response = await this.authenticatedGet<IncidentReportsListResponse>(
+      const response = await this.authenticatedGet<IncidentReportsListResponse>( 
         `/nearby?latitude=${latitude}&longitude=${longitude}&radius=${radius}&limit=${limit}`,
       );
 

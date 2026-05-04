@@ -30,7 +30,8 @@ interface RiskCircle {
   description: string;
 }
 
-interface MapScreenProps {
+// MapScreen component displays a map with a single risk circle around the user's location, color-coded by risk level. It also shows a tooltip with incident types when the circle is tapped. The screen can be accessed from the SafetyScreen's "View Full Map" button, which passes the current alerts and selected alert as route params.
+interface MapScreenProps { //Route params from navigation
   route?: { params?: { alerts?: SafetyAlert[]; selectedAlert?: SafetyAlert } };
 }
 
@@ -69,9 +70,9 @@ const getRiskRadius = (level: string) => {
   }
 };
 
-const getHighestRiskLevel = (alertsList: SafetyAlert[]): 'high' | 'medium' | 'low' => {
-  if (alertsList.some(a => a.level === 'high')) return 'high';
-  if (alertsList.some(a => a.level === 'medium')) return 'medium';
+const getHighestRiskLevel = (alertsList: SafetyAlert[]): 'high' | 'medium' | 'low' => { //Determine the highest risk level from the list of alerts.
+  if (alertsList.some(a => a.level === 'high')) return 'high'; //If any alert is high risk → overall risk is high
+  if (alertsList.some(a => a.level === 'medium')) return 'medium'; //If any alert is medium risk (and none are high) → overall risk is medium
   return 'low';
 };
 
@@ -135,25 +136,25 @@ const sampleAlerts: SafetyAlert[] = [
   },
 ];
 
-export const MapScreen: React.FC<MapScreenProps> = ({ route }) => {
-  const navigation = useNavigation();
+export const MapScreen: React.FC<MapScreenProps> = ({ route }) => { // Get navigation object and route params
+  const navigation = useNavigation(); // Get navigation object for navigating back
   const alerts =
     route?.params?.alerts && route.params.alerts.length > 0 ? route.params.alerts : sampleAlerts;
   const selectedAlert = route?.params?.selectedAlert;
 
   const [userLocation, setUserLocation] = useState<LocationCoords | null>(null);
   const [locationName, setLocationName] = useState<string>('Current Location');
-  const [locationLoading, setLocationLoading] = useState(true);
-  const [mapRegion, setMapRegion] = useState(DEFAULT_REGION);
+  const [locationLoading, setLocationLoading] = useState(true); // Track loading state for location fetching
+  const [mapRegion, setMapRegion] = useState(DEFAULT_REGION); 
   const [showRiskCircle, setShowRiskCircle] = useState(false);
-  const mapRef = useRef<MapView>(null);
+  const mapRef = useRef<MapView>(null); // Reference to the MapView for programmatic control (e.g. zooming, centering)
 
   // Determine which risk level to display
   // If selectedAlert is provided, use its level; otherwise use the highest risk
   const displayRiskLevel = selectedAlert ? selectedAlert.level : getHighestRiskLevel(alerts);
 
   // Single risk circle at user location
-  const riskCircle: RiskCircle | null = userLocation
+  const riskCircle: RiskCircle | null = userLocation // If user location is available → show risk circle based on the determined risk level
     ? {
         id: 'user-location-risk',
         latitude: userLocation.latitude,
@@ -232,7 +233,7 @@ export const MapScreen: React.FC<MapScreenProps> = ({ route }) => {
         const degreesPerMeter = 0.00001;
         const delta = radius * degreesPerMeter * paddingFactor;
 
-        setMapRegion({
+        setMapRegion({ // Update map region to center on user location with zoom level based on risk radius
           latitude,
           longitude,
           latitudeDelta: delta,

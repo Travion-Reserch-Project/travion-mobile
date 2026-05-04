@@ -29,6 +29,7 @@ type Station = {
   phone?: string;
 };
 
+// Calculates distance between user and station (Distance in meters) using Haversine formula
 const haversine = (lat1: number, lon1: number, lat2: number, lon2: number) => {
   const toRad = (v: number) => (v * Math.PI) / 180;
   const R = 6371000;
@@ -41,33 +42,33 @@ const haversine = (lat1: number, lon1: number, lat2: number, lon2: number) => {
   return R * c;
 };
 
-const fetchNearbyStations = async (
+const fetchNearbyStations = async ( // Fetches nearby police stations within a given radius
   lat: number,
   lng: number,
   setStations: (stations: Station[]) => void,
   setError: (error: string | null) => void,
 ) => {
   try {
-    const radius = 8000;
-    const url = `https://maps.googleapis.com/maps/api/place/nearbysearch/json?location=${lat},${lng}&radius=${radius}&type=police&keyword=police%20station&key=${Config.GOOGLE_MAPS_API_KEY}`;
+    const radius = 8000; // Search within 8 km radius (Google Places API max is 50,000 meters, but we use a smaller radius for relevance)
+    const url = `https://maps.googleapis.com/maps/api/place/nearbysearch/json?location=${lat},${lng}&radius=${radius}&type=police&keyword=police%20station&key=${Config.GOOGLE_MAPS_API_KEY}`; // Google Places API endpoint for nearby search with type=police and keyword=police station to increase relevance
     const res = await fetch(url);
     const json = await res.json();
-    const results = json?.results || [];
-    const base: Station[] = results.map((r: any) => ({
-      id: r.place_id,
-      name: r.name,
+    const results = json?.results || []; // Extract results array from response, default to empty array if not present
+    const base: Station[] = results.map((r: any) => ({ //// Convert API response into station objects with distance
+      id: r.place_id, 
+      name: r.name, 
       lat: r.geometry?.location?.lat,
       lng: r.geometry?.location?.lng,
       distanceMeters: haversine(lat, lng, r.geometry?.location?.lat, r.geometry?.location?.lng),
     }));
     const top = base
-      .filter(s => Number.isFinite(s.distanceMeters))
-      .sort((a, b) => a.distanceMeters - b.distanceMeters)
-      .slice(0, 5);
+      .filter(s => Number.isFinite(s.distanceMeters)) // Filter out any stations with invalid distance calculations
+      .sort((a, b) => a.distanceMeters - b.distanceMeters) // Sort by nearest
+      .slice(0, 5); // Take top 5 closest stations
     const detailed = await Promise.all(
       top.map(async s => {
         try {
-          const detailsUrl = `https://maps.googleapis.com/maps/api/place/details/json?place_id=${s.id}&fields=formatted_phone_number&key=${Config.GOOGLE_MAPS_API_KEY}`;
+          const detailsUrl = `https://maps.googleapis.com/maps/api/place/details/json?place_id=${s.id}&fields=formatted_phone_number&key=${Config.GOOGLE_MAPS_API_KEY}`; // Fetch additional details like phone number for each station
           const dRes = await fetch(detailsUrl);
           const dJson = await dRes.json();
           return { ...s, phone: dJson?.result?.formatted_phone_number };
@@ -167,12 +168,12 @@ export const PoliceHelpScreen: React.FC = () => {
     };
   };
 
-  const animateToRegion = (region: Region) => {
+  const animateToRegion = (region: Region) => { //Smooth map movement
     mapRef.current?.animateToRegion(region, 200);
     setMapRegion(region);
   };
 
-  const handleZoom = (factor: number) => {
+  const handleZoom = (factor: number) => { //Changes map zoom level
     const region = getRegion();
     const next: Region = {
       ...region,
@@ -205,7 +206,7 @@ export const PoliceHelpScreen: React.FC = () => {
     }
   };
 
-  const handleCall = (phone?: string) => {
+  const handleCall = (phone?: string) => { //Opens phone dialer
     Linking.openURL(`tel:${phone}`);
   };
 

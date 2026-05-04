@@ -23,7 +23,7 @@ type AlertsScreenRouteParams = {
 type AlertsScreenRouteProp = RouteProp<{ params: AlertsScreenRouteParams }, 'params'>;
 
 /**
- * Calculate distance between two coordinates using Haversine formula
+ * Calculate distance between two coordinates (user and incident) using Haversine formula
  * Returns distance in meters
  */
 const calculateDistance = (lat1: number, lon1: number, lat2: number, lon2: number): number => {
@@ -48,10 +48,10 @@ const formatDistance = (meters: number): string => {
   if (meters < 10) {
     return 'Nearby';
   }
-  if (meters < 1000) {
+  if (meters < 1000) { // If distance is less than 1 km, show in meters
     return `${Math.round(meters)}m away`;
   }
-  return `${(meters / 1000).toFixed(1)}km away`;
+  return `${(meters / 1000).toFixed(1)}km away`; // If distance is 1 km or more, show in kilometers with one decimal place
 };
 
 /**

@@ -7,16 +7,18 @@ Geolocation.setRNConfiguration({
   locationProvider: 'android',
 });
 
+// Define types for location coordinates, options, and errors
 export interface LocationCoords {
   latitude: number;
   longitude: number;
-  accuracy?: number;
+  accuracy?: number; // Accuracy in meters
   altitude?: number | null;
   altitudeAccuracy?: number | null;
   heading?: number | null;
   speed?: number | null;
 }
 
+//Controls how GPS works
 export interface GeolocationOptions {
   timeout?: number; // milliseconds, default 15000
   maximumAge?: number; // milliseconds, default 10000
@@ -25,6 +27,7 @@ export interface GeolocationOptions {
   retryDelay?: number; // milliseconds, default 1000
 }
 
+//Detailed error type for geolocation failures, including code, message, and optional details
 export interface GeolocationError {
   code: number;
   message: string;
@@ -34,8 +37,8 @@ export interface GeolocationError {
 const DEFAULT_OPTIONS: Required<GeolocationOptions> = {
   timeout: 15000, // 15 seconds
   maximumAge: 0, // force fresh location by default
-  enableHighAccuracy: true,
-  retryAttempts: 2,
+  enableHighAccuracy: true, // try high accuracy GPS
+  retryAttempts: 2, // number of retry attempts if location fails
   retryDelay: 1000, // 1 second
 };
 
@@ -134,14 +137,14 @@ export const getCurrentPosition = async (
     const attemptMaximumAge = useHighAccuracy ? config.maximumAge : 0;
 
     try {
-      const position = await new Promise<LocationCoords>((resolve, reject) => {
+      const position = await new Promise<LocationCoords>((resolve, reject) => { // Wrap Geolocation.getCurrentPosition in a promise for easier async/await usage
         console.log(
           `[Geolocation] Attempt ${attempt + 1}/${config.retryAttempts + 1} (${
             useHighAccuracy ? 'high' : 'low'
           } accuracy)`,
         );
 
-        Geolocation.getCurrentPosition(
+        Geolocation.getCurrentPosition( // Call the geolocation API
           pos => {
             console.log('[Geolocation] Success:', {
               latitude: pos.coords.latitude,

@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import SafetyService, { SafetyAlert } from '@services/api/SafetyService';
 
-interface UseSafetyAlertsOptions {
+interface UseSafetyAlertsOptions { // input options for the hook, including location and contextual factors
   lat: number;
   lon: number;
   user_location?: string;
@@ -14,7 +14,7 @@ interface UseSafetyAlertsOptions {
   autoFetch?: boolean;
 }
 
-interface UseSafetyAlertsReturn {
+interface UseSafetyAlertsReturn { // output of the hook, including the list of alerts, loading state, error message, and a refetch function
   alerts: SafetyAlert[];
   loading: boolean;
   error: string | null;
@@ -26,6 +26,7 @@ export const useSafetyAlerts = (options: UseSafetyAlertsOptions): UseSafetyAlert
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
 
+  //This function calls backend API to fetch safety alerts based on the provided options (location and contextual factors)
   const fetchAlerts = useCallback(async () => {
     try {
       setLoading(true);
@@ -33,7 +34,7 @@ export const useSafetyAlerts = (options: UseSafetyAlertsOptions): UseSafetyAlert
 
       const fetchedAlerts = await SafetyService.getSafetyAlerts(options.lat, options.lon);
 
-      setAlerts(fetchedAlerts);
+      setAlerts(fetchedAlerts); //save alerts
     } catch (err: any) {
       console.error('Error fetching safety alerts:', err);
       setError(err.message || 'Failed to fetch safety alerts');
@@ -50,10 +51,11 @@ export const useSafetyAlerts = (options: UseSafetyAlertsOptions): UseSafetyAlert
         },
       ]);
     } finally {
-      setLoading(false);
+      setLoading(false); //stop loading
     }
   }, [options.lat, options.lon, options.user_location]);
 
+  // Automatically fetch alerts when location or contextual factors change (unless autoFetch is set to false)
   useEffect(() => {
     if (options.autoFetch !== false) {
       fetchAlerts();
@@ -68,6 +70,7 @@ export const useSafetyAlerts = (options: UseSafetyAlertsOptions): UseSafetyAlert
   };
 };
 
+//This hook calls backend API to gets safety predictions, stores alerts, handles loading & errors, and provides a refetch function. It automatically fetches when location changes.
 export const useQuickSafetyAlerts = (lat: number, lon: number): UseSafetyAlertsReturn => {
   const [alerts, setAlerts] = useState<SafetyAlert[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
@@ -78,7 +81,7 @@ export const useQuickSafetyAlerts = (lat: number, lon: number): UseSafetyAlertsR
       setLoading(true);
       setError(null);
 
-      const fetchedAlerts = await SafetyService.getSafetyPredictions(lat, lon);
+      const fetchedAlerts = await SafetyService.getSafetyPredictions(lat, lon); //calls backend API to fetch safety predictions (which includes alerts) based on lat/lon
       setAlerts(fetchedAlerts ?? []);
     } catch (err: any) {
       console.error('Error fetching quick safety alerts:', err);
@@ -99,6 +102,7 @@ export const useQuickSafetyAlerts = (lat: number, lon: number): UseSafetyAlertsR
     }
   }, [lat, lon]);
 
+  //Only runs when location is available
   useEffect(() => {
     if (lat && lon) {
       fetchAlerts();

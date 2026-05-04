@@ -16,7 +16,7 @@ import { getCurrentPosition, LocationCoords } from '@utils/geolocation';
 import Config from 'react-native-config';
 import SafetyService from '@services/api/SafetyService';
 
-export interface SafetyAlert {
+export interface SafetyAlert { // Defines the structure of a safety alert
   id: string;
   title: string;
   description: string;
@@ -33,7 +33,7 @@ export interface SafetyAlert {
     | 'Other';
 }
 
-interface SafetyAlertsProps {
+interface SafetyAlertsProps { // Functions passed from parent
   alerts?: SafetyAlert[];
   onViewFullMap?: () => void;
   onReportIncident?: () => void;
@@ -70,7 +70,7 @@ const DEFAULT_REGION = {
   longitudeDelta: 0.05,
 };
 
-export const SafetyAlerts: React.FC<SafetyAlertsProps> = ({
+export const SafetyAlerts: React.FC<SafetyAlertsProps> = ({ // Props from parent component, including optional list of alerts and callbacks for user interactions
   alerts: propsAlerts,
   onViewFullMap,
   onReportIncident,
@@ -79,20 +79,20 @@ export const SafetyAlerts: React.FC<SafetyAlertsProps> = ({
   onAlertSelected,
   onAlertsLoaded,
 }) => {
-  const [userLocation, setUserLocation] = useState<LocationCoords | null>(null);
+  const [userLocation, setUserLocation] = useState<LocationCoords | null>(null); //Stores user GPS location
   const [locationName, setLocationName] = useState<string>('Current Location');
-  const [locationLoading, setLocationLoading] = useState(true);
-  const [mapRegion, setMapRegion] = useState(DEFAULT_REGION);
-  const [selectedAlertIndex, setSelectedAlertIndex] = useState(0);
-  const [alerts, setAlerts] = useState<SafetyAlert[]>(propsAlerts || []);
-  const [fetchingAlerts, setFetchingAlerts] = useState(true);
+  const [locationLoading, setLocationLoading] = useState(true); //loading state for location fetching
+  const [mapRegion, setMapRegion] = useState(DEFAULT_REGION); //controls map zoom
+  const [selectedAlertIndex, setSelectedAlertIndex] = useState(0); //Tracks which alert is currently selected in the carousel (for highlighting on map and showing details)
+  const [alerts, setAlerts] = useState<SafetyAlert[]>(propsAlerts || []); //Stores the list of safety alerts to display, initialized from props or empty array
+  const [fetchingAlerts, setFetchingAlerts] = useState(true); //Tracks loading state for fetching safety alerts from backend
 
-  const { width } = useWindowDimensions();
+  const { width } = useWindowDimensions(); // Get screen width for responsive design of the alert cards and carousel. The card width and spacing will adjust based on the screen width to ensure a good user experience on different device sizes.
   // Account for horizontal padding (px-6 = 24 each side)
   // Reduce effective card width so next card peeks visibly
-  const carouselWidth = Math.max(width - 46, 260);
+  const carouselWidth = Math.max(width - 46, 260); // Minimum card width for carousel
   const cardHeight = 160;
-  const scrollRef = useRef<ScrollView | null>(null);
+  const scrollRef = useRef<ScrollView | null>(null); // Ref for the ScrollView to programmatically scroll when alert selection changes
 
   // Memoize filtered alerts to prevent infinite loop
   const filteredAlerts = useMemo(() => {
@@ -123,7 +123,7 @@ export const SafetyAlerts: React.FC<SafetyAlertsProps> = ({
     }
 
     if (hasAnyRisk) {
-      return sortedAlerts.filter(alert => alert.level !== 'low');
+      return sortedAlerts.filter(alert => alert.level !== 'low'); // Show only medium and high risk alerts if any exist
     }
 
     return sortedAlerts;
@@ -131,11 +131,11 @@ export const SafetyAlerts: React.FC<SafetyAlertsProps> = ({
 
   // Animation for pulsing dot - must be declared before any conditional logic
   const pulseAnim = useRef(new Animated.Value(0)).current;
-  const hasValidUserLocation =
-    !!userLocation &&
-    Number.isFinite(userLocation.latitude) &&
-    Number.isFinite(userLocation.longitude);
-  const shouldUseGoogleProvider =
+  const hasValidUserLocation = //
+    !!userLocation && // Check if latitude and longitude are valid numbers
+    Number.isFinite(userLocation.latitude) && 
+    Number.isFinite(userLocation.longitude); 
+  const shouldUseGoogleProvider = //Uses Google Maps only if API key exists and platform is Android (since iOS has native support for geocoding and maps without needing Google Maps API key)
     Platform.OS === 'android' &&
     !!Config.GOOGLE_MAPS_API_KEY &&
     Config.GOOGLE_MAPS_API_KEY !== 'YOUR_API_KEY';
@@ -145,16 +145,16 @@ export const SafetyAlerts: React.FC<SafetyAlertsProps> = ({
   const currentRiskLevel = selectedAlert.level;
 
   // Fetch safety predictions from backend
-  const fetchSafetyPredictions = useCallback(async (latitude: number, longitude: number) => {
+  const fetchSafetyPredictions = useCallback(async (latitude: number, longitude: number) => { // Fetches safety predictions from the backend API based on the provided latitude and longitude.
     try {
       setFetchingAlerts(true);
       console.log('Fetching safety predictions for:', latitude, longitude);
 
-      const prediction = await SafetyService.getSafetyPredictions(latitude, longitude);
+      const prediction = await SafetyService.getSafetyPredictions(latitude, longitude); // Calls the SafetyService to get safety predictions based on the user's current location. This function handles the API call and returns the predictions, which include the safety alerts and location information.
 
       if (prediction && prediction.alerts && prediction.alerts.length > 0) {
         console.log('Received alerts:', prediction.alerts);
-        setAlerts(prediction.alerts);
+        setAlerts(prediction.alerts); // update state with the received alerts from the backend API
 
         // Update location name from backend if available
         if (prediction.location && prediction.location.locationName) {
@@ -168,7 +168,7 @@ export const SafetyAlerts: React.FC<SafetyAlertsProps> = ({
       console.error('Error fetching safety predictions:', error);
       setAlerts(defaultAlerts);
     } finally {
-      setFetchingAlerts(false);
+      setFetchingAlerts(false); // Stop loading state after fetching is done, whether it succeeded or failed
     }
   }, []);
 
@@ -211,12 +211,13 @@ export const SafetyAlerts: React.FC<SafetyAlertsProps> = ({
   };
 
   // Refresh location and safety predictions
-  const handleRefresh = useCallback(async () => {
+  const handleRefresh = useCallback(async () => { // Wrapped in useCallback to avoid unnecessary re-creation
     try {
-      setLocationLoading(true);
-      setFetchingAlerts(true);
-      setSelectedAlertIndex(0);
+      setLocationLoading(true); //Show loading spinner
+      setFetchingAlerts(true); //Reset alerts loading state
+      setSelectedAlertIndex(0); //Reset carousel to first card
 
+      // Get user's current GPS location with retry support
       const position = await getCurrentPosition({
         timeout: 15000,
         enableHighAccuracy: true,
@@ -230,14 +231,14 @@ export const SafetyAlerts: React.FC<SafetyAlertsProps> = ({
       const zoomLevel = getMapZoomLevel(radius);
       setMapRegion({ latitude, longitude, ...zoomLevel });
 
-      await fetchSafetyPredictions(latitude, longitude);
+      await fetchSafetyPredictions(latitude, longitude); //Fetch new predictions based on refreshed location. This will update the alerts and location name based on the new coordinates. The function handles API calls and state updates internally.
 
       try {
-        const results = await RNGeocoding.from(latitude, longitude);
+        const results = await RNGeocoding.from(latitude, longitude); //Reverse geocode the new coordinates to get a human-readable location name.
         if (results && results.results && results.results.length > 0) {
-          const address = results.results[0];
+          const address = results.results[0]; 
           const locationString = address.formatted_address || 'Current Location';
-          const parts = locationString.split(',').map(p => p.trim());
+          const parts = locationString.split(',').map(p => p.trim()); // Extract location names, removing postal codes and state codes
           const locationParts = parts
             .map(p => p.replace(/\s*\d+\s*$/, '').trim())
             .filter(p => {
@@ -248,7 +249,7 @@ export const SafetyAlerts: React.FC<SafetyAlertsProps> = ({
             });
 
           let displayName = 'Current Location';
-          if (locationParts.length >= 2) {
+          if (locationParts.length >= 2) { // Show at least 2 location parts if available (e.g. "Galle, Sri Lanka")
             displayName = `${locationParts[0]}, ${locationParts[1]}`;
           } else if (locationParts.length === 1) {
             displayName = locationParts[0];
@@ -270,8 +271,8 @@ export const SafetyAlerts: React.FC<SafetyAlertsProps> = ({
 
   // Pulsing animation effect
   useEffect(() => {
-    const pulse = Animated.loop(
-      Animated.sequence([
+    const pulse = Animated.loop( // Creates infinite animation
+      Animated.sequence([ //fade in → fade out → repeat
         Animated.timing(pulseAnim, {
           toValue: 1,
           duration: 1000,
@@ -311,7 +312,7 @@ export const SafetyAlerts: React.FC<SafetyAlertsProps> = ({
         // Initialize geocoding with proper error handling
         if (Config.GOOGLE_MAPS_API_KEY && Config.GOOGLE_MAPS_API_KEY !== 'YOUR_API_KEY') {
           try {
-            RNGeocoding.init(Config.GOOGLE_MAPS_API_KEY as string);
+            RNGeocoding.init(Config.GOOGLE_MAPS_API_KEY as string); // Initialize geocoding with Google Maps API key for reverse geocoding. This allows us to convert the user's coordinates into a human-readable location name, which enhances the user experience by showing familiar place names instead of just coordinates.
           } catch (error) {
             console.warn('Failed to initialize RNGeocoding:', error);
           }
@@ -334,7 +335,7 @@ export const SafetyAlerts: React.FC<SafetyAlertsProps> = ({
         const radius = getRiskRadius(currentRiskLevel);
         const zoomLevel = getMapZoomLevel(radius);
 
-        setMapRegion({
+        setMapRegion({ //Update map
           latitude,
           longitude,
           ...zoomLevel,

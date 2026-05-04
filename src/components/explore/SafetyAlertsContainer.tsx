@@ -11,6 +11,7 @@ import { SafetyAlerts, SafetyAlert } from './SafetyAlerts';
 import { useQuickSafetyAlerts } from '../../hooks/useSafetyAlerts';
 import { getCurrentPosition } from '@utils/geolocation';
 
+//These are callbacks from parent component to handle user interactions with the safety alerts (e.g., viewing full map, reporting incidents, etc.)
 interface SafetyAlertsContainerProps {
   onViewFullMap?: () => void;
   onReportIncident?: () => void;
@@ -19,6 +20,7 @@ interface SafetyAlertsContainerProps {
   onAlertSelected?: (alert: SafetyAlert) => void;
 }
 
+//Functional component with props 
 export const SafetyAlertsContainer: React.FC<SafetyAlertsContainerProps> = ({
   onViewFullMap,
   onReportIncident,
@@ -26,17 +28,18 @@ export const SafetyAlertsContainer: React.FC<SafetyAlertsContainerProps> = ({
   onViewAlerts,
   onAlertSelected,
 }) => {
-  const [userLocation, setUserLocation] = useState<{ lat: number; lon: number } | null>(null);
-  const [locationError, setLocationError] = useState<string | null>(null);
-  const [fetchingLocation, setFetchingLocation] = useState(true);
+  const [userLocation, setUserLocation] = useState<{ lat: number; lon: number } | null>(null); //Stores user GPS location
+  const [locationError, setLocationError] = useState<string | null>(null); //Stores error if location fails
+  const [fetchingLocation, setFetchingLocation] = useState(true); //Tracks loading state for location fetching
 
   // Fetch safety alerts based on location
   const { alerts, loading, error } = useQuickSafetyAlerts(
-    userLocation?.lat || 0,
+    userLocation?.lat || 0, //If location is null → send 0 to trigger error handling in hook and show fallback alert
     userLocation?.lon || 0,
   );
 
-  const requestLocationPermission = useCallback(async () => {
+  //Request location permission and get current position
+  const requestLocationPermission = useCallback(async () => { //useCallback → prevents unnecessary re-creation of the function on every render, optimizing performance
     try {
       if (Platform.OS === 'android') {
         const granted = await PermissionsAndroid.request(
@@ -56,13 +59,13 @@ export const SafetyAlertsContainer: React.FC<SafetyAlertsContainerProps> = ({
         }
       }
 
-      const position = await getCurrentPosition({
+      const position = await getCurrentPosition({ //Get location
         timeout: 15000,
         enableHighAccuracy: false,
         retryAttempts: 1,
       });
       const { latitude, longitude } = position;
-      setUserLocation({ lat: latitude, lon: longitude });
+      setUserLocation({ lat: latitude, lon: longitude }); //Store location in state to trigger safety alert fetching
       setFetchingLocation(false);
     } catch (error) {
       console.error('Permission error:', error);
@@ -71,7 +74,7 @@ export const SafetyAlertsContainer: React.FC<SafetyAlertsContainerProps> = ({
     }
   }, []);
 
-  // Request location permissions and get current location
+  // Request location permissions and get current location (Runs when component loads)
   useEffect(() => {
     requestLocationPermission();
   }, [requestLocationPermission]);

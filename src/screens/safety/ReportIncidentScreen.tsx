@@ -29,6 +29,7 @@ import { NotificationService } from '@services/NotificationService';
 
 type NavigationProp = NativeStackNavigationProp<MainStackParamList>;
 
+//List of available incident types
 const INCIDENT_TYPES = [
   { id: '1', label: 'Pickpocketing', icon: 'wallet' },
   { id: '2', label: 'Bag Snatching', icon: 'bag' },
@@ -54,9 +55,9 @@ export const ReportIncidentScreen: React.FC = () => {
   const [incidentTime, setIncidentTime] = useState<Date>(new Date());
   const [description, setDescription] = useState<string>('');
   const [loading, setLoading] = useState(true);
-  const [submitting, setSubmitting] = useState(false);
+  const [submitting, setSubmitting] = useState(false); // New state to track submission status
   const [showTimeModal, setShowTimeModal] = useState(false);
-  const [showLocationModal, setShowLocationModal] = useState(false);
+  const [showLocationModal, setShowLocationModal] = useState(false); // New state to control location edit modal
   const [editingLocation, setEditingLocation] = useState<string>('');
   const [editingTime, setEditingTime] = useState<string>('');
   const [descriptionFocused, setDescriptionFocused] = useState(false);
@@ -147,6 +148,7 @@ export const ReportIncidentScreen: React.FC = () => {
     }
   };
 
+  // Format date into readable string for UI
   const formatDate = (date: Date) => {
     const options: Intl.DateTimeFormatOptions = {
       year: 'numeric',
@@ -168,6 +170,7 @@ export const ReportIncidentScreen: React.FC = () => {
     setEditingTime(incidentTime.toISOString().slice(0, 16));
   };
 
+  // Save edited location name
   const handleSaveLocation = () => {
     if (editingLocation.trim()) {
       setLocationName(editingLocation);
@@ -175,6 +178,7 @@ export const ReportIncidentScreen: React.FC = () => {
     setShowLocationModal(false);
   };
 
+  // Save edited time after validating format
   const handleSaveTime = () => {
     if (editingTime) {
       const newDate = new Date(editingTime);
@@ -185,6 +189,7 @@ export const ReportIncidentScreen: React.FC = () => {
     setShowTimeModal(false);
   };
 
+  // Handle photo selection from library
   const handlePickPhoto = () => {
     launchImageLibrary(
       {
@@ -224,7 +229,7 @@ export const ReportIncidentScreen: React.FC = () => {
     setSubmitting(true);
 
     try {
-      const incidentTypeLabel = INCIDENT_TYPES.find(t => t.id === selectedIncidentType)?.label;
+      const incidentTypeLabel = INCIDENT_TYPES.find(t => t.id === selectedIncidentType)?.label; // Get the label for the selected incident type
 
       if (!incidentTypeLabel) {
         throw new Error('Invalid incident type selected');
