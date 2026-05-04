@@ -1,5 +1,5 @@
 export { authService } from './api/AuthService';
-export { chatService } from './api/ChatService';
+export { chatService, tourGuideChatService } from './api/ChatService';
 export { SafetyService } from './api/SafetyService';
 export { apiClient } from './api/client';
 export { aiService } from './api/AIService';

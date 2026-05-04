@@ -17,6 +17,7 @@ export const MainAppScreen: React.FC<Props> = ({ route, navigation }) => {
   const userName = route.params?.userName;
   const userEmail = route.params?.userEmail;
   const [activeTab, setActiveTab] = useState<TabKey>('home');
+  const [mountedTabs, setMountedTabs] = useState<Set<TabKey>>(new Set(['home']));
   const [weatherSubScreen, setWeatherSubScreen] = useState<'main' | 'sunProtection' | 'safetyAdvisor'>('main');
   const [safetyAdvisorParams, setSafetyAdvisorParams] = useState<{ uvIndex?: number; riskLevel?: string }>({});
 
@@ -25,6 +26,12 @@ export const MainAppScreen: React.FC<Props> = ({ route, navigation }) => {
       setWeatherSubScreen('main');
     }
     setActiveTab(tab);
+    setMountedTabs(prev => {
+      if (prev.has(tab)) return prev;
+      const next = new Set(prev);
+      next.add(tab);
+      return next;
+    });
   }, []);
 
   // Dynamically update the native screen container background
@@ -38,63 +45,77 @@ export const MainAppScreen: React.FC<Props> = ({ route, navigation }) => {
     });
   }, [activeTab, navigation]);
 
-  const renderScreen = () => {
-    switch (activeTab) {
-      case 'home':
-        return (
-          <HomeScreen
-            userName={userName}
-            onAlertsPress={() => navigation.navigate('AlertsScreen')}
-            onProfilePress={() => navigation.navigate('ProfileScreen', { userName, userEmail })}
-          />
-        );
-      case 'transport':
-        return <TransportScreen navigation={navigation} />;
-      case 'guide':
-        return <TourGuideScreen navigation={navigation} />;
-      case 'safety':
-        return <SafetyScreen />;
-      case 'weather':
-        if (weatherSubScreen === 'safetyAdvisor') {
-          return (
-            <SafetyAdvisorScreen
-              onBack={() => setWeatherSubScreen('sunProtection')}
-              uvIndexProp={safetyAdvisorParams.uvIndex}
-              riskLevelProp={safetyAdvisorParams.riskLevel}
-            />
-          );
-        }
-        if (weatherSubScreen === 'sunProtection') {
-          return (
-            <SunProtectionScreen
-              onBack={() => setWeatherSubScreen('main')}
-              onNavigateToSafetyAdvisor={(params) => {
-                setSafetyAdvisorParams(params);
-                setWeatherSubScreen('safetyAdvisor');
-              }}
-            />
-          );
-        }
-        return (
-          <WeatherScreen
-            onNavigateToSunProtection={() => setWeatherSubScreen('sunProtection')}
-          />
-        );
-      default:
-        return (
-          <HomeScreen
-            userName={userName}
-            onAlertsPress={() => navigation.navigate('AlertsScreen')}
-            onProfilePress={() => navigation.navigate('ProfileScreen', { userName, userEmail })}
-          />
-        );
+  const renderWeatherContent = () => {
+    if (weatherSubScreen === 'safetyAdvisor') {
+      return (
+        <SafetyAdvisorScreen
+          onBack={() => setWeatherSubScreen('sunProtection')}
+          uvIndexProp={safetyAdvisorParams.uvIndex}
+          riskLevelProp={safetyAdvisorParams.riskLevel}
+        />
+      );
     }
+    if (weatherSubScreen === 'sunProtection') {
+      return (
+        <SunProtectionScreen
+          onBack={() => setWeatherSubScreen('main')}
+          onNavigateToSafetyAdvisor={(params) => {
+            setSafetyAdvisorParams(params);
+            setWeatherSubScreen('safetyAdvisor');
+          }}
+        />
+      );
+    }
+    return (
+      <WeatherScreen
+        onNavigateToSunProtection={() => setWeatherSubScreen('sunProtection')}
+      />
+    );
   };
 
   return (
     <View style={{ flex: 1, backgroundColor: activeTab === 'guide' ? '#F5840E' : '#FFFFFF' }}>
       <View className="flex-1">
-        {renderScreen()}
+        {/* Home — always mounted */}
+        <View style={{ flex: 1, display: activeTab === 'home' ? 'flex' : 'none' }}>
+          <HomeScreen
+            userName={userName}
+            onAlertsPress={() => navigation.navigate('AlertsScreen')}
+            onProfilePress={() => navigation.navigate('ProfileScreen', { userName, userEmail })}
+          />
+        </View>
+
+        {/* Transport — lazy mount, kept alive after first visit */}
+        {mountedTabs.has('transport') && (
+          <View style={{ flex: 1, display: activeTab === 'transport' ? 'flex' : 'none' }}>
+            <TransportScreen navigation={navigation} />
+          </View>
+        )}
+
+        {/* Guide — lazy mount, kept alive to prevent reload on every tab switch */}
+        {mountedTabs.has('guide') && (
+          <View style={{ flex: 1, display: activeTab === 'guide' ? 'flex' : 'none' }}>
+            <TourGuideScreen
+              navigation={navigation}
+              onChatbotPress={() => navigation.navigate('TourGuideChat')}
+            />
+          </View>
+        )}
+
+        {/* Safety — lazy mount, kept alive after first visit */}
+        {mountedTabs.has('safety') && (
+          <View style={{ flex: 1, display: activeTab === 'safety' ? 'flex' : 'none' }}>
+            <SafetyScreen />
+          </View>
+        )}
+
+        {/* Weather — lazy mount, kept alive after first visit */}
+        {mountedTabs.has('weather') && (
+          <View style={{ flex: 1, display: activeTab === 'weather' ? 'flex' : 'none' }}>
+            {renderWeatherContent()}
+          </View>
+        )}
+
         <BottomTabBar activeTab={activeTab} onTabPress={handleTabPress} />
       </View>
       <TravionBotButton />
