@@ -18,6 +18,7 @@ import { MainStackParamList } from '@navigation/MainNavigator';
 import { RouteProp, useNavigation, useRoute } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { launchCamera, launchImageLibrary, ImagePickerResponse } from 'react-native-image-picker';
+import { API_CONFIG } from '@constants';
 
 const { width } = Dimensions.get('window');
 type NavigationProp = NativeStackNavigationProp<MainStackParamList, 'SkinAnalysis'>;
@@ -96,10 +97,17 @@ const SkinAnalysisScreen: React.FC = () => {
         name: 'skin_image.jpg',
       } as any);
 
-      const API_URL =
-        Platform.OS === 'android'
-          ? 'https://traviongo.online/ml/weather/api/skin/fitzpatrick_predict'
-          : 'http://localhost:8002/api/skin/fitzpatrick_predict';
+      let API_URL: string;
+      if (__DEV__) {
+        // Development: use localhost on the host machine
+        API_URL =
+          Platform.OS === 'android'
+            ? 'http://10.0.2.2:8002/api/skin/fitzpatrick_predict'
+            : 'http://localhost:8002/api/skin/fitzpatrick_predict';
+      } else {
+        // Production: use the deployed ML service
+        API_URL = `${API_CONFIG.BASE_URL}${API_CONFIG.API_VERSION}/ml/weather/api/skin/fitzpatrick_predict`;
+      }
 
       const response = await fetch(API_URL, { method: 'POST', body: formData });
       if (!response.ok) throw new Error('Failed to analyze skin');
